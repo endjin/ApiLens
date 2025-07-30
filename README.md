@@ -20,7 +20,7 @@ ApiLens is a .NET 9 CLI application that indexes and queries .NET XML API docume
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/apilens.git
+git clone https://github.com/endjin/ApiLens.git
 cd apilens
 
 # Build the application
