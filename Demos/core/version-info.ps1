@@ -40,7 +40,8 @@ dotnet restore $tempProj --verbosity quiet
 Remove-Item $tempProj
 
 # Demo paths
-$indexPath = "/.tmp/indexes/demo-index"
+$tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+$indexPath = Join-Path $tmpBase "indexes/demo-index"
 $nugetCache = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { "$HOME/.nuget/packages" }
 
 # Clean previous demo

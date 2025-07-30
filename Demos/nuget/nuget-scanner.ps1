@@ -30,7 +30,8 @@ $nugetCache = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { "$HOME/.nu
 Write-Host "NuGet Cache: $nugetCache" -ForegroundColor Cyan
 
 # Create demo index
-$indexPath = "/.tmp/indexes/scanner-demo-index"
+$tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+$indexPath = Join-Path $tmpBase "indexes/scanner-demo-index"
 if (Test-Path $indexPath) { Remove-Item $indexPath -Recurse -Force }
 
 # Demo 1: List available packages

@@ -9,8 +9,14 @@
 #>
 
 param(
-    [string]$IndexPath = "/.tmp/indexes/mcp-demo-index"
+    [string]$IndexPath = ""
 )
+
+# Set default index path if not provided
+if (-not $IndexPath) {
+    $tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+    $IndexPath = Join-Path $tmpBase "indexes/mcp-demo-index"
+}
 
 Write-Host "`n🤖 ApiLens MCP Integration Demo" -ForegroundColor Cyan
 Write-Host "===============================" -ForegroundColor Cyan
@@ -27,7 +33,8 @@ if ($IsWindows) { $apilens += ".exe" }
 
 # Create a realistic API documentation set
 Write-Host "`n📚 Creating sample API documentation..." -ForegroundColor Yellow
-$docsDir = "/.tmp/docs/mcp-demo-docs"
+$tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+$docsDir = Join-Path $tmpBase "docs/mcp-demo-docs"
 New-Item -ItemType Directory -Path $docsDir -Force | Out-Null
 
 # E-commerce API documentation

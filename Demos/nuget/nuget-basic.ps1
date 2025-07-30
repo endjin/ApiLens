@@ -39,7 +39,8 @@ Write-Host "  ✅ Can index multiple packages at once" -ForegroundColor Green
 Write-Host "`n📦 Let's try it:" -ForegroundColor Cyan
 
 # Clean index
-$indexPath = "/.tmp/indexes/demo-nuget-index"
+$tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+$indexPath = Join-Path $tmpBase "indexes/demo-nuget-index"
 if (Test-Path $indexPath) { Remove-Item $indexPath -Recurse -Force }
 
 # Index Newtonsoft packages

@@ -37,14 +37,16 @@ Write-Host "$ apilens nuget --list --filter `"newtonsoft.*`"" -ForegroundColor Y
 & $apilens nuget --list --filter "newtonsoft.*"
 
 # Demo 3: Index all packages (clean index)
+$tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+$indexPath = Join-Path $tmpBase "indexes/nuget-demo-index"
 Write-Host "`n3️⃣ Index all NuGet packages:" -ForegroundColor Green
-Write-Host "$ apilens nuget --clean --index /.tmp/indexes/nuget-demo-index" -ForegroundColor Yellow
-& $apilens nuget --clean --index /.tmp/indexes/nuget-demo-index
+Write-Host "$ apilens nuget --clean --index $indexPath" -ForegroundColor Yellow
+& $apilens nuget --clean --index $indexPath
 
 # Demo 4: Query the indexed packages
 Write-Host "`n4️⃣ Query indexed packages:" -ForegroundColor Green
-Write-Host "$ apilens query JsonSerializer --index /.tmp/indexes/nuget-demo-index" -ForegroundColor Yellow
-& $apilens query JsonSerializer --index /.tmp/indexes/nuget-demo-index --max 5
+Write-Host "$ apilens query JsonSerializer --index $indexPath" -ForegroundColor Yellow
+& $apilens query JsonSerializer --index $indexPath --max 5
 
 # Demo 5: Index only latest versions
 Write-Host "`n5️⃣ Index only latest versions:" -ForegroundColor Green
@@ -54,7 +56,7 @@ Write-Host "$ apilens nuget --clean --latest --index ./nuget-latest-index" -Fore
 # Compare statistics
 Write-Host "`n6️⃣ Compare index sizes:" -ForegroundColor Green
 Write-Host "`nAll versions index:" -ForegroundColor Yellow
-& $apilens stats --index /.tmp/indexes/nuget-demo-index --format json | ConvertFrom-Json | Select-Object documentCount, totalSizeInBytes
+& $apilens stats --index $indexPath --format json | ConvertFrom-Json | Select-Object documentCount, totalSizeInBytes
 
 Write-Host "`nLatest versions only:" -ForegroundColor Yellow
 & $apilens stats --index ./nuget-latest-index --format json | ConvertFrom-Json | Select-Object documentCount, totalSizeInBytes
@@ -66,7 +68,7 @@ Write-Host "$ apilens nuget --clean --filter `"microsoft.*`" --latest --index ./
 
 # Cleanup
 Write-Host "`n🧹 Cleaning up demo indexes..." -ForegroundColor Yellow
-Remove-Item /.tmp/indexes/nuget-demo-index -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item $indexPath -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item ./nuget-latest-index -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item ./ms-index -Recurse -Force -ErrorAction SilentlyContinue
 

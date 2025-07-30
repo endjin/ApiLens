@@ -30,8 +30,9 @@ if (-not (Test-Path "./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens*")) {
 
 # Create demo data
 Write-Host "`n📄 Creating sample XML documentation..." -ForegroundColor Yellow
-$demoDir = "/.tmp/docs/quick-demo"
-$indexDir = "/.tmp/indexes/quick-demo-index"
+$tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+$demoDir = Join-Path $tmpBase "docs/quick-demo"
+$indexDir = Join-Path $tmpBase "indexes/quick-demo-index"
 New-Item -ItemType Directory -Path $demoDir -Force | Out-Null
 
 @'

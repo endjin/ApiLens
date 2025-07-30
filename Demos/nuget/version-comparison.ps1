@@ -13,8 +13,14 @@
 
 param(
     [string]$Package = "newtonsoft.json",
-    [string]$IndexPath = "/.tmp/indexes/version-demo-index"
+    [string]$IndexPath = ""
 )
+
+# Set default index path if not provided
+if (-not $IndexPath) {
+    $tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+    $IndexPath = Join-Path $tmpBase "indexes/version-demo-index"
+}
 
 $ErrorActionPreference = "Stop"
 

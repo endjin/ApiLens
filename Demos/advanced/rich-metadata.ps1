@@ -9,8 +9,14 @@
 #>
 
 param(
-    [string]$IndexPath = "/.tmp/indexes/rich-metadata-index"
+    [string]$IndexPath = ""
 )
+
+# Set default index path if not provided
+if (-not $IndexPath) {
+    $tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+    $IndexPath = Join-Path $tmpBase "indexes/rich-metadata-index"
+}
 
 Write-Host "`n🔍 ApiLens Rich Metadata Demo" -ForegroundColor Cyan
 Write-Host "=============================" -ForegroundColor Cyan
@@ -32,7 +38,8 @@ if (Test-Path $IndexPath) {
 
 # Create sample documentation with rich metadata
 Write-Host "📚 Creating sample XML documentation with rich metadata..." -ForegroundColor Yellow
-$docsDir = "/.tmp/docs/rich-metadata-docs"
+$tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+$docsDir = Join-Path $tmpBase "docs/rich-metadata-docs"
 New-Item -ItemType Directory -Path $docsDir -Force | Out-Null
 
 # Sample 1: Documentation with code examples

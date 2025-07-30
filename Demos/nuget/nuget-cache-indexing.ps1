@@ -15,9 +15,15 @@
 #>
 
 param(
-    [string]$IndexPath = "/.tmp/indexes/nuget-index",
+    [string]$IndexPath = "",
     [switch]$SkipBuild
 )
+
+# Set default index path if not provided
+if (-not $IndexPath) {
+    $tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+    $IndexPath = Join-Path $tmpBase "indexes/nuget-index"
+}
 
 $ErrorActionPreference = "Stop"
 

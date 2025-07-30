@@ -57,7 +57,9 @@ function Write-Example {
 function Invoke-ApiLens {
     param([string[]]$ArgumentList)
     
-    $apiLensPath = Join-Path $WorkingDirectory "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+    # Get the repo root (two levels up from script location)
+    $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    $apiLensPath = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
     if ($IsWindows) {
         $apiLensPath += ".exe"
     }
@@ -84,7 +86,9 @@ try {
         Write-Section "Building ApiLens"
         Write-Host "Building the application in Release mode..." -ForegroundColor $colors.Info
         
-        dotnet build ./Solutions/ApiLens.Cli/ApiLens.Cli.csproj --verbosity minimal
+        $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        $csprojPath = Join-Path $repoRoot "Solutions/ApiLens.Cli/ApiLens.Cli.csproj"
+        dotnet build $csprojPath --verbosity minimal
         if ($LASTEXITCODE -ne 0) {
             throw "Build failed"
         }
@@ -93,8 +97,9 @@ try {
 
     # Step 2: Prepare sample data
     Write-Section "Preparing Sample Data"
-    $dataDir = Join-Path $WorkingDirectory "data"
-    $indexDir = Join-Path $WorkingDirectory "/.tmp/indexes/demo-index"
+    $tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+    $dataDir = Join-Path $tmpBase "data"
+    $indexDir = Join-Path $tmpBase "indexes/demo-index"
     
     if (-not (Test-Path $dataDir)) {
         New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
@@ -452,7 +457,7 @@ try {
     Write-Header "Indexing XML Documentation"
     
     Write-Section "Clean Index and Index All Files"
-    Write-Example "apilens index ./data --clean --index /.tmp/indexes/demo-index" "Clean previous index and index all XML files"
+    Write-Example "apilens index $dataDir --clean --index $indexDir" "Clean previous index and index all XML files"
     Invoke-ApiLens @("index", $dataDir, "--clean", "--index", $indexDir)
     
     Write-Host "`nIndexing completed!" -ForegroundColor $colors.Success

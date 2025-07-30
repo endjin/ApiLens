@@ -33,7 +33,7 @@ $demoCategories = @{
         @{Name = "nuget-command.ps1"; Description = "Full NuGet command features"; Timeout = $true},
         @{Name = "nuget-cache-indexing.ps1"; Description = "NuGet cache indexing demonstration"},
         @{Name = "nuget-scanner.ps1"; Description = "NuGet cache scanner functionality"},
-        @{Name = "version-comparison.ps1"; Description = "Version comparison features"; Args = @("-Package", "newtonsoft.json")}
+        @{Name = "version-comparison.ps1"; Description = "Version comparison features"; Args = @("newtonsoft.json")}
     )
     advanced = @(
         @{Name = "rich-metadata.ps1"; Description = "Rich metadata extraction demo"},

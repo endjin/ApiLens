@@ -8,8 +8,14 @@
 #>
 
 param(
-    [string]$IndexPath = "/.tmp/indexes/specialized-query-index"
+    [string]$IndexPath = ""
 )
+
+# Set default index path if not provided
+if (-not $IndexPath) {
+    $tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+    $IndexPath = Join-Path $tmpBase "indexes/specialized-query-index"
+}
 
 Write-Host "`n🔍 ApiLens Specialized Queries Demo" -ForegroundColor Cyan
 Write-Host "===================================" -ForegroundColor Cyan
@@ -31,7 +37,8 @@ if (Test-Path $IndexPath) {
 
 # Use the rich metadata documentation from previous demo
 Write-Host "📚 Using rich metadata documentation..." -ForegroundColor Yellow
-$docsDir = "/.tmp/docs/rich-metadata-docs"
+$tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
+$docsDir = Join-Path $tmpBase "docs/rich-metadata-docs"
 
 if (-not (Test-Path $docsDir)) {
     Write-Host "Creating sample documentation..." -ForegroundColor Yellow
