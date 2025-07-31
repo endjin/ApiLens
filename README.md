@@ -95,7 +95,7 @@ apilens nuget --filter "newtonsoft.*"
 
 Index only latest versions:
 ```bash
-apilens nuget --latest
+apilens nuget --latest-only
 ```
 
 Index all packages with documentation:
