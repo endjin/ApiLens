@@ -72,22 +72,40 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 return 0;
             }
 
-            AnsiConsole.MarkupLine($"[green]Found {packages.Count} package(s) with XML documentation.[/]");
+            AnsiConsole.MarkupLine($"[green]Found {packages.Count} NuGet package(s) with XML documentation.[/]");
 
             // Apply version filter if specified
             if (!string.IsNullOrWhiteSpace(settings.VersionFilter))
             {
-                Regex versionRegex = new(settings.VersionFilter, RegexOptions.IgnoreCase);
-                packages = packages.Where(p => versionRegex.IsMatch(p.Version)).ToList();
+                await AnsiConsole.Status()
+                    .StartAsync("Applying version filter...", async ctx =>
+                    {
+                        ctx.Spinner(Spinner.Known.Star);
+                        ctx.SpinnerStyle(Style.Parse("yellow"));
+                        
+                        await Task.Run(() =>
+                        {
+                            Regex versionRegex = new(settings.VersionFilter, RegexOptions.IgnoreCase);
+                            packages = packages.Where(p => versionRegex.IsMatch(p.Version)).ToList();
+                        });
+                    });
                 AnsiConsole.MarkupLine($"[green]After version filter: {packages.Count} package(s).[/]");
             }
 
             // Apply latest-only filter if specified
             if (settings.LatestOnly)
             {
-                ImmutableArray<NuGetPackageInfo> latestPackages = scanner.GetLatestVersions([.. packages]);
-                packages = latestPackages.ToList();
-                AnsiConsole.MarkupLine($"[green]After latest-only filter: {packages.Count} package(s).[/]");
+                await AnsiConsole.Status()
+                    .StartAsync("Filtering to latest versions only...", async ctx =>
+                    {
+                        ctx.Spinner(Spinner.Known.Star);
+                        ctx.SpinnerStyle(Style.Parse("yellow"));
+                        
+                        ImmutableArray<NuGetPackageInfo> latestPackages = await Task.Run(() => 
+                            scanner.GetLatestVersions([.. packages]));
+                        packages = latestPackages.ToList();
+                    });
+                AnsiConsole.MarkupLine($"[green]After latest-only filter: {packages.Count} package(s) to process.[/]");
             }
 
             if (settings.List)
@@ -99,16 +117,116 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             // Create index manager
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
 
+            List<NuGetPackageInfo> packagesToIndex;
+            HashSet<string> packageIdsToDelete = [];
+            
             if (settings.Clean)
             {
                 AnsiConsole.MarkupLine("[yellow]Cleaning index...[/]");
                 indexManager.DeleteAll();
                 await indexManager.CommitAsync();
+                packagesToIndex = packages;
+            }
+            else
+            {
+                // Get existing packages from index for change detection
+                Dictionary<string, HashSet<string>> indexedPackages = new();
+                
+                await AnsiConsole.Status()
+                    .StartAsync("Analyzing index for change detection...", async ctx =>
+                    {
+                        ctx.Spinner(Spinner.Known.Star);
+                        ctx.SpinnerStyle(Style.Parse("yellow"));
+                        
+                        indexedPackages = await Task.Run(() => indexManager.GetIndexedPackageVersions());
+                    });
+                
+                // Determine which packages need indexing
+                packagesToIndex = [];
+                int skippedPackages = 0;
+                
+                foreach (NuGetPackageInfo package in packages)
+                {
+                    bool shouldIndex = false;
+                    
+                    if (!indexedPackages.TryGetValue(package.PackageId, out HashSet<string>? indexedVersions))
+                    {
+                        // Package not in index at all
+                        shouldIndex = true;
+                    }
+                    else if (!indexedVersions.Contains(package.Version))
+                    {
+                        // This version not in index
+                        shouldIndex = true;
+                        
+                        if (settings.LatestOnly)
+                        {
+                            // Mark all versions of this package for deletion
+                            // since we're indexing a new version
+                            packageIdsToDelete.Add(package.PackageId);
+                        }
+                    }
+                    else
+                    {
+                        // Package+version already in index
+                        skippedPackages++;
+                    }
+                    
+                    if (shouldIndex)
+                    {
+                        packagesToIndex.Add(package);
+                    }
+                }
+                
+                // Report what we're doing
+                int totalInIndex = indexedPackages.Sum(kvp => kvp.Value.Count);
+                AnsiConsole.MarkupLine($"[dim]Index contains {totalInIndex:N0} package versions across {indexedPackages.Count:N0} packages.[/]");
+                
+                if (skippedPackages > 0)
+                {
+                    AnsiConsole.MarkupLine($"[green]Skipping {skippedPackages:N0} package(s) already up-to-date in index.[/]");
+                }
+                
+                if (packagesToIndex.Count == 0)
+                {
+                    AnsiConsole.MarkupLine("[yellow]All packages are already up-to-date. Nothing to index.[/]");
+                    return 0;
+                }
+                
+                AnsiConsole.MarkupLine($"[green]Found {packagesToIndex.Count:N0} package(s) to index (new or updated).[/]");
+                
+                // Clean up old versions if needed
+                if (packageIdsToDelete.Count > 0)
+                {
+                    int documentsBeforeCleanup = indexManager.GetTotalDocuments();
+                    
+                    await AnsiConsole.Status()
+                        .StartAsync($"Removing old versions from {packageIdsToDelete.Count:N0} package(s)...", async ctx =>
+                        {
+                            ctx.Spinner(Spinner.Known.Star);
+                            ctx.SpinnerStyle(Style.Parse("yellow"));
+                            
+                            await Task.Run(() =>
+                            {
+                                indexManager.DeleteDocumentsByPackageIds(packageIdsToDelete);
+                            });
+                            await indexManager.CommitAsync();
+                        });
+                    
+                    int documentsAfterCleanup = indexManager.GetTotalDocuments();
+                    int documentsRemoved = documentsBeforeCleanup - documentsAfterCleanup;
+                    
+                    if (documentsRemoved > 0)
+                    {
+                        AnsiConsole.MarkupLine($"[green]Removed {documentsRemoved:N0} API members from old versions.[/]");
+                    }
+                }
             }
 
             // Index packages
+            IndexingResult result = null!;
             await AnsiConsole.Progress()
-                .AutoClear(false)
+                .AutoClear(true)
                 .Columns(
                     new TaskDescriptionColumn(),
                     new ProgressBarColumn(),
@@ -117,23 +235,24 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     new SpinnerColumn())
                 .StartAsync(async ctx =>
                 {
-                    ProgressTask task = ctx.AddTask("[green]Indexing NuGet packages[/]", maxValue: packages.Count);
+                    ProgressTask task = ctx.AddTask("[green]Indexing NuGet packages[/]", maxValue: packagesToIndex.Count);
 
                     // Get all XML files from packages
-                    List<string> xmlFiles = packages.Select(p => p.XmlDocumentationPath).ToList();
+                    List<string> xmlFiles = packagesToIndex.Select(p => p.XmlDocumentationPath).ToList();
 
                     // Index all files using high-performance batch operations
                     Stopwatch stopwatch = Stopwatch.StartNew();
-                    IndexingResult result = await indexManager.IndexXmlFilesAsync(xmlFiles);
+                    result = await indexManager.IndexXmlFilesAsync(
+                        xmlFiles, 
+                        filesProcessed => task.Value = filesProcessed);
                     stopwatch.Stop();
 
-                    task.Value = packages.Count;
                     task.StopTask();
-
-                    // Display results
-                    AnsiConsole.WriteLine();
-                    DisplayResults(result, indexManager, settings.IndexPath);
                 });
+
+            // Display results after progress context
+            AnsiConsole.WriteLine();
+            DisplayResults(result, indexManager, settings.IndexPath);
 
             return 0;
         }
@@ -197,10 +316,10 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
         table.AddColumn("[bold]Value[/]", c => c.RightAligned());
 
         // Basic stats
-        table.AddRow("Documents Indexed", result.SuccessfulDocuments.ToString("N0"));
-        table.AddRow("Failed Documents", result.FailedDocuments.ToString("N0"));
+        table.AddRow("API Members Processed", result.SuccessfulDocuments.ToString("N0"));
+        table.AddRow("Failed Members", result.FailedDocuments.ToString("N0"));
         table.AddRow("Total Time", FormatDuration(result.ElapsedTime));
-        table.AddRow("Documents/Second", result.DocumentsPerSecond.ToString("N2"));
+        table.AddRow("Members/Second", result.DocumentsPerSecond.ToString("N2"));
         table.AddRow("Throughput", $"{result.MegabytesPerSecond:N2} MB/s");
         table.AddRow("Data Processed", FormatSize(result.BytesProcessed));
 
@@ -221,9 +340,17 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
         {
             table.AddEmptyRow();
             table.AddRow("[dim]Index Statistics[/]", "");
-            table.AddRow("Total Documents", stats.DocumentCount.ToString("N0"));
+            table.AddRow("Total API Members", stats.DocumentCount.ToString("N0"));
             table.AddRow("Index Size", FormatSize(stats.TotalSizeInBytes));
             table.AddRow("Index Location", stats.IndexPath);
+            
+            // Show deduplication info if significant difference
+            if (result.SuccessfulDocuments > stats.DocumentCount)
+            {
+                int deduplicated = result.SuccessfulDocuments - stats.DocumentCount;
+                double dedupePercent = (deduplicated / (double)result.SuccessfulDocuments) * 100;
+                table.AddRow("[dim]Duplicate Members Skipped[/]", $"{deduplicated:N0} ({dedupePercent:N1}%)");
+            }
         }
 
         AnsiConsole.Write(table);
@@ -273,7 +400,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
     {
         [Description("Path to the Lucene index directory")]
         [CommandOption("-i|--index")]
-        public string IndexPath { get; init; } = "./nuget-index";
+        public string IndexPath { get; init; } = "./index";
 
         [Description("Clean the index before adding new documents")]
         [CommandOption("-c|--clean")]

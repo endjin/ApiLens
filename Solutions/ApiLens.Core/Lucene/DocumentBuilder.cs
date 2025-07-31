@@ -167,20 +167,32 @@ public class DocumentBuilder : IDocumentBuilder
         }
 
         // Add version tracking fields
-        doc.Add(new StringField("packageId", memberInfo.PackageId ?? "", Field.Store.YES));
-        doc.Add(new StringField("packageVersion", memberInfo.PackageVersion ?? "", Field.Store.YES));
-        doc.Add(new StringField("targetFramework", memberInfo.TargetFramework ?? "", Field.Store.YES));
+        if (!string.IsNullOrWhiteSpace(memberInfo.PackageId))
+        {
+            doc.Add(new StringField("packageId", memberInfo.PackageId, Field.Store.YES));
+        }
+        
+        if (!string.IsNullOrWhiteSpace(memberInfo.PackageVersion))
+        {
+            doc.Add(new StringField("packageVersion", memberInfo.PackageVersion, Field.Store.YES));
+        }
+        
+        if (!string.IsNullOrWhiteSpace(memberInfo.TargetFramework))
+        {
+            doc.Add(new StringField("targetFramework", memberInfo.TargetFramework, Field.Store.YES));
+        }
+        
         doc.Add(new StringField("isFromNuGetCache", memberInfo.IsFromNuGetCache.ToString().ToLowerInvariant(), Field.Store.YES));
-        doc.Add(new StringField("sourceFilePath", memberInfo.SourceFilePath ?? "", Field.Store.YES));
+        
+        if (!string.IsNullOrWhiteSpace(memberInfo.SourceFilePath))
+        {
+            doc.Add(new StringField("sourceFilePath", memberInfo.SourceFilePath, Field.Store.YES));
+        }
 
         // Add searchable version field
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageVersion))
         {
             doc.Add(new TextField("versionSearch", memberInfo.PackageVersion, Field.Store.YES));
-        }
-        else
-        {
-            doc.Add(new TextField("versionSearch", "", Field.Store.YES));
         }
 
         // Add content hash for deduplication (not stored)

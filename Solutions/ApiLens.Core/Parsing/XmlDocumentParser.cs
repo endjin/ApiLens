@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
+using ApiLens.Core.Helpers;
 using ApiLens.Core.Infrastructure;
 using ApiLens.Core.Models;
 
@@ -33,6 +34,9 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
     {
         ArgumentNullException.ThrowIfNull(filePath);
 
+        // Extract NuGet package information from the file path if available
+        var nugetInfo = NuGetHelper.ExtractNuGetInfo(filePath);
+
         XmlReaderSettings settings = new()
         {
             Async = true,
@@ -58,7 +62,7 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
                 }
                 else if (reader.Name == memberElementName && reader.Depth == 2)
                 {
-                    MemberInfo? member = await ParseMemberAsync(reader, assemblyName ?? "Unknown");
+                    MemberInfo? member = await ParseMemberAsync(reader, assemblyName ?? "Unknown", filePath, nugetInfo);
                     if (member != null)
                     {
                         yield return member;
@@ -131,7 +135,11 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
         return null;
     }
 
-    private async Task<MemberInfo?> ParseMemberAsync(XmlReader reader, string assemblyName)
+    private async Task<MemberInfo?> ParseMemberAsync(
+        XmlReader reader, 
+        string assemblyName,
+        string filePath,
+        (string PackageId, string Version, string Framework)? nugetInfo)
     {
         string? nameAttribute = reader.GetAttribute(nameAttributeName);
         if (string.IsNullOrEmpty(nameAttribute))
@@ -209,7 +217,13 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
                 Parameters = [.. parameters],
                 Exceptions = [.. exceptions],
                 CodeExamples = [.. examples],
-                IndexedAt = DateTime.UtcNow
+                IndexedAt = DateTime.UtcNow,
+                // Set NuGet package information if available
+                PackageId = nugetInfo?.PackageId,
+                PackageVersion = nugetInfo?.Version,
+                TargetFramework = nugetInfo?.Framework,
+                IsFromNuGetCache = nugetInfo.HasValue,
+                SourceFilePath = filePath
             };
         }
         finally
@@ -480,7 +494,14 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
             Parameters = [.. parameters],
             Exceptions = [.. exceptions],
             CodeExamples = [.. examples],
-            Complexity = complexity
+            Complexity = complexity,
+            // Note: NuGet package info cannot be determined here without file path
+            PackageId = null,
+            PackageVersion = null,
+            TargetFramework = null,
+            IsFromNuGetCache = false,
+            SourceFilePath = null,
+            IndexedAt = DateTime.UtcNow
         };
     }
 

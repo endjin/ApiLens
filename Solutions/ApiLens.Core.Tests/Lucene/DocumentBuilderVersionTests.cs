@@ -46,7 +46,7 @@ public class DocumentBuilderVersionTests
     }
 
     [TestMethod]
-    public void BuildDocument_WithoutVersionFields_StoresEmptyStrings()
+    public void BuildDocument_WithoutVersionFields_DoesNotAddFields()
     {
         // Arrange
         MemberInfo member = new()
@@ -62,12 +62,12 @@ public class DocumentBuilderVersionTests
         // Act
         Document doc = builder.BuildDocument(member);
 
-        // Assert - empty strings for missing nullable fields
-        doc.Get("packageId").ShouldBe("");
-        doc.Get("packageVersion").ShouldBe("");
-        doc.Get("targetFramework").ShouldBe("");
+        // Assert - fields should not exist when not provided
+        doc.Get("packageId").ShouldBeNull();
+        doc.Get("packageVersion").ShouldBeNull();
+        doc.Get("targetFramework").ShouldBeNull();
         doc.Get("isFromNuGetCache").ShouldBe("false");
-        doc.Get("sourceFilePath").ShouldBe("");
+        doc.Get("sourceFilePath").ShouldBeNull();
     }
 
     [TestMethod]

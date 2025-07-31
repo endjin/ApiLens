@@ -163,7 +163,11 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
 
                     if (batch.Count >= BatchSize)
                     {
-                        writer.AddDocuments(batch);
+                        foreach (Document batchDoc in batch)
+                        {
+                            Term idTerm = new("id", batchDoc.Get("id"));
+                            writer.UpdateDocument(idTerm, batchDoc);
+                        }
                         writer.Commit();
                         batch.Clear();
                         performanceTracker.RecordBatchCommit(BatchSize);
@@ -181,7 +185,11 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             // Commit remaining documents
             if (batch.Count > 0)
             {
-                writer.AddDocuments(batch);
+                foreach (Document batchDoc in batch)
+                {
+                    Term idTerm = new("id", batchDoc.Get("id"));
+                    writer.UpdateDocument(idTerm, batchDoc);
+                }
                 writer.Commit();
                 performanceTracker.RecordBatchCommit(batch.Count);
             }
@@ -219,6 +227,14 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         IEnumerable<string> filePaths,
         CancellationToken cancellationToken = default)
     {
+        return await IndexXmlFilesAsync(filePaths, null, cancellationToken);
+    }
+
+    public async Task<IndexingResult> IndexXmlFilesAsync(
+        IEnumerable<string> filePaths,
+        Action<int>? progressCallback,
+        CancellationToken cancellationToken = default)
+    {
         Stopwatch stopwatch = Stopwatch.StartNew();
         List<string> errors = [];
         int totalDocuments = 0;
@@ -235,7 +251,11 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             MaxDegreeOfParallelism = Environment.ProcessorCount
         };
 
-        await Parallel.ForEachAsync(filePaths, parseOptions, async (filePath, ct) =>
+        // Track progress
+        List<string> filePathList = filePaths.ToList();
+        int filesProcessed = 0;
+        
+        await Parallel.ForEachAsync(filePathList, parseOptions, async (filePath, ct) =>
         {
             try
             {
@@ -249,6 +269,10 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                     Interlocked.Increment(ref totalDocuments);
                     Interlocked.Increment(ref successCount);
                 }
+                
+                // Report progress after each file
+                int currentProgress = Interlocked.Increment(ref filesProcessed);
+                progressCallback?.Invoke(currentProgress);
             }
 #pragma warning disable CA1031 // Do not catch general exception types
             catch (Exception ex)
@@ -290,7 +314,11 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             if (batch.Count >= BatchSize)
             {
                 Stopwatch batchStopwatch = Stopwatch.StartNew();
-                writer.AddDocuments(batch);
+                foreach (Document batchDoc in batch)
+                {
+                    Term idTerm = new("id", batchDoc.Get("id"));
+                    writer.UpdateDocument(idTerm, batchDoc);
+                }
                 writer.Commit();
                 performanceTracker.RecordBatchCommit(batch.Count, batchStopwatch.Elapsed);
                 batch.Clear();
@@ -301,7 +329,11 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         if (batch.Count > 0)
         {
             Stopwatch batchStopwatch = Stopwatch.StartNew();
-            writer.AddDocuments(batch);
+            foreach (Document batchDoc in batch)
+            {
+                Term idTerm = new("id", batchDoc.Get("id"));
+                writer.UpdateDocument(idTerm, batchDoc);
+            }
             writer.Commit();
             performanceTracker.RecordBatchCommit(batch.Count, batchStopwatch.Elapsed);
         }
@@ -311,6 +343,23 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
     {
         ArgumentNullException.ThrowIfNull(term);
         writer.DeleteDocuments(term);
+    }
+
+    public void DeleteDocumentsByPackageId(string packageId)
+    {
+        ArgumentNullException.ThrowIfNull(packageId);
+        Term packageTerm = new("packageId", packageId);
+        writer.DeleteDocuments(packageTerm);
+    }
+
+    public void DeleteDocumentsByPackageIds(IEnumerable<string> packageIds)
+    {
+        ArgumentNullException.ThrowIfNull(packageIds);
+        foreach (string packageId in packageIds)
+        {
+            Term packageTerm = new("packageId", packageId);
+            writer.DeleteDocuments(packageTerm);
+        }
     }
 
     public void DeleteAll()
@@ -449,6 +498,37 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
     public PerformanceMetrics GetPerformanceMetrics()
     {
         return performanceTracker.GetMetrics();
+    }
+
+    public Dictionary<string, HashSet<string>> GetIndexedPackageVersions()
+    {
+        Dictionary<string, HashSet<string>> packageVersions = new(StringComparer.OrdinalIgnoreCase);
+        
+        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
+        
+        // Only load the fields we need for efficiency
+        HashSet<string> fieldsToLoad = ["packageId", "packageVersion"];
+        
+        // Iterate through all documents efficiently
+        for (int i = 0; i < reader.MaxDoc; i++)
+        {
+            Document? doc = reader.Document(i, fieldsToLoad);
+            
+            string? packageId = doc?.Get("packageId");
+            string? version = doc?.Get("packageVersion");
+            
+            if (!string.IsNullOrWhiteSpace(packageId) && !string.IsNullOrWhiteSpace(version))
+            {
+                if (!packageVersions.TryGetValue(packageId, out HashSet<string>? versions))
+                {
+                    versions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    packageVersions[packageId] = versions;
+                }
+                versions.Add(version);
+            }
+        }
+        
+        return packageVersions;
     }
 
     public void Dispose()

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using ApiLens.Core.Helpers;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
@@ -207,20 +208,8 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
     /// </summary>
     public static (string PackageId, string Version, string Framework)? ExtractNuGetInfo(string filePath)
     {
-        // Pattern to match NuGet cache paths: .../packageid/version/lib|ref/framework/*.xml
-        Regex regex = new(@"[\\/](?<packageId>[^\\/]+)[\\/](?<version>[^\\/]+)[\\/](?:lib|ref)[\\/](?<framework>[^\\/]+)[\\/][^\\/]+\.xml$", RegexOptions.IgnoreCase);
-        Match match = regex.Match(filePath);
-
-        if (match.Success)
-        {
-            return (
-                PackageId: match.Groups["packageId"].Value,
-                Version: match.Groups["version"].Value,
-                Framework: match.Groups["framework"].Value
-            );
-        }
-
-        return null;
+        // Delegate to the shared helper
+        return NuGetHelper.ExtractNuGetInfo(filePath);
     }
 
     public sealed class Settings : CommandSettings

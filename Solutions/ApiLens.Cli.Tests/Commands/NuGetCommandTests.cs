@@ -55,7 +55,7 @@ public class NuGetCommandTests
         NuGetCommand.Settings settings = new();
 
         // Assert
-        settings.IndexPath.ShouldBe("./nuget-index");
+        settings.IndexPath.ShouldBe("./index");
         settings.Clean.ShouldBe(false);
         settings.LatestOnly.ShouldBe(false);
         settings.PackageFilter.ShouldBeNull();
@@ -103,7 +103,7 @@ public class NuGetCommandTests
                 PackageId = "newtonsoft.json",
                 Version = "13.0.3",
                 TargetFramework = "net6.0",
-                XmlDocumentationPath = "/path/to/xml"
+                XmlDocumentationPath = "/home/user/.nuget/packages/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.xml"
             }
         ];
         mockScanner.ScanDirectory(cachePath).Returns([.. packages]);
@@ -199,14 +199,14 @@ public class NuGetCommandTests
                 PackageId = "newtonsoft.json",
                 Version = "13.0.3",
                 TargetFramework = "net6.0",
-                XmlDocumentationPath = "/path1"
+                XmlDocumentationPath = "/home/user/.nuget/packages/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.xml"
             },
             new()
             {
                 PackageId = "microsoft.extensions",
                 Version = "6.0.0",
                 TargetFramework = "net6.0",
-                XmlDocumentationPath = "/path2"
+                XmlDocumentationPath = "/home/user/.nuget/packages/microsoft.extensions/6.0.0/lib/net6.0/Microsoft.Extensions.xml"
             }
         ];
         mockScanner.ScanDirectory(cachePath).Returns([.. packages]);
@@ -241,14 +241,14 @@ public class NuGetCommandTests
                 PackageId = "newtonsoft.json",
                 Version = "13.0.3",
                 TargetFramework = "net6.0",
-                XmlDocumentationPath = "/path1"
+                XmlDocumentationPath = "/home/user/.nuget/packages/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.xml"
             },
             new()
             {
                 PackageId = "newtonsoft.json",
                 Version = "13.0.2",
                 TargetFramework = "net6.0",
-                XmlDocumentationPath = "/path2"
+                XmlDocumentationPath = "/home/user/.nuget/packages/newtonsoft.json/13.0.2/lib/net6.0/Newtonsoft.Json.xml"
             }
         ];
 
@@ -259,7 +259,7 @@ public class NuGetCommandTests
                 PackageId = "newtonsoft.json",
                 Version = "13.0.3",
                 TargetFramework = "net6.0",
-                XmlDocumentationPath = "/path1"
+                XmlDocumentationPath = "/home/user/.nuget/packages/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.xml"
             }
         ];
 
@@ -337,21 +337,21 @@ public class NuGetCommandTests
                 PackageId = "package1",
                 Version = "1.0.0",
                 TargetFramework = "net6.0",
-                XmlDocumentationPath = "/path1"
+                XmlDocumentationPath = "/home/user/.nuget/packages/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.xml"
             },
             new()
             {
                 PackageId = "package2",
                 Version = "2.0.0",
                 TargetFramework = "net7.0",
-                XmlDocumentationPath = "/path2"
+                XmlDocumentationPath = "/home/user/.nuget/packages/microsoft.extensions/6.0.0/lib/net6.0/Microsoft.Extensions.xml"
             },
             new()
             {
                 PackageId = "package3",
                 Version = "3.0.0",
                 TargetFramework = "net8.0",
-                XmlDocumentationPath = "/path3"
+                XmlDocumentationPath = "/home/user/.nuget/packages/package3/3.0.0/lib/net8.0/Package3.xml"
             }
         ];
         mockScanner.ScanDirectory(cachePath).Returns([.. packages]);

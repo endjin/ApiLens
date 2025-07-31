@@ -10,9 +10,12 @@ public interface ILuceneIndexManager : IDisposable
     // High-performance batch operations
     Task<IndexingResult> IndexBatchAsync(IEnumerable<MemberInfo> members, CancellationToken cancellationToken = default);
     Task<IndexingResult> IndexXmlFilesAsync(IEnumerable<string> filePaths, CancellationToken cancellationToken = default);
+    Task<IndexingResult> IndexXmlFilesAsync(IEnumerable<string> filePaths, Action<int>? progressCallback, CancellationToken cancellationToken = default);
 
     // Document management
     void DeleteDocument(Term term);
+    void DeleteDocumentsByPackageId(string packageId);
+    void DeleteDocumentsByPackageIds(IEnumerable<string> packageIds);
     void DeleteAll();
     Task CommitAsync();
 
@@ -27,6 +30,9 @@ public interface ILuceneIndexManager : IDisposable
     int GetTotalDocuments();
     long GetIndexSizeInBytes();
     IndexStatistics? GetIndexStatistics();
+    
+    // Package tracking
+    Dictionary<string, HashSet<string>> GetIndexedPackageVersions();
 
     // Performance metrics
     PerformanceMetrics GetPerformanceMetrics();
