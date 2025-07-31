@@ -3,13 +3,15 @@ using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
+using Spectre.Console;
 using Spectre.Console.Cli;
+using Spectre.Console.Testing;
 using Spectre.IO.Testing;
 
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]
-public class NuGetCommandTests
+public sealed class NuGetCommandTests : IDisposable
 {
     private IFileSystemService mockFileSystem = null!;
     private INuGetCacheScanner mockScanner = null!;
@@ -20,6 +22,7 @@ public class NuGetCommandTests
     private IFileSystemService? fakeFileSystemService;
     private NuGetCommand command = null!;
     private CommandContext context = null!;
+    private TestConsole console = null!;
 
     [TestInitialize]
     public void Setup()
@@ -34,6 +37,9 @@ public class NuGetCommandTests
         command = new NuGetCommand(mockFileSystem, mockScanner, mockIndexManagerFactory);
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
+        
+        console = new TestConsole();
+        AnsiConsole.Console = console;
     }
 
     private void SetupFakeFileSystem(string? customCachePath = null)
@@ -493,5 +499,16 @@ public class NuGetCommandTests
         // Assert
         result.ShouldBe(1);
         fakeFileSystemService!.DirectoryExists(cachePath).ShouldBeFalse();
+    }
+
+    [TestCleanup]
+    public void Cleanup()
+    {
+        console?.Dispose();
+    }
+
+    public void Dispose()
+    {
+        console?.Dispose();
     }
 }

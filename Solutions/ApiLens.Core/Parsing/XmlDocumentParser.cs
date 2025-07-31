@@ -258,7 +258,7 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
                 PackageVersion = nugetInfo?.Version ?? fileHash,
                 TargetFramework = nugetInfo?.Framework,
                 IsFromNuGetCache = nugetInfo.HasValue,
-                SourceFilePath = filePath,
+                SourceFilePath = NormalizePath(filePath),
                 ContentHash = fileHash
             };
         }
@@ -354,6 +354,22 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
 
         // Simple normalization - replace multiple whitespaces with single space
         return System.Text.RegularExpressions.Regex.Replace(text.Trim(), @"\s+", " ");
+    }
+
+    private static string NormalizePath(string path)
+    {
+        try
+        {
+            return Path.GetFullPath(path).Replace('\\', '/');
+        }
+        catch (ArgumentException)
+        {
+            return path.Replace('\\', '/');
+        }
+        catch (NotSupportedException)
+        {
+            return path.Replace('\\', '/');
+        }
     }
 
     private static string ExtractTypeNameFromCref(string cref)

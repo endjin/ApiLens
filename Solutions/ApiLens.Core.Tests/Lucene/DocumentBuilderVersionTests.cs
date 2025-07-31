@@ -67,7 +67,7 @@ public class DocumentBuilderVersionTests
         doc.Get("packageVersion").ShouldBeNull();
         doc.Get("targetFramework").ShouldBeNull();
         doc.Get("isFromNuGetCache").ShouldBe("false");
-        doc.Get("sourceFilePath").ShouldBeNull();
+        doc.Get("sourceFilePath").ShouldBe(string.Empty);
     }
 
     [TestMethod]

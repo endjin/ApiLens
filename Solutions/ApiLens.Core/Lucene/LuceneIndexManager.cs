@@ -259,13 +259,44 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         {
             try
             {
-                FileInfo fileInfo = new(filePath);
-                Interlocked.Add(ref bytesProcessed, fileInfo.Length);
+                long fileSize = 0;
+                try
+                {
+                    FileInfo fileInfo = new(filePath);
+                    if (fileInfo.Exists)
+                    {
+                        fileSize = fileInfo.Length;
+                    }
+                }
+                catch (IOException)
+                {
+                    // File might not exist in unit tests, continue anyway
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // File access denied, continue anyway
+                }
+                Interlocked.Add(ref bytesProcessed, fileSize);
 
+                int membersInFile = 0;
                 await foreach (MemberInfo member in parser.ParseXmlFileStreamAsync(filePath, ct))
                 {
                     Document doc = documentBuilder.BuildDocument(member);
                     await documentChannel.Writer.WriteAsync(doc, ct);
+                    Interlocked.Increment(ref totalDocuments);
+                    Interlocked.Increment(ref successCount);
+                    membersInFile++;
+                }
+
+                // Track files that produce 0 members
+                if (membersInFile == 0)
+                {
+                    // Add a special document to track empty XML files
+                    Document emptyFileDoc = new Document();
+                    emptyFileDoc.Add(new StringField("id", $"EMPTY_FILE|{NormalizePath(filePath)}", Field.Store.YES));
+                    emptyFileDoc.Add(new StringField("documentType", "EmptyXmlFile", Field.Store.YES));
+                    emptyFileDoc.Add(new StringField("sourceFilePath", NormalizePath(filePath), Field.Store.YES));
+                    await documentChannel.Writer.WriteAsync(emptyFileDoc, ct);
                     Interlocked.Increment(ref totalDocuments);
                     Interlocked.Increment(ref successCount);
                 }
@@ -285,8 +316,10 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             }
         });
 
-        // Signal completion
-        documentChannel.Writer.Complete();
+        // Signal completion by sending a sentinel document
+        Document sentinelDoc = new Document();
+        sentinelDoc.Add(new StringField("id", "SENTINEL_END_OF_STREAM", Field.Store.NO));
+        await documentChannel.Writer.WriteAsync(sentinelDoc, cancellationToken);
 
         // Wait for indexing to complete
         await indexingTask;
@@ -303,12 +336,36 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         };
     }
 
+
     private async Task StartIndexingPipelineAsync(CancellationToken cancellationToken)
     {
         List<Document> batch = new(BatchSize);
 
         await foreach (Document doc in documentChannel.Reader.ReadAllAsync(cancellationToken))
         {
+            // Check for sentinel document
+            string? id = doc.Get("id");
+            if (id == "SENTINEL_END_OF_STREAM")
+            {
+                // Process any remaining documents in the batch before exiting
+                if (batch.Count > 0)
+                {
+                    Stopwatch batchStopwatch = Stopwatch.StartNew();
+                    foreach (Document batchDoc in batch)
+                    {
+                        string? docId = batchDoc.Get("id");
+                        if (!string.IsNullOrEmpty(docId))
+                        {
+                            Term idTerm = new("id", docId);
+                            writer.UpdateDocument(idTerm, batchDoc);
+                        }
+                    }
+                    writer.Commit();
+                    performanceTracker.RecordBatchCommit(batch.Count, batchStopwatch.Elapsed);
+                }
+                return; // Exit the pipeline
+            }
+
             batch.Add(doc);
 
             if (batch.Count >= BatchSize)
@@ -316,8 +373,12 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                 Stopwatch batchStopwatch = Stopwatch.StartNew();
                 foreach (Document batchDoc in batch)
                 {
-                    Term idTerm = new("id", batchDoc.Get("id"));
-                    writer.UpdateDocument(idTerm, batchDoc);
+                    string? docId = batchDoc.Get("id");
+                    if (!string.IsNullOrEmpty(docId))
+                    {
+                        Term idTerm = new("id", docId);
+                        writer.UpdateDocument(idTerm, batchDoc);
+                    }
                 }
                 writer.Commit();
                 performanceTracker.RecordBatchCommit(batch.Count, batchStopwatch.Elapsed);
@@ -325,14 +386,19 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             }
         }
 
-        // Commit remaining documents
+        // This should not be reached if sentinel is properly sent
+        // But keeping it for safety
         if (batch.Count > 0)
         {
             Stopwatch batchStopwatch = Stopwatch.StartNew();
             foreach (Document batchDoc in batch)
             {
-                Term idTerm = new("id", batchDoc.Get("id"));
-                writer.UpdateDocument(idTerm, batchDoc);
+                string? docId = batchDoc.Get("id");
+                if (!string.IsNullOrEmpty(docId))
+                {
+                    Term idTerm = new("id", docId);
+                    writer.UpdateDocument(idTerm, batchDoc);
+                }
             }
             writer.Commit();
             performanceTracker.RecordBatchCommit(batch.Count, batchStopwatch.Elapsed);
@@ -458,6 +524,8 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
 
     public int GetTotalDocuments()
     {
+        // Force a commit to ensure all documents are visible
+        writer.Commit();
         using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
         return reader.NumDocs;
     }
@@ -512,6 +580,11 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         // Iterate through all documents efficiently
         for (int i = 0; i < reader.MaxDoc; i++)
         {
+            // Skip deleted documents
+            var liveDocs = MultiFields.GetLiveDocs(reader);
+            if (liveDocs != null && !liveDocs.Get(i))
+                continue;
+
             Document? doc = reader.Document(i, fieldsToLoad);
 
             string? packageId = doc?.Get("packageId");
@@ -543,6 +616,11 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         // Iterate through all documents efficiently
         for (int i = 0; i < reader.MaxDoc; i++)
         {
+            // Skip deleted documents
+            var liveDocs = MultiFields.GetLiveDocs(reader);
+            if (liveDocs != null && !liveDocs.Get(i))
+                continue;
+
             Document? doc = reader.Document(i, fieldsToLoad);
 
             string? packageId = doc?.Get("packageId");
@@ -563,6 +641,59 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         return packageVersions;
     }
 
+    public HashSet<string> GetIndexedXmlPaths()
+    {
+        HashSet<string> xmlPaths = new(StringComparer.OrdinalIgnoreCase);
+
+        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
+
+        // Only load the sourceFilePath field for efficiency
+        HashSet<string> fieldsToLoad = ["sourceFilePath"];
+
+        // Iterate through all documents efficiently
+        HashSet<string> seenPaths = new(StringComparer.OrdinalIgnoreCase);
+        
+        for (int i = 0; i < reader.MaxDoc; i++)
+        {
+            Document? doc = reader.Document(i, fieldsToLoad);
+            string? sourcePath = doc?.Get("sourceFilePath");
+
+            if (!string.IsNullOrWhiteSpace(sourcePath) && seenPaths.Add(sourcePath))
+            {
+                xmlPaths.Add(sourcePath);
+            }
+        }
+
+        return xmlPaths;
+    }
+
+    public HashSet<string> GetEmptyXmlPaths()
+    {
+        HashSet<string> emptyPaths = new(StringComparer.OrdinalIgnoreCase);
+
+        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
+
+        // Search for empty file documents
+        TermQuery query = new(new Term("documentType", "EmptyXmlFile"));
+        IndexSearcher searcher = new(reader);
+        TopDocs topDocs = searcher.Search(query, int.MaxValue);
+
+        HashSet<string> fieldsToLoad = ["sourceFilePath"];
+
+        foreach (ScoreDoc scoreDoc in topDocs.ScoreDocs)
+        {
+            Document? doc = searcher.Doc(scoreDoc.Doc, fieldsToLoad);
+            string? sourcePath = doc?.Get("sourceFilePath");
+
+            if (!string.IsNullOrWhiteSpace(sourcePath))
+            {
+                emptyPaths.Add(sourcePath);
+            }
+        }
+
+        return emptyPaths;
+    }
+
     public void Dispose()
     {
         if (disposed)
@@ -575,6 +706,11 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         analyzer?.Dispose();
         keywordAnalyzer?.Dispose();
         whitespaceAnalyzer?.Dispose();
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return path.Replace('\\', '/');
     }
 
     private record ParseTask(string FilePath, CancellationToken CancellationToken);

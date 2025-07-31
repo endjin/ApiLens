@@ -184,10 +184,8 @@ public class DocumentBuilder : IDocumentBuilder
 
         doc.Add(new StringField("isFromNuGetCache", memberInfo.IsFromNuGetCache.ToString().ToLowerInvariant(), Field.Store.YES));
 
-        if (!string.IsNullOrWhiteSpace(memberInfo.SourceFilePath))
-        {
-            doc.Add(new StringField("sourceFilePath", memberInfo.SourceFilePath, Field.Store.YES));
-        }
+        // Always add sourceFilePath for proper change detection tracking
+        doc.Add(new StringField("sourceFilePath", memberInfo.SourceFilePath ?? string.Empty, Field.Store.YES));
 
         // Add searchable version field
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageVersion))

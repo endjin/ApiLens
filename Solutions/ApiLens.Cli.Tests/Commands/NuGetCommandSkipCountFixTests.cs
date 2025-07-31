@@ -4,17 +4,20 @@ using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
 using NSubstitute;
+using Spectre.Console;
+using Spectre.Console.Testing;
 
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]
-public class NuGetCommandSkipCountFixTests
+public sealed class NuGetCommandSkipCountFixTests : IDisposable
 {
     private IFileSystemService mockFileSystem = null!;
     private INuGetCacheScanner mockScanner = null!;
     private ILuceneIndexManagerFactory mockIndexManagerFactory = null!;
     private ILuceneIndexManager mockIndexManager = null!;
     private NuGetCommand command = null!;
+    private TestConsole console = null!;
 
     [TestInitialize]
     public void Initialize()
@@ -26,6 +29,9 @@ public class NuGetCommandSkipCountFixTests
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
 
         command = new NuGetCommand(mockFileSystem, mockScanner, mockIndexManagerFactory);
+        
+        console = new TestConsole();
+        AnsiConsole.Console = console;
     }
 
     [TestMethod]
@@ -65,6 +71,8 @@ public class NuGetCommandSkipCountFixTests
         // Empty index
         mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(new Dictionary<string, HashSet<(string, string)>>());
+        mockIndexManager.GetIndexedXmlPaths().Returns(new HashSet<string>());
+        mockIndexManager.GetEmptyXmlPaths().Returns(new HashSet<string>());
         mockIndexManager.GetTotalDocuments().Returns(0);
 
         // Setup indexing result
@@ -125,6 +133,8 @@ public class NuGetCommandSkipCountFixTests
         // Empty index
         mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(new Dictionary<string, HashSet<(string, string)>>());
+        mockIndexManager.GetIndexedXmlPaths().Returns(new HashSet<string>());
+        mockIndexManager.GetEmptyXmlPaths().Returns(new HashSet<string>());
         mockIndexManager.GetTotalDocuments().Returns(0);
 
         var indexingResult = CreateIndexingResult(successfulDocs: 150, elapsedMs: 75, bytesProcessed: 15000);
@@ -213,6 +223,8 @@ public class NuGetCommandSkipCountFixTests
             ["package1"] = [("1.0.0", "net6.0"), ("1.0.0", "net7.0"), ("1.0.0", "net8.0")]
         };
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(indexedPackagesWithFramework);
+        mockIndexManager.GetIndexedXmlPaths().Returns(new HashSet<string> { "/cache/package1/1.0.0/lib/netstandard2.0/Package1.xml" });
+        mockIndexManager.GetEmptyXmlPaths().Returns(new HashSet<string>());
         mockIndexManager.GetTotalDocuments().Returns(100); // Some documents already in index
 
         var indexingResult = CreateIndexingResult(successfulDocs: 30, elapsedMs: 25, bytesProcessed: 3000);
@@ -272,5 +284,16 @@ public class NuGetCommandSkipCountFixTests
                 StringsInterned = 500
             }
         };
+    }
+
+    [TestCleanup]
+    public void Cleanup()
+    {
+        console?.Dispose();
+    }
+
+    public void Dispose()
+    {
+        console?.Dispose();
     }
 }

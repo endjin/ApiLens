@@ -1,15 +1,18 @@
 using ApiLens.Cli.Commands;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Querying;
+using Spectre.Console;
+using Spectre.Console.Testing;
 
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]
-public class QueryCommandTests
+public sealed class QueryCommandTests : IDisposable
 {
     private QueryCommand command = null!;
     private ILuceneIndexManagerFactory indexManagerFactory = null!;
     private IQueryEngineFactory queryEngineFactory = null!;
+    private TestConsole console = null!;
 
     [TestInitialize]
     public void Setup()
@@ -17,6 +20,14 @@ public class QueryCommandTests
         indexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
         command = new QueryCommand(indexManagerFactory, queryEngineFactory);
+        console = new TestConsole();
+        AnsiConsole.Console = console;
+    }
+
+    [TestCleanup]
+    public void Cleanup()
+    {
+        console?.Dispose();
     }
 
     [TestMethod]
@@ -87,5 +98,10 @@ public class QueryCommandTests
         mockQueryEngine.Received(1).SearchByName("TestQuery", 10);
         mockIndexManager.Received(1).Dispose();
         mockQueryEngine.Received(1).Dispose();
+    }
+
+    public void Dispose()
+    {
+        console?.Dispose();
     }
 }

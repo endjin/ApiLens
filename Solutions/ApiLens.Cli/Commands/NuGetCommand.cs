@@ -131,6 +131,8 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             {
                 // Get existing packages from index for change detection
                 Dictionary<string, HashSet<(string Version, string Framework)>> indexedPackagesWithFramework = new();
+                HashSet<string> indexedXmlPaths = new();
+                HashSet<string> emptyXmlPaths = new();
 
                 await AnsiConsole.Status()
                     .StartAsync("Analyzing index for change detection...", async ctx =>
@@ -139,6 +141,8 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         ctx.SpinnerStyle(Style.Parse("yellow"));
 
                         indexedPackagesWithFramework = await Task.Run(() => indexManager.GetIndexedPackageVersionsWithFramework());
+                        indexedXmlPaths = await Task.Run(() => indexManager.GetIndexedXmlPaths());
+                        emptyXmlPaths = await Task.Run(() => indexManager.GetEmptyXmlPaths());
                     });
 
                 // Determine which packages need indexing
@@ -148,14 +152,82 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 // First, check all packages to determine what needs indexing
                 HashSet<string> xmlFilesToIndex = new(StringComparer.OrdinalIgnoreCase);
                 
+                // Normalize all indexed paths once for efficient comparison
+                HashSet<string> normalizedIndexedPaths = new(StringComparer.OrdinalIgnoreCase);
+                foreach (string path in indexedXmlPaths)
+                {
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        try
+                        {
+                            normalizedIndexedPaths.Add(System.IO.Path.GetFullPath(path).Replace('\\', '/'));
+                        }
+                        catch (ArgumentException)
+                        {
+                            // If path normalization fails, use as-is
+                            normalizedIndexedPaths.Add(path.Replace('\\', '/'));
+                        }
+                        catch (NotSupportedException)
+                        {
+                            // If path normalization fails, use as-is
+                            normalizedIndexedPaths.Add(path.Replace('\\', '/'));
+                        }
+                    }
+                }
+                
+                // Also normalize empty XML paths
+                HashSet<string> normalizedEmptyPaths = new(StringComparer.OrdinalIgnoreCase);
+                foreach (string path in emptyXmlPaths)
+                {
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        try
+                        {
+                            normalizedEmptyPaths.Add(System.IO.Path.GetFullPath(path).Replace('\\', '/'));
+                        }
+                        catch (ArgumentException)
+                        {
+                            normalizedEmptyPaths.Add(path.Replace('\\', '/'));
+                        }
+                        catch (NotSupportedException)
+                        {
+                            normalizedEmptyPaths.Add(path.Replace('\\', '/'));
+                        }
+                    }
+                }
+                
                 // Track which packages have truly new versions (for deletion logic)
                 Dictionary<string, string> packagesWithNewVersions = new(StringComparer.OrdinalIgnoreCase);
+                
+                // Add logging for debugging
+                List<string> filesBeingReindexed = new();
                 
                 foreach (NuGetPackageInfo package in packages)
                 {
                     bool shouldIndex = false;
 
-                    if (!indexedPackagesWithFramework.TryGetValue(package.PackageId, out HashSet<(string Version, string Framework)>? indexedVersions))
+                    // First check if the XML file has already been indexed
+                    // Normalize the path for comparison (handle case and separator differences)
+                    string normalizedPath;
+                    try
+                    {
+                        normalizedPath = System.IO.Path.GetFullPath(package.XmlDocumentationPath).Replace('\\', '/');
+                    }
+                    catch (ArgumentException)
+                    {
+                        normalizedPath = package.XmlDocumentationPath.Replace('\\', '/');
+                    }
+                    catch (NotSupportedException)
+                    {
+                        normalizedPath = package.XmlDocumentationPath.Replace('\\', '/');
+                    }
+                    
+                    if (normalizedIndexedPaths.Contains(normalizedPath) || normalizedEmptyPaths.Contains(normalizedPath))
+                    {
+                        // XML file is already indexed or known to be empty, skip this package
+                        shouldIndex = false;
+                    }
+                    else if (!indexedPackagesWithFramework.TryGetValue(package.PackageId, out HashSet<(string Version, string Framework)>? indexedVersions))
                     {
                         // Package not in index at all
                         shouldIndex = true;
@@ -173,7 +245,8 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         shouldIndex = true;
                         
                         // Check if this is a newer version for deletion logic
-                        if (settings.LatestOnly && !indexedVersions.Any(v => v.Version == package.Version))
+                        // Only track for deletion if we're actually going to index this package
+                        if (shouldIndex && settings.LatestOnly && !indexedVersions.Any(v => v.Version == package.Version))
                         {
                             // This is a new version (not just a new framework)
                             // Track the highest version we're adding
@@ -207,6 +280,12 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     if (shouldIndex)
                     {
                         xmlFilesToIndex.Add(package.XmlDocumentationPath);
+                        
+                        // Log files being reindexed for debugging
+                        if (settings.Verbose && normalizedIndexedPaths.Count > 0)
+                        {
+                            filesBeingReindexed.Add($"{package.PackageId} v{package.Version} ({package.TargetFramework}): {normalizedPath}");
+                        }
                     }
                 }
                 
@@ -253,20 +332,25 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     }
                 }
 
-                // Now deduplicate by XML path for actual indexing
-                var uniquePackagesByPath = packages
+                // Group packages by XML path to handle shared files
+                var packagesByXmlPath = packages
                     .Where(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath))
                     .GroupBy(p => p.XmlDocumentationPath, StringComparer.OrdinalIgnoreCase)
-                    .Select(g => g.First())
                     .ToList();
 
-                packagesToIndex = uniquePackagesByPath;
+                // For indexing, we still deduplicate by XML path
+                packagesToIndex = packagesByXmlPath.Select(g => g.First()).ToList();
                 skippedPackages = packages.Count - packages.Count(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath));
 
                 // Report what we're doing
                 int totalInIndex = indexedPackagesWithFramework.Sum(kvp => kvp.Value.Count);
                 int uniquePackageVersions = indexedPackagesWithFramework.Sum(kvp => kvp.Value.Select(v => v.Version).Distinct().Count());
                 AnsiConsole.MarkupLine($"[dim]Index contains {uniquePackageVersions:N0} package versions across {indexedPackagesWithFramework.Count:N0} packages.[/]");
+                
+                if (emptyXmlPaths.Count > 0)
+                {
+                    AnsiConsole.MarkupLine($"[dim]Skipping {emptyXmlPaths.Count:N0} known empty XML files.[/]");
+                }
                 
                 // Report deduplication if it occurred
                 if (xmlFilesToIndex.Count > 0 && xmlFilesToIndex.Count < packages.Count(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath)))
@@ -286,6 +370,20 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 }
 
                 AnsiConsole.MarkupLine($"[green]Found {packagesToIndex.Count:N0} XML file(s) to index (new or updated).[/]");
+
+                // Show files being reindexed if verbose
+                if (settings.Verbose && filesBeingReindexed.Count > 0)
+                {
+                    AnsiConsole.MarkupLine($"[yellow]Files being reindexed ({filesBeingReindexed.Count}):[/]");
+                    foreach (string file in filesBeingReindexed.Take(10))
+                    {
+                        AnsiConsole.MarkupLine($"  [dim]• {file}[/]");
+                    }
+                    if (filesBeingReindexed.Count > 10)
+                    {
+                        AnsiConsole.MarkupLine($"  [dim]... and {filesBeingReindexed.Count - 10} more[/]");
+                    }
+                }
 
                 // Clean up old versions if needed
                 if (packageIdsToDelete.Count > 0)

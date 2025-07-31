@@ -7,7 +7,7 @@ namespace ApiLens.Core.Helpers;
 /// </summary>
 public static partial class NuGetHelper
 {
-    [GeneratedRegex(@"[\\/](?<packageId>[^\\/]+)[\\/](?<version>[^\\/]+)[\\/](?:lib|ref)[\\/](?<framework>[^\\/]+)[\\/][^\\/]+\.xml$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"[\\/]packages[\\/](?<packageId>[^\\/]+)[\\/](?<version>[^\\/]+)[\\/](?:lib|ref)[\\/](?<framework>[^\\/]+)[\\/][^\\/]+\.xml$", RegexOptions.IgnoreCase)]
     private static partial Regex NuGetPathRegex();
 
     /// <summary>
@@ -17,7 +17,8 @@ public static partial class NuGetHelper
     /// <returns>A tuple containing PackageId, Version, and Framework if the path is from a NuGet package; otherwise, null.</returns>
     public static (string PackageId, string Version, string Framework)? ExtractNuGetInfo(string filePath)
     {
-        ArgumentNullException.ThrowIfNull(filePath);
+        if (filePath is null)
+            return null;
 
         Match match = NuGetPathRegex().Match(filePath);
 
@@ -40,7 +41,8 @@ public static partial class NuGetHelper
     /// <returns>True if the path appears to be from a NuGet cache; otherwise, false.</returns>
     public static bool IsNuGetPath(string filePath)
     {
-        ArgumentNullException.ThrowIfNull(filePath);
+        if (filePath is null)
+            return false;
         return NuGetPathRegex().IsMatch(filePath);
     }
 }
