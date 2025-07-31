@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Tests.Helpers;
@@ -208,7 +207,7 @@ public class DocumentBuilderAdvancedTests
         // Assert
         string content = doc.Get("content");
         content.ShouldNotBeNull();
-        
+
         // Content should include all searchable text from BuildSearchableContent
         content.ShouldContain("Add", Case.Insensitive);
         content.ShouldContain("Example.Calculator.Add", Case.Insensitive);
@@ -289,7 +288,7 @@ public class DocumentBuilderAdvancedTests
         // Assert
         var crossrefs = doc.GetFields("crossref");
         crossrefs.Length.ShouldBe(3);
-        
+
         var crossrefValues = crossrefs.Select(f => f.GetStringValue()).ToList();
         crossrefValues.ShouldContain("T:Example.IService");
         crossrefValues.ShouldContain("M:Example.BaseService.Execute");
@@ -328,7 +327,7 @@ public class DocumentBuilderAdvancedTests
 
         // Assert
         doc.Get(expectedField).ShouldBe("Member");
-        
+
         // Other type fields should not exist
         var allTypeFields = new[] { "typeSearch", "methodSearch", "propertySearch", "fieldSearch", "eventSearch" };
         foreach (var field in allTypeFields.Where(f => f != expectedField))
@@ -367,7 +366,7 @@ public class DocumentBuilderAdvancedTests
         // Assert - Should not throw and should create valid document
         doc.ShouldNotBeNull();
         doc.Get("id").ShouldBe("T:Test.Type|package|1.0.0|net6.0");
-        
+
         // No collection fields should be added
         doc.GetFields("parameter").Length.ShouldBe(0);
         doc.GetFields("exceptionType").Length.ShouldBe(0);
@@ -398,7 +397,7 @@ public class DocumentBuilderAdvancedTests
         // Assert
         doc.Get("name").ShouldBe("Method<T>");
         doc.Get("summary").ShouldBe("Generic method with <T> parameter & special chars: @#$%");
-        
+
         string content = doc.Get("content");
         content.ShouldContain("Method<T>");
         content.ShouldContain("<T> parameter & special chars");
@@ -425,7 +424,7 @@ public class DocumentBuilderAdvancedTests
         // Assert - ContentHash field should exist but be configured with Field.Store.NO
         var contentHashField = doc.GetField("contentHash");
         contentHashField.ShouldNotBeNull();
-        
+
         // In Lucene.NET, Field.Store.NO fields can still be retrieved from the Document object
         // before indexing, but won't be stored in the index itself.
         // This test verifies the field exists in the document for indexing purposes.

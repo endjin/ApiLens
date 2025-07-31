@@ -1,11 +1,8 @@
-using System.Xml.Linq;
 using ApiLens.Core.Helpers;
-using ApiLens.Core.Infrastructure;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
 using ApiLens.Core.Services;
 using ApiLens.Core.Tests.Extensions;
-using NSubstitute;
 
 namespace ApiLens.Core.Tests.Parsing;
 
@@ -51,7 +48,7 @@ public class XmlDocumentParserComprehensiveTests
         // Assert
         members.ShouldHaveSingleItem();
         MemberInfo member = members[0];
-        
+
         // The unique ID should include package info to prevent duplicates
         member.Id.ShouldBe("M:Newtonsoft.Json.JsonConvert.SerializeObject(System.Object)|newtonsoft.json|13.0.3|net6.0");
         member.PackageId.ShouldBe("newtonsoft.json");
@@ -95,7 +92,7 @@ public class XmlDocumentParserComprehensiveTests
             // Simulate framework-specific parsing by temporarily modifying the path
             string frameworkSpecificPath = sharedXmlPath.Replace("netstandard2.0", pkgInfo.TargetFramework);
             mockFileSystem.OpenReadAsync(frameworkSpecificPath).Returns(CreateStreamFromString(xmlContent));
-            
+
             var members = await parser.ParseXmlFileStreamAsync(frameworkSpecificPath).ToListAsync();
             allMembers.AddRange(members);
         }
@@ -103,7 +100,7 @@ public class XmlDocumentParserComprehensiveTests
         // Assert - Each framework should generate a unique ID
         allMembers.Count.ShouldBe(3);
         allMembers.Select(m => m.Id).Distinct().Count().ShouldBe(3);
-        
+
         // Verify each has the correct framework
         allMembers[0].TargetFramework.ShouldBe("net6.0");
         allMembers[1].TargetFramework.ShouldBe("net7.0");
@@ -136,7 +133,7 @@ public class XmlDocumentParserComprehensiveTests
         // Assert
         members.ShouldHaveSingleItem();
         MemberInfo member = members[0];
-        
+
         // For local files, package version should be the file hash
         member.Id.ShouldBe("T:MyLib.MyClass|mylib|ABC123HASH");
         member.PackageId.ShouldBe("mylib");

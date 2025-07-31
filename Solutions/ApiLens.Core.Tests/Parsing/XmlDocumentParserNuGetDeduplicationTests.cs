@@ -2,8 +2,6 @@ using ApiLens.Core.Helpers;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
 using ApiLens.Core.Services;
-using NSubstitute;
-using Shouldly;
 
 namespace ApiLens.Core.Tests.Parsing;
 
@@ -151,7 +149,7 @@ public class XmlDocumentParserNuGetDeduplicationTests
 </doc>";
 
         // Simulate the same type in different framework targets
-        string[] paths = 
+        string[] paths =
         {
             @"C:\Users\test\.nuget\packages\newtonsoft.json\13.0.3\lib\net6.0\Newtonsoft.Json.xml",
             @"C:\Users\test\.nuget\packages\newtonsoft.json\13.0.3\lib\netstandard2.0\Newtonsoft.Json.xml",
@@ -175,7 +173,7 @@ public class XmlDocumentParserNuGetDeduplicationTests
 
         // Assert - All IDs should be unique
         allIds.Distinct().Count().ShouldBe(4);
-        
+
         // All should reference the same base member
         foreach (string id in allIds)
         {

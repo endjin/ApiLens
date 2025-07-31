@@ -203,7 +203,7 @@ public class StringInternCacheTests
     {
         // Arrange
         StringInternCache cache = new();
-        string[] specialStrings = 
+        string[] specialStrings =
         [
             "test\nstring",
             "test\tstring",

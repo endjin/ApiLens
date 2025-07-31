@@ -1,5 +1,4 @@
 using ApiLens.Core.Helpers;
-using ApiLens.Core.Models;
 
 namespace ApiLens.Core.Tests.Helpers;
 
@@ -9,15 +8,15 @@ public class NuGetHelperTests
     #region ExtractNuGetInfo Tests - Valid Paths
 
     [TestMethod]
-    [DataRow(@"C:\Users\test\.nuget\packages\newtonsoft.json\13.0.3\lib\net6.0\Newtonsoft.Json.xml", 
+    [DataRow(@"C:\Users\test\.nuget\packages\newtonsoft.json\13.0.3\lib\net6.0\Newtonsoft.Json.xml",
              "newtonsoft.json", "13.0.3", "net6.0")]
-    [DataRow(@"C:\Users\test\.nuget\packages\microsoft.extensions.logging\8.0.0\lib\netstandard2.0\Microsoft.Extensions.Logging.xml", 
+    [DataRow(@"C:\Users\test\.nuget\packages\microsoft.extensions.logging\8.0.0\lib\netstandard2.0\Microsoft.Extensions.Logging.xml",
              "microsoft.extensions.logging", "8.0.0", "netstandard2.0")]
-    [DataRow("/home/user/.nuget/packages/serilog/3.1.1/lib/net7.0/Serilog.xml", 
+    [DataRow("/home/user/.nuget/packages/serilog/3.1.1/lib/net7.0/Serilog.xml",
              "serilog", "3.1.1", "net7.0")]
-    [DataRow(@"D:\NuGet\packages\my.package-name\1.0.0+build\lib\net48\My.Package-Name.xml", 
+    [DataRow(@"D:\NuGet\packages\my.package-name\1.0.0+build\lib\net48\My.Package-Name.xml",
              "my.package-name", "1.0.0+build", "net48")]
-    public void ExtractNuGetInfo_WithValidPath_ExtractsCorrectInfo(string path, string expectedPackageId, 
+    public void ExtractNuGetInfo_WithValidPath_ExtractsCorrectInfo(string path, string expectedPackageId,
         string expectedVersion, string expectedFramework)
     {
         // Act

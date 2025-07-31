@@ -69,7 +69,7 @@ public class ObjectPoolTests
                 resetCalled = true;
                 sb.Clear();
             });
-        
+
         StringBuilder sb = pool.Rent();
         sb.Append("test");
 
@@ -86,20 +86,20 @@ public class ObjectPoolTests
     {
         // Arrange
         ObjectPool<StringBuilder> pool = new(() => new StringBuilder(), maxSize: 2);
-        
+
         // Create objects up to max size
         StringBuilder sb1 = pool.Rent();
         StringBuilder sb2 = pool.Rent();
-        
+
         // Act - Return objects
         pool.Return(sb1);
         pool.Return(sb2);
-        
+
         // Now create another object when we're at max
         StringBuilder sb3 = pool.Rent(); // This takes one from pool
         StringBuilder sb4 = pool.Rent(); // This takes another from pool
         StringBuilder sb5 = pool.Rent(); // This creates a new one (total = 3)
-        
+
         pool.Return(sb3);
         pool.Return(sb4);
         pool.Return(sb5); // This one won't be added to pool
@@ -192,10 +192,10 @@ public class ObjectPoolTests
         // Act
         StringBuilder sb1 = pool.Rent();
         pool.TotalCreated.ShouldBe(1);
-        
+
         StringBuilder sb2 = pool.Rent();
         pool.TotalCreated.ShouldBe(2);
-        
+
         StringBuilder sb3 = pool.Rent();
         pool.TotalCreated.ShouldBe(3);
 
@@ -255,7 +255,7 @@ public class ObjectPoolTests
         {
             objects.Add(pool.Rent());
         }
-        
+
         pool.TotalCreated.ShouldBe(5); // All objects were created
 
         // Return first 3 objects
@@ -263,9 +263,9 @@ public class ObjectPoolTests
         {
             pool.Return(objects[i]);
         }
-        
+
         pool.Count.ShouldBe(3); // Pool filled to max
-        
+
         // Return remaining objects
         for (int i = 3; i < 5; i++)
         {

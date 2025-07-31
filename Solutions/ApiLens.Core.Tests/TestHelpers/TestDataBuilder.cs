@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using ApiLens.Core.Models;
 
 namespace ApiLens.Core.Tests.Helpers;

@@ -1,13 +1,7 @@
-using System.Collections.Immutable;
 using ApiLens.Core.Helpers;
-using ApiLens.Core.Infrastructure;
 using ApiLens.Core.Lucene;
-using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
 using ApiLens.Core.Services;
-using ApiLens.Core.Tests.Extensions;
-using ApiLens.Core.Tests.Helpers;
-using NSubstitute;
 
 namespace ApiLens.Core.Tests.Integration;
 
@@ -40,10 +34,10 @@ public class NuGetIndexingIntegrationTests : IDisposable
     public void Cleanup()
     {
         indexManager?.Dispose();
-        
+
         if (Directory.Exists(indexPath))
             Directory.Delete(indexPath, true);
-            
+
         if (Directory.Exists(testDataPath))
             Directory.Delete(testDataPath, true);
     }
@@ -111,7 +105,7 @@ public class NuGetIndexingIntegrationTests : IDisposable
         // Assert first run
         result1.SuccessfulDocuments.ShouldBe(5); // 3 members from logging + 1 empty file marker + 1 member from shared
         result1.FailedDocuments.ShouldBe(0);
-        
+
         var stats1 = indexManager.GetIndexStatistics();
         stats1.ShouldNotBeNull();
         stats1.DocumentCount.ShouldBe(5);
@@ -133,7 +127,7 @@ public class NuGetIndexingIntegrationTests : IDisposable
 
         // Assert second run - Re-indexes same documents
         result2.SuccessfulDocuments.ShouldBe(5);
-        
+
         // Index should remain unchanged (documents are updated, not duplicated)
         var stats2 = indexManager.GetIndexStatistics();
         stats2.ShouldNotBeNull();
@@ -176,15 +170,15 @@ public class NuGetIndexingIntegrationTests : IDisposable
 
         // Assert
         result.SuccessfulDocuments.ShouldBe(6); // 2 members × 3 times indexed
-        
+
         // XML paths should show only one unique path
         var xmlPaths = indexManager.GetIndexedXmlPaths();
         xmlPaths.Count.ShouldBe(1);
-        
+
         // But the actual documents in the index should be unique (2 members)
         var totalDocs = indexManager.GetTotalDocuments();
         totalDocs.ShouldBe(2); // Documents are updated, not duplicated
-        
+
         var docs = indexManager.SearchByField("namespace", "Microsoft.Extensions.DependencyInjection", 10);
         docs.TotalHits.ShouldBe(2);
     }
@@ -195,7 +189,7 @@ public class NuGetIndexingIntegrationTests : IDisposable
         // Arrange - Create files with different path formats
         var windowsPath = Path.Combine(testDataPath, @".nuget\packages\windows.package\1.0.0\lib\net6.0\Windows.Package.xml");
         var linuxPath = Path.Combine(testDataPath, ".nuget/packages/linux.package/1.0.0/lib/net6.0/Linux.Package.xml");
-        
+
         string xmlContent = @"<?xml version=""1.0""?>
 <doc>
     <assembly>
@@ -216,11 +210,11 @@ public class NuGetIndexingIntegrationTests : IDisposable
 
         // Assert
         result.SuccessfulDocuments.ShouldBe(2);
-        
+
         // Both paths should be tracked with normalized format
         var xmlPaths = indexManager.GetIndexedXmlPaths();
         xmlPaths.Count.ShouldBe(2);
-        
+
         // All paths should use forward slashes
         foreach (var path in xmlPaths)
         {
@@ -273,25 +267,25 @@ public class NuGetIndexingIntegrationTests : IDisposable
         // Act - Clean old version and index new
         indexManager.DeleteDocumentsByPackageIds(new[] { "evolving.package" });
         await indexManager.CommitAsync();
-        
+
         var result = await indexManager.IndexXmlFilesAsync(new[] { newVersionFile.path });
         await indexManager.CommitAsync(); // Ensure documents are committed
 
         // Assert
         result.SuccessfulDocuments.ShouldBe(2); // 2 members in new version
-        
+
         var versions2 = indexManager.GetIndexedPackageVersionsWithFramework();
         versions2["evolving.package"].ShouldContain(("2.0.0", "net6.0"));
         versions2["evolving.package"].ShouldNotContain(("1.0.0", "net6.0"));
-        
+
         // Debug: Check if any documents exist
         var totalDocs = indexManager.GetTotalDocuments();
         totalDocs.ShouldBe(2); // Should have exactly 2 documents
-        
+
         // Search by name to verify documents are indexed
         var nameSearchResults = indexManager.SearchByField("name", "NewClass", 10);
         nameSearchResults.TotalHits.ShouldBe(1);
-        
+
         // Search should find new content in summary
         // First, let's try to get the first document and check its fields
         var firstDoc = indexManager.GetDocument(0);
@@ -299,11 +293,11 @@ public class NuGetIndexingIntegrationTests : IDisposable
         var summaryField = firstDoc.Get("summary");
         summaryField.ShouldNotBeNull();
         summaryField.ShouldContain("v2");
-        
+
         // Search for a word that should definitely be in the summary
         var searchResults = indexManager.SearchByField("summary", "updated", 10);
         searchResults.TotalHits.ShouldBe(1); // Only OldClass has "updated"
-        
+
         // Search for "added" which should be in NewClass
         var searchResults2 = indexManager.SearchByField("summary", "added", 10);
         searchResults2.TotalHits.ShouldBe(1);
@@ -354,35 +348,35 @@ public class NuGetIndexingIntegrationTests : IDisposable
 
         // Assert comprehensive results
         // We're getting 7 documents, but one is the empty file marker
-        result.SuccessfulDocuments.ShouldBe(7); 
+        result.SuccessfulDocuments.ShouldBe(7);
         result.FailedDocuments.ShouldBe(0);
-        
+
         // Check total documents
         var totalDocs = indexManager.GetTotalDocuments();
         totalDocs.ShouldBe(7);
-        
+
         var emptyFiles = indexManager.GetEmptyXmlPaths();
         var hasEmptyFile = emptyFiles.Count > 0;
-        
+
         // Verify package tracking
         var packages = indexManager.GetIndexedPackageVersionsWithFramework();
         packages.Count.ShouldBe(4); // empty.docs is not tracked because it has no members
-        
+
         // Verify framework-specific tracking
         packages["regular.package"].ShouldContain(("1.0.0", "net6.0"));
         packages["shared.xml.package"].ShouldContain(("1.0.0", "netstandard2.0"));
         // empty.docs is not tracked in packageVersions because it has no members
         packages["special-chars.package"].ShouldContain(("1.0.0-beta+build.123", "net8.0"));
         packages["com.company.product.feature.component.subcomponent"].ShouldContain(("10.5.3", "net9.0"));
-        
+
         // Verify empty file tracking
         emptyFiles.Count.ShouldBe(1);
         emptyFiles.First().ShouldEndWith("empty.docs/1.0.0/lib/net7.0/empty-docs.xml"); // Note: packageId dots replaced with dashes
-        
+
         // Verify searchability
         var genericSearch = indexManager.SearchByField("summary", "Generic", 10);
         genericSearch.TotalHits.ShouldBeGreaterThan(0);
-        
+
         // Search for a method we know exists
         var methodSearch = indexManager.SearchByField("name", "Method1", 10);
         methodSearch.TotalHits.ShouldBeGreaterThan(0);
@@ -397,7 +391,7 @@ public class NuGetIndexingIntegrationTests : IDisposable
     {
         // Arrange - Create many files for concurrent processing
         var files = new List<(string path, string content)>();
-        
+
         for (int i = 0; i < 20; i++)
         {
             var file = CreateNuGetXmlFile($"concurrent.package{i}", "1.0.0", "net6.0", CreateXmlWithMembers(
@@ -417,11 +411,11 @@ public class NuGetIndexingIntegrationTests : IDisposable
         // Assert
         result.SuccessfulDocuments.ShouldBe(60); // 3 members * 20 files
         result.FailedDocuments.ShouldBe(0);
-        
+
         // Verify all packages are tracked
         var packages = indexManager.GetIndexedPackageVersionsWithFramework();
         packages.Count.ShouldBe(20);
-        
+
         // Performance should be reasonable (parallel processing)
         stopwatch.ElapsedMilliseconds.ShouldBeLessThan(5000); // Should complete in under 5 seconds
     }
@@ -440,7 +434,7 @@ public class NuGetIndexingIntegrationTests : IDisposable
     {
         string directory = Path.GetDirectoryName(path)!;
         Directory.CreateDirectory(directory);
-        
+
         // Setup mock file system to return a new stream each time
         mockFileSystem.OpenReadAsync(path).Returns(_ => CreateStreamFromString(content));
     }
@@ -457,7 +451,7 @@ public class NuGetIndexingIntegrationTests : IDisposable
 
     private static string CreateXmlWithMembers(params (string name, string summary)[] members)
     {
-        var memberElements = string.Join("\n", members.Select(m => 
+        var memberElements = string.Join("\n", members.Select(m =>
             $@"        <member name=""{m.name}"">
             <summary>{m.summary}</summary>
         </member>"));

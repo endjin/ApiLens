@@ -151,7 +151,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 
                 // First, check all packages to determine what needs indexing
                 HashSet<string> xmlFilesToIndex = new(StringComparer.OrdinalIgnoreCase);
-                
+
                 // Normalize all indexed paths once for efficient comparison
                 HashSet<string> normalizedIndexedPaths = new(StringComparer.OrdinalIgnoreCase);
                 foreach (string path in indexedXmlPaths)
@@ -174,7 +174,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         }
                     }
                 }
-                
+
                 // Also normalize empty XML paths
                 HashSet<string> normalizedEmptyPaths = new(StringComparer.OrdinalIgnoreCase);
                 foreach (string path in emptyXmlPaths)
@@ -195,13 +195,13 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         }
                     }
                 }
-                
+
                 // Track which packages have truly new versions (for deletion logic)
                 Dictionary<string, string> packagesWithNewVersions = new(StringComparer.OrdinalIgnoreCase);
-                
+
                 // Add logging for debugging
                 List<string> filesBeingReindexed = new();
-                
+
                 foreach (NuGetPackageInfo package in packages)
                 {
                     bool shouldIndex = false;
@@ -221,7 +221,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     {
                         normalizedPath = package.XmlDocumentationPath.Replace('\\', '/');
                     }
-                    
+
                     if (normalizedIndexedPaths.Contains(normalizedPath) || normalizedEmptyPaths.Contains(normalizedPath))
                     {
                         // XML file is already indexed or known to be empty, skip this package
@@ -232,18 +232,18 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         // Package not in index at all
                         shouldIndex = true;
                     }
-                    else if (!indexedVersions.Any(v => 
-                        v.Version == package.Version && 
-                        (v.Framework == package.TargetFramework || 
-                         (v.Framework == "unknown" && !indexedVersions.Any(iv => 
-                            iv.Version == package.Version && 
+                    else if (!indexedVersions.Any(v =>
+                        v.Version == package.Version &&
+                        (v.Framework == package.TargetFramework ||
+                         (v.Framework == "unknown" && !indexedVersions.Any(iv =>
+                            iv.Version == package.Version &&
                             iv.Framework != "unknown")))))
                     {
                         // This version+framework combination not in index
                         // Note: "unknown" framework entries (from legacy index) match any specific framework
                         // unless a specific framework entry already exists for that version
                         shouldIndex = true;
-                        
+
                         // Check if this is a newer version for deletion logic
                         // Only track for deletion if we're actually going to index this package
                         if (shouldIndex && settings.LatestOnly && !indexedVersions.Any(v => v.Version == package.Version))
@@ -258,8 +258,8 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                             {
                                 try
                                 {
-                                    if (Version.TryParse(package.Version, out var pkgVer) && 
-                                        Version.TryParse(currentHighest, out var curVer) && 
+                                    if (Version.TryParse(package.Version, out var pkgVer) &&
+                                        Version.TryParse(currentHighest, out var curVer) &&
                                         pkgVer > curVer)
                                     {
                                         packagesWithNewVersions[package.PackageId] = package.Version;
@@ -280,7 +280,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     if (shouldIndex)
                     {
                         xmlFilesToIndex.Add(package.XmlDocumentationPath);
-                        
+
                         // Log files being reindexed for debugging
                         if (settings.Verbose && normalizedIndexedPaths.Count > 0)
                         {
@@ -288,23 +288,23 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         }
                     }
                 }
-                
+
                 // Now determine which packages should have old versions deleted
                 foreach (var kvp in packagesWithNewVersions)
                 {
                     string packageId = kvp.Key;
                     string newVersion = kvp.Value;
-                    
+
                     // Only delete if the new version is actually newer than ALL existing versions
                     if (indexedPackagesWithFramework.TryGetValue(packageId, out var existingVersions))
                     {
                         bool isNewerThanAll = true;
-                        
+
                         foreach (var existing in existingVersions)
                         {
                             try
                             {
-                                if (Version.TryParse(newVersion, out var newVer) && 
+                                if (Version.TryParse(newVersion, out var newVer) &&
                                     Version.TryParse(existing.Version, out var existVer))
                                 {
                                     if (newVer <= existVer)
@@ -324,7 +324,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                                 }
                             }
                         }
-                        
+
                         if (isNewerThanAll)
                         {
                             packageIdsToDelete.Add(packageId);
@@ -346,12 +346,12 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 int totalInIndex = indexedPackagesWithFramework.Sum(kvp => kvp.Value.Count);
                 int uniquePackageVersions = indexedPackagesWithFramework.Sum(kvp => kvp.Value.Select(v => v.Version).Distinct().Count());
                 AnsiConsole.MarkupLine($"[dim]Index contains {uniquePackageVersions:N0} package versions across {indexedPackagesWithFramework.Count:N0} packages.[/]");
-                
+
                 if (emptyXmlPaths.Count > 0)
                 {
                     AnsiConsole.MarkupLine($"[dim]Skipping {emptyXmlPaths.Count:N0} known empty XML files.[/]");
                 }
-                
+
                 // Report deduplication if it occurred
                 if (xmlFilesToIndex.Count > 0 && xmlFilesToIndex.Count < packages.Count(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath)))
                 {

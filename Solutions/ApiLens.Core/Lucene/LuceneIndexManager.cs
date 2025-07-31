@@ -652,7 +652,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
 
         // Iterate through all documents efficiently
         HashSet<string> seenPaths = new(StringComparer.OrdinalIgnoreCase);
-        
+
         for (int i = 0; i < reader.MaxDoc; i++)
         {
             Document? doc = reader.Document(i, fieldsToLoad);

@@ -1,13 +1,8 @@
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
-using ApiLens.Core.Tests.Extensions;
 using ApiLens.Core.Tests.Helpers;
 using Lucene.Net.Documents;
-using Lucene.Net.Index;
-using Lucene.Net.Search;
-using NSubstitute;
-using System.Linq;
 
 namespace ApiLens.Core.Tests.Lucene;
 
@@ -67,7 +62,7 @@ public class LuceneIndexManagerAdvancedTests : IDisposable
 
         // Assert
         packageVersionsWithFramework.Count.ShouldBe(2);
-        
+
         // Microsoft.Extensions.Logging should have 3 framework entries
         var msLogging = packageVersionsWithFramework["microsoft.extensions.logging"];
         msLogging.Count.ShouldBe(3);
@@ -144,7 +139,7 @@ public class LuceneIndexManagerAdvancedTests : IDisposable
         // Assert
         result.SuccessfulDocuments.ShouldBeGreaterThan(0); // Should have at least the normal document
         totalDocs.ShouldBeGreaterThan(0);
-        
+
         var emptyPaths = indexManager.GetEmptyXmlPaths();
         emptyPaths.Count.ShouldBe(1);
         emptyPaths.ShouldContain("/test/empty.xml");
@@ -159,7 +154,7 @@ public class LuceneIndexManagerAdvancedTests : IDisposable
     {
         // Arrange - Index multiple empty files
         var emptyFiles = new[] { "/test/empty1.xml", "/test/empty2.xml", "/test/subdir/empty3.xml" };
-        
+
         foreach (var file in emptyFiles)
         {
             mockParser.ParseXmlFileStreamAsync(file, Arg.Any<CancellationToken>())
@@ -185,7 +180,7 @@ public class LuceneIndexManagerAdvancedTests : IDisposable
     {
         // Arrange - Windows-style path
         string windowsPath = @"C:\test\empty.xml";
-        
+
         mockParser.ParseXmlFileStreamAsync(windowsPath, Arg.Any<CancellationToken>())
             .Returns(AsyncEnumerable.Empty<MemberInfo>());
 
@@ -307,13 +302,13 @@ public class LuceneIndexManagerAdvancedTests : IDisposable
         // Arrange - Simulate concurrent indexing of multiple files
         int fileCount = 10;
         var files = Enumerable.Range(1, fileCount).Select(i => $"/test/file{i}.xml").ToList();
-        
+
         for (int i = 0; i < files.Count; i++)
         {
             var file = files[i];
-            var members = Enumerable.Range(1, 5).Select(j => 
+            var members = Enumerable.Range(1, 5).Select(j =>
                 CreateMemberInfo($"package{i + 1}", "1.0.0", "net6.0", file, $"Type{j}")).ToList();
-            
+
             mockParser.ParseXmlFileStreamAsync(file, Arg.Any<CancellationToken>())
                 .Returns(CreateAsyncEnumerable(members.ToArray()));
 
@@ -331,13 +326,13 @@ public class LuceneIndexManagerAdvancedTests : IDisposable
         {
             throw new Exception($"Indexing errors: {string.Join(", ", result.Errors)}");
         }
-        
+
         // Debug output
         var afterIndexCount = indexManager.GetTotalDocuments();
-        
+
         result.SuccessfulDocuments.ShouldBe(fileCount * 5); // 5 members per file
         result.FailedDocuments.ShouldBe(0);
-        
+
         var totalDocs = indexManager.GetTotalDocuments();
         totalDocs.ShouldBe(fileCount * 5);
     }
@@ -398,12 +393,12 @@ public class LuceneIndexManagerAdvancedTests : IDisposable
         var normalizedPath = NormalizePath(filePath);
         var searchTerm = $"EMPTY_FILE|{normalizedPath}";
         var results = indexManager.SearchByField("id", searchTerm, 1);
-        
+
         if (results.TotalHits > 0)
         {
             return indexManager.GetDocument(results.ScoreDocs[0].Doc);
         }
-        
+
         return null;
     }
 

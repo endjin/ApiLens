@@ -1,9 +1,7 @@
-using System.Collections.Immutable;
 using ApiLens.Cli.Commands;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
-using NSubstitute;
 using Spectre.Console;
 using Spectre.Console.Testing;
 
@@ -27,7 +25,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         mockIndexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         mockIndexManager = Substitute.For<ILuceneIndexManager>();
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
-        
+
         command = new NuGetCommand(mockFileSystem, mockScanner, mockIndexManagerFactory);
         console = new TestConsole();
         AnsiConsole.Console = console;
@@ -46,14 +44,14 @@ public class NuGetCommandComprehensiveTests : IDisposable
         var packages = new List<NuGetPackageInfo>
         {
             // Normal packages with content
-            new() { PackageId = "package1", Version = "1.0.0", TargetFramework = "net6.0", 
+            new() { PackageId = "package1", Version = "1.0.0", TargetFramework = "net6.0",
                    XmlDocumentationPath = "/cache/package1/1.0.0/lib/net6.0/Package1.xml" },
-            new() { PackageId = "package2", Version = "1.0.0", TargetFramework = "net6.0", 
+            new() { PackageId = "package2", Version = "1.0.0", TargetFramework = "net6.0",
                    XmlDocumentationPath = "/cache/package2/1.0.0/lib/net6.0/Package2.xml" },
             // Empty XML files
-            new() { PackageId = "empty1", Version = "1.0.0", TargetFramework = "net6.0", 
+            new() { PackageId = "empty1", Version = "1.0.0", TargetFramework = "net6.0",
                    XmlDocumentationPath = "/cache/empty1/1.0.0/lib/net6.0/Empty1.xml" },
-            new() { PackageId = "empty2", Version = "1.0.0", TargetFramework = "net6.0", 
+            new() { PackageId = "empty2", Version = "1.0.0", TargetFramework = "net6.0",
                    XmlDocumentationPath = "/cache/empty2/1.0.0/lib/net6.0/Empty2.xml" }
         };
 
@@ -118,13 +116,13 @@ public class NuGetCommandComprehensiveTests : IDisposable
         string sharedXmlPath = "/cache/microsoft.extensions.logging/8.0.0/lib/netstandard2.0/Microsoft.Extensions.Logging.xml";
         var packages = new List<NuGetPackageInfo>
         {
-            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net6.0", 
+            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net6.0",
                    XmlDocumentationPath = sharedXmlPath },
-            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net7.0", 
+            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net7.0",
                    XmlDocumentationPath = sharedXmlPath },
-            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net8.0", 
+            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net8.0",
                    XmlDocumentationPath = sharedXmlPath },
-            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net9.0", 
+            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net9.0",
                    XmlDocumentationPath = sharedXmlPath }
         };
 
@@ -159,19 +157,19 @@ public class NuGetCommandComprehensiveTests : IDisposable
         var packages = new List<NuGetPackageInfo>
         {
             // Package with shared XML across frameworks
-            new() { PackageId = "shared.package", Version = "1.0.0", TargetFramework = "net6.0", 
+            new() { PackageId = "shared.package", Version = "1.0.0", TargetFramework = "net6.0",
                    XmlDocumentationPath = "/cache/shared.package/1.0.0/lib/netstandard2.0/Shared.Package.xml" },
-            new() { PackageId = "shared.package", Version = "1.0.0", TargetFramework = "net7.0", 
+            new() { PackageId = "shared.package", Version = "1.0.0", TargetFramework = "net7.0",
                    XmlDocumentationPath = "/cache/shared.package/1.0.0/lib/netstandard2.0/Shared.Package.xml" },
             
             // Package with different XML per framework
-            new() { PackageId = "unique.package", Version = "1.0.0", TargetFramework = "net6.0", 
+            new() { PackageId = "unique.package", Version = "1.0.0", TargetFramework = "net6.0",
                    XmlDocumentationPath = "/cache/unique.package/1.0.0/lib/net6.0/Unique.Package.xml" },
-            new() { PackageId = "unique.package", Version = "1.0.0", TargetFramework = "net7.0", 
+            new() { PackageId = "unique.package", Version = "1.0.0", TargetFramework = "net7.0",
                    XmlDocumentationPath = "/cache/unique.package/1.0.0/lib/net7.0/Unique.Package.xml" },
             
             // Package already in index
-            new() { PackageId = "existing.package", Version = "1.0.0", TargetFramework = "net6.0", 
+            new() { PackageId = "existing.package", Version = "1.0.0", TargetFramework = "net6.0",
                    XmlDocumentationPath = "/cache/existing.package/1.0.0/lib/net6.0/Existing.Package.xml" }
         };
 
@@ -205,7 +203,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         // Assert - Should index 3 files: 1 shared + 2 unique (existing is skipped)
         await mockIndexManager.Received(1).IndexXmlFilesAsync(
-            Arg.Is<List<string>>(files => 
+            Arg.Is<List<string>>(files =>
                 files.Count == 3 &&
                 files.Contains("/cache/shared.package/1.0.0/lib/netstandard2.0/Shared.Package.xml") &&
                 files.Contains("/cache/unique.package/1.0.0/lib/net6.0/Unique.Package.xml") &&
@@ -226,7 +224,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         var packages = new List<NuGetPackageInfo>
         {
-            new() { PackageId = "mypackage", Version = "3.0.0", TargetFramework = "net6.0", 
+            new() { PackageId = "mypackage", Version = "3.0.0", TargetFramework = "net6.0",
                    XmlDocumentationPath = "/cache/mypackage/3.0.0/lib/net6.0/MyPackage.xml" }
         };
 
@@ -268,7 +266,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         var packages = new List<NuGetPackageInfo>
         {
-            new() { PackageId = "prerelease.package", Version = "2.0.0-preview.1", TargetFramework = "net8.0", 
+            new() { PackageId = "prerelease.package", Version = "2.0.0-preview.1", TargetFramework = "net8.0",
                    XmlDocumentationPath = "/cache/prerelease.package/2.0.0-preview.1/lib/net8.0/Package.xml" }
         };
 
@@ -315,10 +313,10 @@ public class NuGetCommandComprehensiveTests : IDisposable
         var packages = new List<NuGetPackageInfo>
         {
             // Windows-style paths
-            new() { PackageId = "package1", Version = "1.0.0", TargetFramework = "net6.0", 
+            new() { PackageId = "package1", Version = "1.0.0", TargetFramework = "net6.0",
                    XmlDocumentationPath = @"C:\Users\test\.nuget\packages\package1\1.0.0\lib\net6.0\Package1.xml" },
             // Forward slashes
-            new() { PackageId = "package2", Version = "1.0.0", TargetFramework = "net6.0", 
+            new() { PackageId = "package2", Version = "1.0.0", TargetFramework = "net6.0",
                    XmlDocumentationPath = "C:/Users/test/.nuget/packages/package2/1.0.0/lib/net6.0/Package2.xml" }
         };
 
@@ -351,8 +349,8 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         // Assert - Should only index package2 (package1 is already indexed despite different path format)
         await mockIndexManager.Received(1).IndexXmlFilesAsync(
-            Arg.Is<List<string>>(files => 
-                files.Count == 1 && 
+            Arg.Is<List<string>>(files =>
+                files.Count == 1 &&
                 files[0].Contains("package2")),
             Arg.Any<Action<int>?>());
     }

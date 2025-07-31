@@ -37,7 +37,7 @@ public sealed class NuGetCommandTests : IDisposable
         command = new NuGetCommand(mockFileSystem, mockScanner, mockIndexManagerFactory);
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
-        
+
         console = new TestConsole();
         AnsiConsole.Console = console;
     }
