@@ -50,8 +50,8 @@ Write-Host "$ apilens query JsonSerializer --index $indexPath" -ForegroundColor 
 
 # Demo 5: Index only latest versions
 Write-Host "`n5️⃣ Index only latest versions:" -ForegroundColor Green
-Write-Host "$ apilens nuget --clean --latest --index ./nuget-latest-index" -ForegroundColor Yellow
-& $apilens nuget --clean --latest --index ./nuget-latest-index
+Write-Host "$ apilens nuget --clean --latest-only --index ./nuget-latest-index" -ForegroundColor Yellow
+& $apilens nuget --clean --latest-only --index ./nuget-latest-index
 
 # Compare statistics
 Write-Host "`n6️⃣ Compare index sizes:" -ForegroundColor Green
@@ -63,8 +63,8 @@ Write-Host "`nLatest versions only:" -ForegroundColor Yellow
 
 # Demo 7: Filter and index specific packages
 Write-Host "`n7️⃣ Index only Microsoft packages (latest versions):" -ForegroundColor Green
-Write-Host "$ apilens nuget --clean --filter `"microsoft.*`" --latest --index ./ms-index" -ForegroundColor Yellow
-& $apilens nuget --clean --filter "microsoft.*" --latest --index ./ms-index
+Write-Host "$ apilens nuget --clean --filter `"microsoft.*`" --latest-only --index ./ms-index" -ForegroundColor Yellow
+& $apilens nuget --clean --filter "microsoft.*" --latest-only --index ./ms-index
 
 # Cleanup
 Write-Host "`n🧹 Cleaning up demo indexes..." -ForegroundColor Yellow
@@ -79,14 +79,14 @@ Key Features of 'apilens nuget' command:
 - Automatically discovers NuGet cache location
 - Scans all packages with XML documentation
 - Supports regex filtering (--filter)
-- Can index only latest versions (--latest)
+- Can index only latest versions (--latest-only)
 - Progress tracking for large caches
 - Cross-platform support via Spectre.IO
 
 Usage examples:
   apilens nuget                           # Index all packages
-  apilens nuget --latest                  # Only latest versions
+  apilens nuget --latest-only             # Only latest versions
   apilens nuget --filter "system.*"       # Filter by pattern
   apilens nuget --list                    # List without indexing
-  apilens nuget --clean --latest          # Clean index, latest only
+  apilens nuget --clean --latest-only     # Clean index, latest only
 "@ -ForegroundColor Cyan

@@ -44,8 +44,8 @@ $indexPath = Join-Path $tmpBase "indexes/demo-nuget-index"
 if (Test-Path $indexPath) { Remove-Item $indexPath -Recurse -Force }
 
 # Index Newtonsoft packages
-Write-Host "`n$ apilens nuget --filter `"newtonsoft.*`" --latest" -ForegroundColor Yellow
-& $apilens nuget --filter "newtonsoft.*" --latest --index $indexPath
+Write-Host "`n$ apilens nuget --filter `"newtonsoft.*`" --latest-only" -ForegroundColor Yellow
+& $apilens nuget --filter "newtonsoft.*" --latest-only --index $indexPath
 
 # Query the results
 Write-Host "`n🔍 Now query the indexed packages:" -ForegroundColor Cyan

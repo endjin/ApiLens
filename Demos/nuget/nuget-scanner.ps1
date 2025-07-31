@@ -41,8 +41,8 @@ Write-Host "Command: apilens nuget --list --filter 'json*'" -ForegroundColor Yel
 
 # Demo 2: Index specific packages
 Write-Host "`n📦 Demo 2: Index Specific Packages" -ForegroundColor Green
-Write-Host "Command: apilens nuget --filter 'newtonsoft.*' --latest --index $indexPath" -ForegroundColor Yellow
-& $apilens nuget --filter "newtonsoft.*" --latest --index $indexPath
+Write-Host "Command: apilens nuget --filter 'newtonsoft.*' --latest-only --index $indexPath" -ForegroundColor Yellow
+& $apilens nuget --filter "newtonsoft.*" --latest-only --index $indexPath
 
 # Demo 3: Show index statistics
 Write-Host "`n📊 Demo 3: Index Statistics" -ForegroundColor Green

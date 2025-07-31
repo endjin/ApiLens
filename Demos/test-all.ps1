@@ -180,7 +180,7 @@ if ($Category -eq "all" -or $Category -eq "nuget") {
         
         Write-Host "`nTesting version info in queries..." -ForegroundColor Yellow
         $tempIndex = Join-Path ([System.IO.Path]::GetTempPath()) "test-version-$(Get-Random)"
-        & $apilensPath nuget --filter "newtonsoft.*" --latest --index $tempIndex 2>&1 | Out-Null
+        & $apilensPath nuget --filter "newtonsoft.*" --latest-only --index $tempIndex 2>&1 | Out-Null
         $queryTest = & $apilensPath query JsonSerializer --index $tempIndex 2>&1
         Remove-Item $tempIndex -Recurse -Force -ErrorAction SilentlyContinue
         
