@@ -33,6 +33,7 @@ public interface ILuceneIndexManager : IDisposable
 
     // Package tracking
     Dictionary<string, HashSet<string>> GetIndexedPackageVersions();
+    Dictionary<string, HashSet<(string Version, string Framework)>> GetIndexedPackageVersionsWithFramework();
 
     // Performance metrics
     PerformanceMetrics GetPerformanceMetrics();

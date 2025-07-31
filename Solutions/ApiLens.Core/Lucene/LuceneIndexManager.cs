@@ -531,6 +531,38 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         return packageVersions;
     }
 
+    public Dictionary<string, HashSet<(string Version, string Framework)>> GetIndexedPackageVersionsWithFramework()
+    {
+        Dictionary<string, HashSet<(string, string)>> packageVersions = new(StringComparer.OrdinalIgnoreCase);
+
+        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
+
+        // Only load the fields we need for efficiency
+        HashSet<string> fieldsToLoad = ["packageId", "packageVersion", "targetFramework"];
+
+        // Iterate through all documents efficiently
+        for (int i = 0; i < reader.MaxDoc; i++)
+        {
+            Document? doc = reader.Document(i, fieldsToLoad);
+
+            string? packageId = doc?.Get("packageId");
+            string? version = doc?.Get("packageVersion");
+            string? framework = doc?.Get("targetFramework") ?? "unknown";
+
+            if (!string.IsNullOrWhiteSpace(packageId) && !string.IsNullOrWhiteSpace(version))
+            {
+                if (!packageVersions.TryGetValue(packageId, out HashSet<(string, string)>? versions))
+                {
+                    versions = new HashSet<(string, string)>();
+                    packageVersions[packageId] = versions;
+                }
+                versions.Add((version, framework));
+            }
+        }
+
+        return packageVersions;
+    }
+
     public void Dispose()
     {
         if (disposed)

@@ -218,9 +218,28 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
             string fullName = ExtractFullNameFromId(id, memberType.Value);
             string namespaceName = ExtractNamespaceFromId(id, memberType.Value);
 
+            // Create a unique ID that includes package information to avoid collisions
+            // between the same type in different packages/versions/frameworks
+            string uniqueId;
+            if (nugetInfo.HasValue)
+            {
+                // For NuGet packages: include package, version, and framework
+                uniqueId = $"{nameAttribute}|{nugetInfo.Value.PackageId}|{nugetInfo.Value.Version}|{nugetInfo.Value.Framework}";
+            }
+            else if (fileHash != null)
+            {
+                // For local files: include assembly name and file hash
+                uniqueId = $"{nameAttribute}|{assemblyName.ToLowerInvariant()}|{fileHash}";
+            }
+            else
+            {
+                // Fallback to original behavior
+                uniqueId = nameAttribute;
+            }
+
             return new MemberInfo
             {
-                Id = stringCache.GetOrAdd(nameAttribute),
+                Id = stringCache.GetOrAdd(uniqueId),
                 MemberType = memberType.Value,
                 Name = stringCache.GetOrAdd(name),
                 FullName = stringCache.GetOrAdd(fullName),

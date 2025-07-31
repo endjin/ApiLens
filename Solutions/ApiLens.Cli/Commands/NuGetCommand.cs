@@ -130,7 +130,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             else
             {
                 // Get existing packages from index for change detection
-                Dictionary<string, HashSet<string>> indexedPackages = new();
+                Dictionary<string, HashSet<(string Version, string Framework)>> indexedPackagesWithFramework = new();
 
                 await AnsiConsole.Status()
                     .StartAsync("Analyzing index for change detection...", async ctx =>
@@ -138,49 +138,141 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         ctx.Spinner(Spinner.Known.Star);
                         ctx.SpinnerStyle(Style.Parse("yellow"));
 
-                        indexedPackages = await Task.Run(() => indexManager.GetIndexedPackageVersions());
+                        indexedPackagesWithFramework = await Task.Run(() => indexManager.GetIndexedPackageVersionsWithFramework());
                     });
 
                 // Determine which packages need indexing
                 packagesToIndex = [];
                 int skippedPackages = 0;
 
+                // First, check all packages to determine what needs indexing
+                HashSet<string> xmlFilesToIndex = new(StringComparer.OrdinalIgnoreCase);
+                
+                // Track which packages have truly new versions (for deletion logic)
+                Dictionary<string, string> packagesWithNewVersions = new(StringComparer.OrdinalIgnoreCase);
+                
                 foreach (NuGetPackageInfo package in packages)
                 {
                     bool shouldIndex = false;
 
-                    if (!indexedPackages.TryGetValue(package.PackageId, out HashSet<string>? indexedVersions))
+                    if (!indexedPackagesWithFramework.TryGetValue(package.PackageId, out HashSet<(string Version, string Framework)>? indexedVersions))
                     {
                         // Package not in index at all
                         shouldIndex = true;
                     }
-                    else if (!indexedVersions.Contains(package.Version))
+                    else if (!indexedVersions.Any(v => 
+                        v.Version == package.Version && 
+                        (v.Framework == package.TargetFramework || 
+                         (v.Framework == "unknown" && !indexedVersions.Any(iv => 
+                            iv.Version == package.Version && 
+                            iv.Framework != "unknown")))))
                     {
-                        // This version not in index
+                        // This version+framework combination not in index
+                        // Note: "unknown" framework entries (from legacy index) match any specific framework
+                        // unless a specific framework entry already exists for that version
                         shouldIndex = true;
-
-                        if (settings.LatestOnly)
+                        
+                        // Check if this is a newer version for deletion logic
+                        if (settings.LatestOnly && !indexedVersions.Any(v => v.Version == package.Version))
                         {
-                            // Mark all versions of this package for deletion
-                            // since we're indexing a new version
-                            packageIdsToDelete.Add(package.PackageId);
+                            // This is a new version (not just a new framework)
+                            // Track the highest version we're adding
+                            if (!packagesWithNewVersions.TryGetValue(package.PackageId, out string? currentHighest))
+                            {
+                                packagesWithNewVersions[package.PackageId] = package.Version;
+                            }
+                            else
+                            {
+                                try
+                                {
+                                    if (Version.TryParse(package.Version, out var pkgVer) && 
+                                        Version.TryParse(currentHighest, out var curVer) && 
+                                        pkgVer > curVer)
+                                    {
+                                        packagesWithNewVersions[package.PackageId] = package.Version;
+                                    }
+                                }
+                                catch (FormatException)
+                                {
+                                    // Fall back to string comparison
+                                    if (string.Compare(package.Version, currentHighest, StringComparison.OrdinalIgnoreCase) > 0)
+                                    {
+                                        packagesWithNewVersions[package.PackageId] = package.Version;
+                                    }
+                                }
+                            }
                         }
-                    }
-                    else
-                    {
-                        // Package+version already in index
-                        skippedPackages++;
                     }
 
                     if (shouldIndex)
                     {
-                        packagesToIndex.Add(package);
+                        xmlFilesToIndex.Add(package.XmlDocumentationPath);
+                    }
+                }
+                
+                // Now determine which packages should have old versions deleted
+                foreach (var kvp in packagesWithNewVersions)
+                {
+                    string packageId = kvp.Key;
+                    string newVersion = kvp.Value;
+                    
+                    // Only delete if the new version is actually newer than ALL existing versions
+                    if (indexedPackagesWithFramework.TryGetValue(packageId, out var existingVersions))
+                    {
+                        bool isNewerThanAll = true;
+                        
+                        foreach (var existing in existingVersions)
+                        {
+                            try
+                            {
+                                if (Version.TryParse(newVersion, out var newVer) && 
+                                    Version.TryParse(existing.Version, out var existVer))
+                                {
+                                    if (newVer <= existVer)
+                                    {
+                                        isNewerThanAll = false;
+                                        break;
+                                    }
+                                }
+                            }
+                            catch (FormatException)
+                            {
+                                // Fall back to string comparison
+                                if (string.Compare(newVersion, existing.Version, StringComparison.OrdinalIgnoreCase) <= 0)
+                                {
+                                    isNewerThanAll = false;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (isNewerThanAll)
+                        {
+                            packageIdsToDelete.Add(packageId);
+                        }
                     }
                 }
 
+                // Now deduplicate by XML path for actual indexing
+                var uniquePackagesByPath = packages
+                    .Where(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath))
+                    .GroupBy(p => p.XmlDocumentationPath, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .ToList();
+
+                packagesToIndex = uniquePackagesByPath;
+                skippedPackages = packages.Count - packages.Count(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath));
+
                 // Report what we're doing
-                int totalInIndex = indexedPackages.Sum(kvp => kvp.Value.Count);
-                AnsiConsole.MarkupLine($"[dim]Index contains {totalInIndex:N0} package versions across {indexedPackages.Count:N0} packages.[/]");
+                int totalInIndex = indexedPackagesWithFramework.Sum(kvp => kvp.Value.Count);
+                int uniquePackageVersions = indexedPackagesWithFramework.Sum(kvp => kvp.Value.Select(v => v.Version).Distinct().Count());
+                AnsiConsole.MarkupLine($"[dim]Index contains {uniquePackageVersions:N0} package versions across {indexedPackagesWithFramework.Count:N0} packages.[/]");
+                
+                // Report deduplication if it occurred
+                if (xmlFilesToIndex.Count > 0 && xmlFilesToIndex.Count < packages.Count(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath)))
+                {
+                    AnsiConsole.MarkupLine($"[dim]Found {packages.Count(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath)):N0} package entries sharing {xmlFilesToIndex.Count:N0} unique XML files.[/]");
+                }
 
                 if (skippedPackages > 0)
                 {
@@ -193,7 +285,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     return 0;
                 }
 
-                AnsiConsole.MarkupLine($"[green]Found {packagesToIndex.Count:N0} package(s) to index (new or updated).[/]");
+                AnsiConsole.MarkupLine($"[green]Found {packagesToIndex.Count:N0} XML file(s) to index (new or updated).[/]");
 
                 // Clean up old versions if needed
                 if (packageIdsToDelete.Count > 0)
