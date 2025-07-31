@@ -35,7 +35,7 @@ public sealed class ObjectPool<T> where T : class
 
         resetAction?.Invoke(item);
 
-        if (currentSize < maxSize)
+        if (objects.Count < maxSize)
         {
             objects.Add(item);
         }
