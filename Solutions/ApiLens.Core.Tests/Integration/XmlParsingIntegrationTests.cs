@@ -168,7 +168,7 @@ public class XmlParsingIntegrationTests
         XElement? membersElement = doc.Root?.Element("members");
 
         // Act
-        Dictionary<ReferenceType, List<CrossReference>> referencesByType = new Dictionary<ReferenceType, List<CrossReference>>();
+        Dictionary<ReferenceType, List<CrossReference>> referencesByType = new();
         foreach (XElement memberElement in membersElement?.Elements("member") ?? [])
         {
             string? memberId = memberElement.Attribute("name")?.Value;

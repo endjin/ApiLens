@@ -1,5 +1,13 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Text;
+using System.Threading.Channels;
+using ApiLens.Core.Infrastructure;
 using ApiLens.Core.Models;
+using ApiLens.Core.Parsing;
 using Lucene.Net.Analysis;
+using Lucene.Net.Analysis.Core;
+using Lucene.Net.Analysis.Miscellaneous;
 using Lucene.Net.Documents;
 using Lucene.Net.Index;
 using Lucene.Net.QueryParsers.Classic;
@@ -9,45 +17,294 @@ using Lucene.Net.Util;
 
 namespace ApiLens.Core.Lucene;
 
-public class LuceneIndexManager : ILuceneIndexManager
+public sealed class LuceneIndexManager : ILuceneIndexManager
 {
     private readonly global::Lucene.Net.Store.Directory directory;
-    private readonly Analyzer analyzer;
     private readonly IndexWriter writer;
-    private readonly LuceneVersion version = LuceneVersion.LUCENE_48;
+    private readonly IXmlDocumentParser parser;
+    private readonly IDocumentBuilder documentBuilder;
     private readonly string? indexPath;
+
+    // Performance settings
+    private const int BatchSize = 50_000;
+    private const int ChannelCapacity = 100_000;
+    private const double RamBufferSizeMB = 512.0;
+
+    // Object pools
+    private readonly ObjectPool<Document> documentPool;
+    private readonly ObjectPool<StringBuilder> stringBuilderPool;
+    private readonly StringInternCache stringCache;
+
+    // Channels for parallel processing
+    private readonly Channel<ParseTask> parseChannel;
+    private readonly Channel<Document> documentChannel;
+
+    // Pre-created analyzers
+    private readonly KeywordAnalyzer keywordAnalyzer;
+    private readonly WhitespaceAnalyzer whitespaceAnalyzer;
+    private readonly PerFieldAnalyzerWrapper analyzer;
+
+    // Performance tracking
+    private readonly PerformanceTracker performanceTracker;
     private bool disposed;
 
-    public LuceneIndexManager(global::Lucene.Net.Store.Directory directory, string? indexPath = null)
+    public LuceneIndexManager(
+        string indexPath,
+        IXmlDocumentParser parser,
+        IDocumentBuilder documentBuilder)
     {
-        ArgumentNullException.ThrowIfNull(directory);
-        this.directory = directory;
-        analyzer = new DotNetCodeAnalyzer(version);
-        this.indexPath = indexPath;
+        ArgumentNullException.ThrowIfNull(indexPath);
+        ArgumentNullException.ThrowIfNull(parser);
+        ArgumentNullException.ThrowIfNull(documentBuilder);
 
-        IndexWriterConfig config = new(version, analyzer)
+        this.indexPath = indexPath;
+        this.parser = parser;
+        this.documentBuilder = documentBuilder;
+
+        // Initialize directory
+        directory = FSDirectory.Open(indexPath);
+
+        // Initialize analyzers
+        keywordAnalyzer = new KeywordAnalyzer();
+        whitespaceAnalyzer = new WhitespaceAnalyzer(LuceneVersion.LUCENE_48);
+
+        // Configure per-field analyzer
+        Dictionary<string, Analyzer> fieldAnalyzers = new()
         {
-            OpenMode = OpenMode.CREATE_OR_APPEND
+            { "id", keywordAnalyzer },
+            { "memberType", keywordAnalyzer },
+            { "name", keywordAnalyzer },
+            { "fullName", keywordAnalyzer },
+            { "assembly", keywordAnalyzer },
+            { "namespace", keywordAnalyzer },
+            { "memberTypeFacet", keywordAnalyzer },
+            { "crossref", keywordAnalyzer },
+            { "exceptionType", keywordAnalyzer },
+            { "attribute", keywordAnalyzer },
+            { "packageId", keywordAnalyzer },
+            { "packageVersion", keywordAnalyzer },
+            { "targetFramework", keywordAnalyzer },
+            { "contentHash", keywordAnalyzer }
+        };
+
+        analyzer = new PerFieldAnalyzerWrapper(whitespaceAnalyzer, fieldAnalyzers);
+
+        // Configure IndexWriter for maximum performance
+        IndexWriterConfig config = new(LuceneVersion.LUCENE_48, analyzer)
+        {
+            OpenMode = OpenMode.CREATE_OR_APPEND,
+            RAMBufferSizeMB = RamBufferSizeMB,
+            MaxBufferedDocs = BatchSize,
+            MergePolicy = new TieredMergePolicy
+            {
+                MaxMergeAtOnce = 10,
+                SegmentsPerTier = 10
+            },
+            UseCompoundFile = false
         };
 
         writer = new IndexWriter(directory, config);
+
+        // Initialize object pools
+        documentPool = new ObjectPool<Document>(
+            () => [],
+            doc => { }, // Documents can't be cleared, we'll create new ones
+            maxSize: 4096);
+
+        stringBuilderPool = new ObjectPool<StringBuilder>(
+            () => new StringBuilder(4096),
+            sb => sb.Clear(),
+            maxSize: 1024);
+
+        stringCache = new StringInternCache(maxSize: 10000);
+
+        // Initialize channels
+        parseChannel = Channel.CreateBounded<ParseTask>(new BoundedChannelOptions(ChannelCapacity)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleWriter = false,
+            SingleReader = false
+        });
+
+        documentChannel = Channel.CreateBounded<Document>(new BoundedChannelOptions(ChannelCapacity)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleWriter = false,
+            SingleReader = true
+        });
+
+        performanceTracker = new PerformanceTracker();
     }
 
-    public LuceneIndexManager(string indexPath) : this(FSDirectory.Open(indexPath), indexPath)
+    public async Task<IndexingResult> IndexBatchAsync(
+        IEnumerable<MemberInfo> members,
+        CancellationToken cancellationToken = default)
     {
+        await Task.Yield(); // Ensure async
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        List<string> errors = [];
+        int successCount = 0;
+        int failCount = 0;
+
+        try
+        {
+            List<Document> batch = new(BatchSize);
+
+            foreach (MemberInfo member in members)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
+                try
+                {
+                    Document doc = documentBuilder.BuildDocument(member);
+                    batch.Add(doc);
+                    successCount++;
+
+                    if (batch.Count >= BatchSize)
+                    {
+                        writer.AddDocuments(batch);
+                        writer.Commit();
+                        batch.Clear();
+                        performanceTracker.RecordBatchCommit(BatchSize);
+                    }
+                }
+#pragma warning disable CA1031 // Do not catch general exception types
+                catch (Exception ex)
+#pragma warning restore CA1031 // Do not catch general exception types
+                {
+                    failCount++;
+                    errors.Add($"Failed to index member {member.Id}: {ex.Message}");
+                }
+            }
+
+            // Commit remaining documents
+            if (batch.Count > 0)
+            {
+                writer.AddDocuments(batch);
+                writer.Commit();
+                performanceTracker.RecordBatchCommit(batch.Count);
+            }
+
+            return new IndexingResult
+            {
+                TotalDocuments = successCount + failCount,
+                SuccessfulDocuments = successCount,
+                FailedDocuments = failCount,
+                ElapsedTime = stopwatch.Elapsed,
+                BytesProcessed = 0, // Would need to track this
+                Metrics = performanceTracker.GetMetrics(),
+                Errors = [.. errors]
+            };
+        }
+#pragma warning disable CA1031 // Do not catch general exception types
+        catch (Exception ex)
+#pragma warning restore CA1031 // Do not catch general exception types
+        {
+            errors.Add($"Indexing failed: {ex.Message}");
+            return new IndexingResult
+            {
+                TotalDocuments = successCount + failCount,
+                SuccessfulDocuments = successCount,
+                FailedDocuments = failCount,
+                ElapsedTime = stopwatch.Elapsed,
+                BytesProcessed = 0,
+                Metrics = performanceTracker.GetMetrics(),
+                Errors = [.. errors]
+            };
+        }
     }
 
-    public void AddDocument(Document document)
+    public async Task<IndexingResult> IndexXmlFilesAsync(
+        IEnumerable<string> filePaths,
+        CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(document);
-        writer.AddDocument(document);
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        List<string> errors = [];
+        int totalDocuments = 0;
+        int successCount = 0;
+        long bytesProcessed = 0;
+
+        // Start indexing pipeline
+        Task indexingTask = StartIndexingPipelineAsync(cancellationToken);
+
+        // Parse files in parallel
+        ParallelOptions parseOptions = new()
+        {
+            CancellationToken = cancellationToken,
+            MaxDegreeOfParallelism = Environment.ProcessorCount
+        };
+
+        await Parallel.ForEachAsync(filePaths, parseOptions, async (filePath, ct) =>
+        {
+            try
+            {
+                FileInfo fileInfo = new(filePath);
+                Interlocked.Add(ref bytesProcessed, fileInfo.Length);
+
+                await foreach (MemberInfo member in parser.ParseXmlFileStreamAsync(filePath, ct))
+                {
+                    Document doc = documentBuilder.BuildDocument(member);
+                    await documentChannel.Writer.WriteAsync(doc, ct);
+                    Interlocked.Increment(ref totalDocuments);
+                    Interlocked.Increment(ref successCount);
+                }
+            }
+#pragma warning disable CA1031 // Do not catch general exception types
+            catch (Exception ex)
+#pragma warning restore CA1031 // Do not catch general exception types
+            {
+                lock (errors)
+                {
+                    errors.Add($"Failed to parse {filePath}: {ex.Message}");
+                }
+            }
+        });
+
+        // Signal completion
+        documentChannel.Writer.Complete();
+
+        // Wait for indexing to complete
+        await indexingTask;
+
+        return new IndexingResult
+        {
+            TotalDocuments = totalDocuments,
+            SuccessfulDocuments = successCount,
+            FailedDocuments = totalDocuments - successCount,
+            ElapsedTime = stopwatch.Elapsed,
+            BytesProcessed = bytesProcessed,
+            Metrics = performanceTracker.GetMetrics(),
+            Errors = [.. errors]
+        };
     }
 
-    public void UpdateDocument(Term term, Document document)
+    private async Task StartIndexingPipelineAsync(CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(term);
-        ArgumentNullException.ThrowIfNull(document);
-        writer.UpdateDocument(term, document);
+        List<Document> batch = new(BatchSize);
+
+        await foreach (Document doc in documentChannel.Reader.ReadAllAsync(cancellationToken))
+        {
+            batch.Add(doc);
+
+            if (batch.Count >= BatchSize)
+            {
+                Stopwatch batchStopwatch = Stopwatch.StartNew();
+                writer.AddDocuments(batch);
+                writer.Commit();
+                performanceTracker.RecordBatchCommit(batch.Count, batchStopwatch.Elapsed);
+                batch.Clear();
+            }
+        }
+
+        // Commit remaining documents
+        if (batch.Count > 0)
+        {
+            Stopwatch batchStopwatch = Stopwatch.StartNew();
+            writer.AddDocuments(batch);
+            writer.Commit();
+            performanceTracker.RecordBatchCommit(batch.Count, batchStopwatch.Elapsed);
+        }
     }
 
     public void DeleteDocument(Term term)
@@ -61,43 +318,70 @@ public class LuceneIndexManager : ILuceneIndexManager
         writer.DeleteAll();
     }
 
-    public void Commit()
+    public async Task CommitAsync()
     {
-        writer.Commit();
+        await Task.Run(() => writer.Commit());
     }
 
-    public DirectoryReader OpenReader()
+    public TopDocs SearchByField(string fieldName, string searchTerm, int maxResults = 100)
     {
-        return DirectoryReader.Open(directory);
-    }
+        ArgumentNullException.ThrowIfNull(fieldName);
+        ArgumentNullException.ThrowIfNull(searchTerm);
 
-    public List<Document> SearchByField(string fieldName, string queryText, int maxResults)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fieldName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(queryText);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
-
-        using DirectoryReader reader = OpenReader();
+        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
         IndexSearcher searcher = new(reader);
 
+        // For keyword fields, use a TermQuery for exact matching
         Query query;
-
-        // For string fields (not analyzed), use TermQuery
-        if (fieldName is "id" or "memberType" or "assembly" or "name" or "fullName" or "namespace"
-            or "exceptionType" or "attribute" or "crossref" or "memberTypeFacet")
+        if (fieldName is "id" or "memberType" or "name" or "fullName" or "assembly" or "namespace")
         {
-            query = new TermQuery(new Term(fieldName, queryText));
+            query = new TermQuery(new Term(fieldName, searchTerm));
         }
         else
         {
-            // For text fields (analyzed), use QueryParser
-            QueryParser parser = new(version, fieldName, analyzer);
-            query = parser.Parse(queryText);
+            QueryParser parser = new(LuceneVersion.LUCENE_48, fieldName, analyzer);
+            query = parser.Parse(searchTerm);
         }
 
-        TopDocs topDocs = searcher.Search(query, maxResults);
-        List<Document> results = [];
+        return searcher.Search(query, maxResults);
+    }
 
+    public TopDocs SearchWithQuery(Query query, int maxResults = 100)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
+        IndexSearcher searcher = new(reader);
+
+        return searcher.Search(query, maxResults);
+    }
+
+    public Document? GetDocument(int docId)
+    {
+        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
+        IndexSearcher searcher = new(reader);
+
+        try
+        {
+            return searcher.Doc(docId);
+        }
+#pragma warning disable CA1031 // Do not catch general exception types
+        catch
+#pragma warning restore CA1031 // Do not catch general exception types
+        {
+            return null;
+        }
+    }
+
+    public List<Document> SearchByIntRange(string fieldName, int min, int max, int maxResults)
+    {
+        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
+        IndexSearcher searcher = new(reader);
+
+        NumericRangeQuery<int>? query = NumericRangeQuery.NewInt32Range(fieldName, min, max, true, true);
+        TopDocs topDocs = searcher.Search(query, maxResults);
+
+        List<Document> results = new(topDocs.ScoreDocs.Length);
         foreach (ScoreDoc? scoreDoc in topDocs.ScoreDocs)
         {
             results.Add(searcher.Doc(scoreDoc.Doc));
@@ -106,162 +390,119 @@ public class LuceneIndexManager : ILuceneIndexManager
         return results;
     }
 
-    public List<Document> SearchByIntRange(string fieldName, int min, int max, int maxResults)
+    public List<Document> SearchByFieldExists(string fieldName, int maxResults)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fieldName);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
+        IndexSearcher searcher = new(reader);
 
-        List<Document> results = [];
+        TermRangeQuery query = new(fieldName, null, null, true, true);
+        TopDocs topDocs = searcher.Search(query, maxResults);
 
-        try
+        List<Document> results = new(topDocs.ScoreDocs.Length);
+        foreach (ScoreDoc? scoreDoc in topDocs.ScoreDocs)
         {
-            using DirectoryReader reader = writer.GetReader(true);
-            IndexSearcher searcher = new(reader);
-
-            // Create a numeric range query
-            Query query = NumericRangeQuery.NewInt32Range(fieldName, min, max, true, true);
-
-            TopDocs topDocs = searcher.Search(query, maxResults);
-            foreach (ScoreDoc scoreDoc in topDocs.ScoreDocs)
-            {
-                Document doc = searcher.Doc(scoreDoc.Doc);
-                results.Add(doc);
-            }
-        }
-        catch (IOException)
-        {
-            // Return empty results on search error
+            results.Add(searcher.Doc(scoreDoc.Doc));
         }
 
         return results;
     }
 
-    public List<Document> SearchByFieldExists(string fieldName, int maxResults)
+    public int GetTotalDocuments()
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fieldName);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
+        return reader.NumDocs;
+    }
 
-        List<Document> results = [];
+    public long GetIndexSizeInBytes()
+    {
+        long totalSize = 0;
 
-        try
+        if (!string.IsNullOrEmpty(indexPath) && System.IO.Directory.Exists(indexPath))
         {
-            using DirectoryReader reader = writer.GetReader(true);
-            IndexSearcher searcher = new(reader);
-
-            // Create a wildcard query to find documents where the field exists
-            Query query = new WildcardQuery(new Term(fieldName, "*"));
-
-            TopDocs topDocs = searcher.Search(query, maxResults);
-            foreach (ScoreDoc scoreDoc in topDocs.ScoreDocs)
+            DirectoryInfo dirInfo = new(indexPath);
+            foreach (FileInfo file in dirInfo.GetFiles())
             {
-                Document doc = searcher.Doc(scoreDoc.Doc);
-                results.Add(doc);
+                totalSize += file.Length;
             }
         }
-        catch (IOException)
-        {
-            // Return empty results on search error
-        }
 
-        return results;
+        return totalSize;
     }
 
     public IndexStatistics? GetIndexStatistics()
     {
-        try
-        {
-            // Get the directory path
-            string resolvedIndexPath = indexPath ?? "Unknown";
-            long totalSize = 0;
-            int fileCount = 0;
-            DateTime? lastModified = null;
-
-            // If we have the index path, try to calculate file statistics
-            // This is optional and will gracefully fail if file system access is not available
-            if (!string.IsNullOrEmpty(indexPath))
-            {
-                try
-                {
-                    if (System.IO.Directory.Exists(indexPath))
-                    {
-                        DirectoryInfo dirInfo = new(indexPath);
-                        FileInfo[] files = dirInfo.GetFiles("*", SearchOption.AllDirectories);
-                        fileCount = files.Length;
-                        totalSize = files.Sum(f => f.Length);
-                        lastModified = files.Length > 0 ? files.Max(f => f.LastWriteTime) : null;
-                    }
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    // File system access might not be available in all contexts
-                    // Continue without file statistics
-                }
-                catch (IOException)
-                {
-                    // File system access might fail due to I/O issues
-                    // Continue without file statistics
-                }
-            }
-
-            // Get document and field counts
-            int documentCount = 0;
-            int fieldCount = 0;
-
-            try
-            {
-                using DirectoryReader reader = OpenReader();
-                documentCount = reader.NumDocs;
-
-                // Count unique fields across all documents
-                HashSet<string> uniqueFields = [];
-                for (int i = 0; i < Math.Min(100, documentCount); i++) // Sample first 100 docs for performance
-                {
-                    Document doc = reader.Document(i);
-                    foreach (IIndexableField field in doc.Fields)
-                    {
-                        uniqueFields.Add(field.Name);
-                    }
-                }
-                fieldCount = uniqueFields.Count;
-            }
-            catch (global::Lucene.Net.Index.CorruptIndexException)
-            {
-                // Index might be corrupted
-            }
-            catch (IOException)
-            {
-                // Index might be empty or not yet created
-            }
-
-            return new IndexStatistics
-            {
-                IndexPath = resolvedIndexPath,
-                TotalSizeInBytes = totalSize,
-                DocumentCount = documentCount,
-                FieldCount = fieldCount,
-                FileCount = fileCount,
-                LastModified = lastModified
-            };
-        }
-        catch (IOException)
-        {
+        if (string.IsNullOrEmpty(indexPath))
             return null;
-        }
-        catch (InvalidOperationException)
+
+        return new IndexStatistics
         {
-            return null;
-        }
+            DocumentCount = GetTotalDocuments(),
+            IndexPath = indexPath,
+            TotalSizeInBytes = GetIndexSizeInBytes(),
+            FieldCount = 0, // Would need to count unique fields
+            FileCount = System.IO.Directory.Exists(indexPath)
+                ? System.IO.Directory.GetFiles(indexPath).Length
+                : 0
+        };
     }
 
+    public PerformanceMetrics GetPerformanceMetrics()
+    {
+        return performanceTracker.GetMetrics();
+    }
 
     public void Dispose()
     {
-        if (disposed) return;
-
-        writer?.Dispose();
-        analyzer?.Dispose();
-        directory?.Dispose();
+        if (disposed)
+            return;
 
         disposed = true;
+
+        writer?.Dispose();
+        directory?.Dispose();
+        analyzer?.Dispose();
+        keywordAnalyzer?.Dispose();
+        whitespaceAnalyzer?.Dispose();
+    }
+
+    private record ParseTask(string FilePath, CancellationToken CancellationToken);
+
+    private sealed class PerformanceTracker
+    {
+        private readonly ConcurrentBag<TimeSpan> batchCommitTimes = [];
+        private readonly Stopwatch totalStopwatch = Stopwatch.StartNew();
+        private int documentsIndexed;
+
+        public void RecordBatchCommit(int batchSize, TimeSpan? elapsed = null)
+        {
+            Interlocked.Add(ref documentsIndexed, batchSize);
+            if (elapsed.HasValue)
+            {
+                batchCommitTimes.Add(elapsed.Value);
+            }
+        }
+
+        public PerformanceMetrics GetMetrics()
+        {
+            long gcInfo = GC.GetTotalMemory(false);
+
+            return new PerformanceMetrics
+            {
+                TotalAllocatedBytes = gcInfo,
+                Gen0Collections = GC.CollectionCount(0),
+                Gen1Collections = GC.CollectionCount(1),
+                Gen2Collections = GC.CollectionCount(2),
+                AverageParseTimeMs = 0, // Would need to track separately
+                AverageIndexTimeMs = 0, // Would need to track separately
+                AverageBatchCommitTimeMs = batchCommitTimes.Count > 0
+                    ? batchCommitTimes.Average(t => t.TotalMilliseconds)
+                    : 0,
+                PeakThreadCount = ThreadPool.ThreadCount,
+                CpuUsagePercent = 0, // Would need platform-specific code
+                PeakWorkingSetBytes = Process.GetCurrentProcess().PeakWorkingSet64,
+                DocumentsPooled = 0, // Would need to expose from pools
+                StringsInterned = 0 // Would need to expose from cache
+            };
+        }
     }
 }

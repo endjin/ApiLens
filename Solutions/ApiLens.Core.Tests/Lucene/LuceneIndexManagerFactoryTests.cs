@@ -1,4 +1,5 @@
 using ApiLens.Core.Lucene;
+using ApiLens.Core.Parsing;
 
 namespace ApiLens.Core.Tests.Lucene;
 
@@ -10,7 +11,9 @@ public class LuceneIndexManagerFactoryTests
     [TestInitialize]
     public void Initialize()
     {
-        factory = new LuceneIndexManagerFactory();
+        XmlDocumentParser parser = new();
+        DocumentBuilder documentBuilder = new();
+        factory = new LuceneIndexManagerFactory(parser, documentBuilder);
     }
 
     [TestMethod]
@@ -159,7 +162,7 @@ public class LuceneIndexManagerFactoryTests
     {
         // Act & Assert
         Should.Throw<ArgumentNullException>(() => factory.Create(null!))
-            .ParamName.ShouldBe("path");
+            .ParamName.ShouldBe("indexPath");
     }
 
     [TestMethod]
@@ -173,7 +176,9 @@ public class LuceneIndexManagerFactoryTests
     public void Factory_CanBeUsedWithDependencyInjection()
     {
         // Arrange
-        ILuceneIndexManagerFactory diFactory = new LuceneIndexManagerFactory();
+        XmlDocumentParser parser = new();
+        DocumentBuilder documentBuilder = new();
+        ILuceneIndexManagerFactory diFactory = new LuceneIndexManagerFactory(parser, documentBuilder);
 
         // Act
         ILuceneIndexManager manager = diFactory.Create("di-test-index");
@@ -181,5 +186,8 @@ public class LuceneIndexManagerFactoryTests
         // Assert
         manager.ShouldNotBeNull();
         manager.ShouldBeAssignableTo<ILuceneIndexManager>();
+
+        // Cleanup
+        manager.Dispose();
     }
 }

@@ -1,33 +1,37 @@
 using System.Collections.Immutable;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
-using ApiLens.Core.Parsing;
 using ApiLens.Core.Services;
-using Lucene.Net.Documents;
 
 namespace ApiLens.Cli.Commands;
 
 /// <summary>
 /// Command for scanning and indexing NuGet package cache.
 /// </summary>
-public class NuGetCommand : Command<NuGetCommand.Settings>
+public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 {
     private readonly IFileSystemService fileSystem;
     private readonly INuGetCacheScanner scanner;
+    private readonly ILuceneIndexManagerFactory indexManagerFactory;
 
-    public NuGetCommand(IFileSystemService fileSystem, INuGetCacheScanner scanner)
+    public NuGetCommand(
+        IFileSystemService fileSystem,
+        INuGetCacheScanner scanner,
+        ILuceneIndexManagerFactory indexManagerFactory)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(scanner);
+        ArgumentNullException.ThrowIfNull(indexManagerFactory);
 
         this.fileSystem = fileSystem;
         this.scanner = scanner;
+        this.indexManagerFactory = indexManagerFactory;
     }
 
-    public override int Execute(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
         try
         {
@@ -42,153 +46,202 @@ public class NuGetCommand : Command<NuGetCommand.Settings>
             }
 
             // Scan for packages
-            AnsiConsole.Status()
-                .Start("Scanning NuGet cache...", ctx =>
+            List<NuGetPackageInfo> packages = [];
+
+            await AnsiConsole.Status()
+                .StartAsync("Scanning NuGet cache...", async ctx =>
                 {
                     ctx.Spinner(Spinner.Known.Star);
                     ctx.SpinnerStyle(Style.Parse("green"));
+
+                    packages = await Task.Run(() =>
+                    {
+                        ImmutableArray<NuGetPackageInfo> allPackages = scanner.ScanDirectory(cachePath);
+                        if (!string.IsNullOrEmpty(settings.PackageFilter))
+                        {
+                            Regex regex = new(settings.PackageFilter.Replace("*", ".*"), RegexOptions.IgnoreCase);
+                            return allPackages.Where(p => regex.IsMatch(p.PackageId)).ToList();
+                        }
+                        return allPackages.ToList();
+                    });
                 });
 
-            ImmutableArray<NuGetPackageInfo> packages = scanner.ScanNuGetCache();
-
-            // Apply package filter if specified
-            if (!string.IsNullOrWhiteSpace(settings.PackageFilter))
+            if (packages.Count == 0)
             {
-                Regex filterRegex = new(settings.PackageFilter, RegexOptions.IgnoreCase);
-                packages = [.. packages.Where(p => filterRegex.IsMatch(p.PackageId))];
+                AnsiConsole.MarkupLine("[yellow]No packages found matching the filter.[/]");
+                return 0;
+            }
+
+            AnsiConsole.MarkupLine($"[green]Found {packages.Count} package(s) with XML documentation.[/]");
+
+            // Apply version filter if specified
+            if (!string.IsNullOrWhiteSpace(settings.VersionFilter))
+            {
+                Regex versionRegex = new(settings.VersionFilter, RegexOptions.IgnoreCase);
+                packages = packages.Where(p => versionRegex.IsMatch(p.Version)).ToList();
+                AnsiConsole.MarkupLine($"[green]After version filter: {packages.Count} package(s).[/]");
             }
 
             // Apply latest-only filter if specified
             if (settings.LatestOnly)
             {
-                packages = scanner.GetLatestVersions(packages);
+                ImmutableArray<NuGetPackageInfo> latestPackages = scanner.GetLatestVersions([.. packages]);
+                packages = latestPackages.ToList();
+                AnsiConsole.MarkupLine($"[green]After latest-only filter: {packages.Count} package(s).[/]");
             }
 
-            AnsiConsole.MarkupLine($"[green]Found {packages.Length} package(s) with XML documentation[/]");
-
-            // If list-only, display packages and exit
-            if (settings.ListOnly)
+            if (settings.List)
             {
                 DisplayPackageList(packages);
                 return 0;
             }
 
-            // Index the packages
-            return IndexPackages(packages, settings);
+            // Create index manager
+            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
+
+            if (settings.Clean)
+            {
+                AnsiConsole.MarkupLine("[yellow]Cleaning index...[/]");
+                indexManager.DeleteAll();
+                await indexManager.CommitAsync();
+            }
+
+            // Index packages
+            await AnsiConsole.Progress()
+                .AutoClear(false)
+                .Columns(
+                    new TaskDescriptionColumn(),
+                    new ProgressBarColumn(),
+                    new PercentageColumn(),
+                    new RemainingTimeColumn(),
+                    new SpinnerColumn())
+                .StartAsync(async ctx =>
+                {
+                    ProgressTask task = ctx.AddTask("[green]Indexing NuGet packages[/]", maxValue: packages.Count);
+
+                    // Get all XML files from packages
+                    List<string> xmlFiles = packages.Select(p => p.XmlDocumentationPath).ToList();
+
+                    // Index all files using high-performance batch operations
+                    Stopwatch stopwatch = Stopwatch.StartNew();
+                    IndexingResult result = await indexManager.IndexXmlFilesAsync(xmlFiles);
+                    stopwatch.Stop();
+
+                    task.Value = packages.Count;
+                    task.StopTask();
+
+                    // Display results
+                    AnsiConsole.WriteLine();
+                    DisplayResults(result, indexManager, settings.IndexPath);
+                });
+
+            return 0;
         }
-        catch (InvalidOperationException ex)
+#pragma warning disable CA1031 // Do not catch general exception types
+        catch (Exception ex)
+#pragma warning restore CA1031 // Do not catch general exception types
         {
             AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+            if (settings.Verbose)
+            {
+                AnsiConsole.WriteException(ex);
+            }
             return 1;
         }
     }
 
-    private static void DisplayPackageList(ImmutableArray<NuGetPackageInfo> packages)
+    private static void DisplayPackageList(List<NuGetPackageInfo> packages)
     {
-        Table table = new();
-        table.AddColumn("Package");
-        table.AddColumn("Version");
-        table.AddColumn("Framework");
-        table.AddColumn("Path");
+        Table table = new Table()
+            .Border(TableBorder.Rounded)
+            .Title("[bold yellow]NuGet Packages with XML Documentation[/]");
 
-        foreach (NuGetPackageInfo package in packages.OrderBy(p => p.PackageId).ThenBy(p => p.Version).ThenBy(p => p.TargetFramework))
+        table.AddColumn("[bold]Package ID[/]");
+        table.AddColumn("[bold]Version[/]");
+        table.AddColumn("[bold]Framework[/]");
+        table.AddColumn("[bold]XML Size[/]", c => c.RightAligned());
+
+        foreach (NuGetPackageInfo package in packages.OrderBy(p => p.PackageId).ThenBy(p => p.Version))
         {
+            FileInfo fileInfo = new(package.XmlDocumentationPath);
+            long fileSize = 0;
+            try
+            {
+                fileSize = fileInfo.Length;
+            }
+            catch (FileNotFoundException)
+            {
+                // File doesn't exist - use 0 size (common in tests)
+                fileSize = 0;
+            }
+            
             table.AddRow(
                 package.PackageId,
                 package.Version,
                 package.TargetFramework,
-                Markup.Escape(package.XmlDocumentationPath)
-            );
+                FormatSize(fileSize));
         }
 
         AnsiConsole.Write(table);
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[green]Total packages:[/] {packages.Count}");
     }
 
-    private static int IndexPackages(ImmutableArray<NuGetPackageInfo> packages, Settings settings)
+    private static void DisplayResults(IndexingResult result, ILuceneIndexManager indexManager, string indexPath)
     {
-        using LuceneIndexManager indexManager = new(settings.IndexPath);
+        Table table = new Table()
+            .Border(TableBorder.Rounded)
+            .Title("[bold yellow]NuGet Indexing Results[/]");
 
-        if (settings.Clean)
+        table.AddColumn("[bold]Metric[/]");
+        table.AddColumn("[bold]Value[/]", c => c.RightAligned());
+
+        // Basic stats
+        table.AddRow("Documents Indexed", result.SuccessfulDocuments.ToString("N0"));
+        table.AddRow("Failed Documents", result.FailedDocuments.ToString("N0"));
+        table.AddRow("Total Time", FormatDuration(result.ElapsedTime));
+        table.AddRow("Documents/Second", result.DocumentsPerSecond.ToString("N2"));
+        table.AddRow("Throughput", $"{result.MegabytesPerSecond:N2} MB/s");
+        table.AddRow("Data Processed", FormatSize(result.BytesProcessed));
+
+        // Performance metrics
+        if (result.Metrics != null)
         {
-            AnsiConsole.MarkupLine("[yellow]Cleaning index...[/]");
-            indexManager.DeleteAll();
-            indexManager.Commit();
+            table.AddEmptyRow();
+            table.AddRow("[dim]Performance Metrics[/]", "");
+            table.AddRow("Avg Batch Commit", $"{result.Metrics.AverageBatchCommitTimeMs:N2} ms");
+            table.AddRow("Peak Threads", result.Metrics.PeakThreadCount.ToString());
+            table.AddRow("Peak Memory", FormatSize(result.Metrics.PeakWorkingSetBytes));
+            table.AddRow("GC Gen0/1/2", $"{result.Metrics.Gen0Collections}/{result.Metrics.Gen1Collections}/{result.Metrics.Gen2Collections}");
         }
 
-        XmlDocumentParser parser = new();
-        DocumentBuilder documentBuilder = new();
-        int totalMembers = 0;
-        int failed = 0;
-
-        AnsiConsole.Progress()
-            .Start(ctx =>
-            {
-                ProgressTask task = ctx.AddTask("[green]Indexing packages[/]", maxValue: packages.Length);
-
-                foreach (NuGetPackageInfo package in packages)
-                {
-                    task.Description = $"[green]Indexing {package.PackageId} v{package.Version} ({package.TargetFramework})[/]";
-
-                    try
-                    {
-                        // Load and parse the XML file
-                        XDocument document = XDocument.Load(package.XmlDocumentationPath);
-                        ApiAssemblyInfo assembly = parser.ParseAssembly(document);
-                        ImmutableArray<MemberInfo> members = parser.ParseMembers(document, assembly.Name);
-
-                        foreach (MemberInfo member in members)
-                        {
-                            // Enhance member with NuGet package information
-                            MemberInfo enrichedMember = member with
-                            {
-                                PackageId = package.PackageId,
-                                PackageVersion = package.Version,
-                                TargetFramework = package.TargetFramework,
-                                IsFromNuGetCache = true,
-                                SourceFilePath = package.XmlDocumentationPath,
-                                IndexedAt = package.IndexedAt
-                            };
-
-                            Document doc = documentBuilder.BuildDocument(enrichedMember);
-                            indexManager.AddDocument(doc);
-                            totalMembers++;
-                        }
-                    }
-                    catch (System.Xml.XmlException ex)
-                    {
-                        AnsiConsole.MarkupLine($"[red]Failed to parse XML for {package.PackageId}:[/] {ex.Message}");
-                        failed++;
-                    }
-                    catch (IOException ex)
-                    {
-                        AnsiConsole.MarkupLine($"[red]Failed to read {package.PackageId}:[/] {ex.Message}");
-                        failed++;
-                    }
-
-                    task.Increment(1);
-                }
-            });
-
-        indexManager.Commit();
-
-        // Get index statistics
+        // Index info
         IndexStatistics? stats = indexManager.GetIndexStatistics();
-
-        AnsiConsole.MarkupLine($"[green]Indexing complete![/]");
-        AnsiConsole.MarkupLine($"  Packages processed: {packages.Length - failed}");
-        AnsiConsole.MarkupLine($"  Members indexed: {totalMembers}");
-        if (failed > 0)
-        {
-            AnsiConsole.MarkupLine($"  Failed: {failed} package(s)");
-        }
-
         if (stats != null)
         {
-            AnsiConsole.MarkupLine($"  Index size: {FormatSize(stats.TotalSizeInBytes)}");
-            AnsiConsole.MarkupLine($"  Index location: {stats.IndexPath}");
+            table.AddEmptyRow();
+            table.AddRow("[dim]Index Statistics[/]", "");
+            table.AddRow("Total Documents", stats.DocumentCount.ToString("N0"));
+            table.AddRow("Index Size", FormatSize(stats.TotalSizeInBytes));
+            table.AddRow("Index Location", stats.IndexPath);
         }
 
-        return 0;
+        AnsiConsole.Write(table);
+
+        // Display errors if any
+        if (result.Errors.Length > 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[red]Errors encountered ({result.Errors.Length}):[/]");
+            foreach (string error in result.Errors.Take(10))
+            {
+                AnsiConsole.MarkupLine($"  [red]•[/] {error}");
+            }
+            if (result.Errors.Length > 10)
+            {
+                AnsiConsole.MarkupLine($"  [dim]... and {result.Errors.Length - 10} more[/]");
+            }
+        }
     }
 
     private static string FormatSize(long bytes)
@@ -206,26 +259,44 @@ public class NuGetCommand : Command<NuGetCommand.Settings>
         return $"{size:0.##} {sizes[order]}";
     }
 
+    private static string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalMilliseconds < 1000)
+            return $"{duration.TotalMilliseconds:N0} ms";
+        else if (duration.TotalSeconds < 60)
+            return $"{duration.TotalSeconds:N2} s";
+        else
+            return $"{duration.TotalMinutes:N2} min";
+    }
+
     public sealed class Settings : CommandSettings
     {
         [Description("Path to the Lucene index directory")]
         [CommandOption("-i|--index")]
-        public string IndexPath { get; init; } = "./index";
+        public string IndexPath { get; init; } = "./nuget-index";
 
         [Description("Clean the index before adding new documents")]
         [CommandOption("-c|--clean")]
         public bool Clean { get; init; }
 
-        [Description("Only index the latest version of each package")]
-        [CommandOption("-l|--latest")]
-        public bool LatestOnly { get; init; }
-
-        [Description("Filter packages by regex pattern (e.g., 'newtonsoft.*')")]
-        [CommandOption("-f|--filter")]
+        [Description("Filter packages by name (supports wildcards)")]
+        [CommandOption("-p|--package")]
         public string? PackageFilter { get; init; }
 
+        [Description("Filter packages by version (regex)")]
+        [CommandOption("-v|--version")]
+        public string? VersionFilter { get; init; }
+
         [Description("List packages without indexing")]
-        [CommandOption("--list")]
-        public bool ListOnly { get; init; }
+        [CommandOption("-l|--list")]
+        public bool List { get; init; }
+
+        [Description("Only include the latest version of each package per target framework")]
+        [CommandOption("--latest-only")]
+        public bool LatestOnly { get; init; }
+
+        [Description("Show verbose output")]
+        [CommandOption("--verbose")]
+        public bool Verbose { get; init; }
     }
 }

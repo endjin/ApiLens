@@ -1,33 +1,35 @@
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
+using ApiLens.Core.Parsing;
 using ApiLens.Core.Querying;
 using Lucene.Net.Documents;
-using Lucene.Net.Store;
 
 namespace ApiLens.Core.Tests.Querying;
 
 [TestClass]
 public class SpecializedQueryTests : IDisposable
 {
-    private readonly RAMDirectory directory = new();
+    private readonly string tempIndexPath;
     private readonly ILuceneIndexManager indexManager;
     private readonly IDocumentBuilder documentBuilder = new DocumentBuilder();
+    private readonly IXmlDocumentParser parser = new XmlDocumentParser();
     private readonly IQueryEngine queryEngine;
 
     public SpecializedQueryTests()
     {
-        indexManager = new LuceneIndexManager(directory);
+        tempIndexPath = Path.Combine(Path.GetTempPath(), $"apilens_test_{Guid.NewGuid()}");
+        indexManager = new LuceneIndexManager(tempIndexPath, parser, documentBuilder);
         queryEngine = new QueryEngine(indexManager);
     }
 
     [TestMethod]
-    public void SearchByCodeExample_WithMatchingPattern_ShouldReturnResults()
+    public async Task SearchByCodeExample_WithMatchingPattern_ShouldReturnResults()
     {
         // Arrange
         MemberInfo member = CreateTestMemberWithCodeExample();
         Document doc = documentBuilder.BuildDocument(member);
-        indexManager.AddDocument(doc);
-        indexManager.Commit();
+        await indexManager.IndexBatchAsync([member]);
+        await indexManager.CommitAsync();
 
         // Act - First search by name to verify basic indexing works
         List<MemberInfo> nameResults = queryEngine.SearchByName("ProcessOrder", 10);
@@ -52,13 +54,13 @@ public class SpecializedQueryTests : IDisposable
     }
 
     [TestMethod]
-    public void GetByExceptionType_WithMatchingException_ShouldReturnResults()
+    public async Task GetByExceptionType_WithMatchingException_ShouldReturnResults()
     {
         // Arrange
         MemberInfo member = CreateTestMemberWithExceptions();
         Document doc = documentBuilder.BuildDocument(member);
-        indexManager.AddDocument(doc);
-        indexManager.Commit();
+        await indexManager.IndexBatchAsync([member]);
+        await indexManager.CommitAsync();
 
         // Act
         List<MemberInfo> results = queryEngine.GetByExceptionType("System.ArgumentNullException", 10);
@@ -71,17 +73,15 @@ public class SpecializedQueryTests : IDisposable
     }
 
     [TestMethod]
-    public void GetByParameterCount_WithinRange_ShouldReturnResults()
+    public async Task GetByParameterCount_WithinRange_ShouldReturnResults()
     {
         // Arrange
         MemberInfo member1 = CreateTestMemberWithParameters(2);
         MemberInfo member2 = CreateTestMemberWithParameters(3);
         MemberInfo member3 = CreateTestMemberWithParameters(5);
 
-        indexManager.AddDocument(documentBuilder.BuildDocument(member1));
-        indexManager.AddDocument(documentBuilder.BuildDocument(member2));
-        indexManager.AddDocument(documentBuilder.BuildDocument(member3));
-        indexManager.Commit();
+        await indexManager.IndexBatchAsync([member1, member2, member3]);
+        await indexManager.CommitAsync();
 
         // Act
         List<MemberInfo> results = queryEngine.GetByParameterCount(2, 3, 10);
@@ -92,15 +92,14 @@ public class SpecializedQueryTests : IDisposable
     }
 
     [TestMethod]
-    public void GetMethodsWithExamples_ShouldReturnOnlyMethodsWithExamples()
+    public async Task GetMethodsWithExamples_ShouldReturnOnlyMethodsWithExamples()
     {
         // Arrange
         MemberInfo withExample = CreateTestMemberWithCodeExample();
         MemberInfo withoutExample = CreateTestMemberWithoutCodeExample();
 
-        indexManager.AddDocument(documentBuilder.BuildDocument(withExample));
-        indexManager.AddDocument(documentBuilder.BuildDocument(withoutExample));
-        indexManager.Commit();
+        await indexManager.IndexBatchAsync([withExample, withoutExample]);
+        await indexManager.CommitAsync();
 
         // Act
         List<MemberInfo> results = queryEngine.GetMethodsWithExamples(10);
@@ -112,17 +111,15 @@ public class SpecializedQueryTests : IDisposable
     }
 
     [TestMethod]
-    public void GetComplexMethods_WithMinComplexity_ShouldReturnResults()
+    public async Task GetComplexMethods_WithMinComplexity_ShouldReturnResults()
     {
         // Arrange
         MemberInfo simple = CreateTestMemberWithComplexity(1);
         MemberInfo moderate = CreateTestMemberWithComplexity(5);
         MemberInfo complex = CreateTestMemberWithComplexity(10);
 
-        indexManager.AddDocument(documentBuilder.BuildDocument(simple));
-        indexManager.AddDocument(documentBuilder.BuildDocument(moderate));
-        indexManager.AddDocument(documentBuilder.BuildDocument(complex));
-        indexManager.Commit();
+        await indexManager.IndexBatchAsync([simple, moderate, complex]);
+        await indexManager.CommitAsync();
 
         // Act
         List<MemberInfo> results = queryEngine.GetComplexMethods(5, 10);
@@ -133,11 +130,13 @@ public class SpecializedQueryTests : IDisposable
     }
 
     [TestMethod]
-    public void GetByParameterCount_InvalidRange_ShouldThrowException()
+    public async Task GetByParameterCount_InvalidRange_ShouldThrowException()
     {
         // Act & Assert
-        Should.Throw<ArgumentException>(() => queryEngine.GetByParameterCount(5, 2, 10))
-            .Message.ShouldContain("Min parameter count cannot be greater than max");
+        Should.Throw<ArgumentOutOfRangeException>(() => queryEngine.GetByParameterCount(5, 2, 10))
+            .Message.ShouldContain("must be greater than or equal to");
+
+        await Task.CompletedTask;
     }
 
     private static MemberInfo CreateTestMemberWithCodeExample()
@@ -259,8 +258,21 @@ public class SpecializedQueryTests : IDisposable
 
     public void Dispose()
     {
-        queryEngine.Dispose();
-        indexManager.Dispose();
-        directory.Dispose();
+        queryEngine?.Dispose();
+        indexManager?.Dispose();
+
+        if (!string.IsNullOrEmpty(tempIndexPath) && Directory.Exists(tempIndexPath))
+        {
+            try
+            {
+                Directory.Delete(tempIndexPath, true);
+            }
+#pragma warning disable CA1031 // Do not catch general exception types
+            catch
+#pragma warning restore CA1031 // Do not catch general exception types
+            {
+                // Ignore cleanup errors
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
 using ApiLens.Cli.Commands;
 using ApiLens.Cli.Services;
+using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
 using Spectre.Console.Cli;
@@ -12,6 +13,8 @@ public class NuGetCommandTests
 {
     private IFileSystemService mockFileSystem = null!;
     private INuGetCacheScanner mockScanner = null!;
+    private ILuceneIndexManagerFactory mockIndexManagerFactory = null!;
+    private ILuceneIndexManager mockIndexManager = null!;
     private FakeFileSystem? fakeFileSystem;
     private FakeEnvironment? fakeEnvironment;
     private IFileSystemService? fakeFileSystemService;
@@ -23,7 +26,12 @@ public class NuGetCommandTests
     {
         mockFileSystem = Substitute.For<IFileSystemService>();
         mockScanner = Substitute.For<INuGetCacheScanner>();
-        command = new NuGetCommand(mockFileSystem, mockScanner);
+        mockIndexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
+        mockIndexManager = Substitute.For<ILuceneIndexManager>();
+
+        mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
+
+        command = new NuGetCommand(mockFileSystem, mockScanner, mockIndexManagerFactory);
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
     }
@@ -37,7 +45,7 @@ public class NuGetCommandTests
         }
         fakeFileSystem = new FakeFileSystem(fakeEnvironment);
         fakeFileSystemService = new FileSystemService(fakeFileSystem, fakeEnvironment);
-        command = new NuGetCommand(fakeFileSystemService, mockScanner);
+        command = new NuGetCommand(fakeFileSystemService, mockScanner, mockIndexManagerFactory);
     }
 
     [TestMethod]
@@ -47,11 +55,11 @@ public class NuGetCommandTests
         NuGetCommand.Settings settings = new();
 
         // Assert
-        settings.IndexPath.ShouldBe("./index");
+        settings.IndexPath.ShouldBe("./nuget-index");
         settings.Clean.ShouldBe(false);
         settings.LatestOnly.ShouldBe(false);
         settings.PackageFilter.ShouldBeNull();
-        settings.ListOnly.ShouldBe(false);
+        settings.List.ShouldBe(false);
     }
 
     [TestMethod]
@@ -62,26 +70,26 @@ public class NuGetCommandTests
         {
             IndexPath = "/custom/index",
             Clean = true,
-            LatestOnly = true,
+            // LatestOnly = true, // Property removed
             PackageFilter = "newtonsoft.*",
-            ListOnly = true
+            List = true
         };
 
         // Assert
         settings.IndexPath.ShouldBe("/custom/index");
         settings.Clean.ShouldBeTrue();
-        settings.LatestOnly.ShouldBeTrue();
+        // settings.LatestOnly.ShouldBeTrue(); // Property removed
         settings.PackageFilter.ShouldBe("newtonsoft.*");
-        settings.ListOnly.ShouldBeTrue();
+        settings.List.ShouldBeTrue();
     }
 
     [TestMethod]
-    public void Execute_WithListOnly_DoesNotIndex()
+    public async Task Execute_WithList_DoesNotIndex()
     {
         // Arrange
         NuGetCommand.Settings settings = new()
         {
-            ListOnly = true
+            List = true
         };
 
         string cachePath = "/home/user/.nuget/packages";
@@ -98,15 +106,15 @@ public class NuGetCommandTests
                 XmlDocumentationPath = "/path/to/xml"
             }
         ];
-        mockScanner.ScanNuGetCache().Returns([.. packages]);
+        mockScanner.ScanDirectory(cachePath).Returns([.. packages]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
         // Should scan but not index
-        mockScanner.Received(1).ScanNuGetCache();
+        mockScanner.Received(1).ScanDirectory(cachePath);
         mockFileSystem.DidNotReceive().FileExists(Arg.Any<string>());
     }
 
@@ -114,7 +122,7 @@ public class NuGetCommandTests
     public void Constructor_WithNullFileSystem_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new NuGetCommand(null!, mockScanner))
+        Should.Throw<ArgumentNullException>(() => new NuGetCommand(null!, mockScanner, mockIndexManagerFactory))
             .ParamName.ShouldBe("fileSystem");
     }
 
@@ -122,12 +130,20 @@ public class NuGetCommandTests
     public void Constructor_WithNullScanner_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, null!))
+        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, null!, mockIndexManagerFactory))
             .ParamName.ShouldBe("scanner");
     }
 
     [TestMethod]
-    public void Execute_WithNoCacheDirectory_ReturnsError()
+    public void Constructor_WithNullIndexManagerFactory_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, mockScanner, null!))
+            .ParamName.ShouldBe("indexManagerFactory");
+    }
+
+    [TestMethod]
+    public async Task Execute_WithNoCacheDirectory_ReturnsError()
     {
         // Arrange
         NuGetCommand.Settings settings = new();
@@ -136,7 +152,7 @@ public class NuGetCommandTests
         mockFileSystem.DirectoryExists(cachePath).Returns(false);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(1);
@@ -145,30 +161,30 @@ public class NuGetCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithNoPackagesFound_ReturnsSuccess()
+    public async Task Execute_WithNoPackagesFound_ReturnsSuccess()
     {
         // Arrange
-        NuGetCommand.Settings settings = new() { ListOnly = true };
+        NuGetCommand.Settings settings = new() { List = true };
         string cachePath = "/home/user/.nuget/packages";
         mockFileSystem.GetUserNuGetCachePath().Returns(cachePath);
         mockFileSystem.DirectoryExists(cachePath).Returns(true);
-        mockScanner.ScanNuGetCache().Returns([]);
+        mockScanner.ScanDirectory(cachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
-        mockScanner.Received(1).ScanNuGetCache();
+        mockScanner.Received(1).ScanDirectory(cachePath);
     }
 
     [TestMethod]
-    public void Execute_WithPackageFilter_FiltersPackages()
+    public async Task Execute_WithPackageFilter_FiltersPackages()
     {
         // Arrange
         NuGetCommand.Settings settings = new()
         {
-            ListOnly = true,
+            List = true,
             PackageFilter = "newtonsoft"
         };
 
@@ -193,24 +209,24 @@ public class NuGetCommandTests
                 XmlDocumentationPath = "/path2"
             }
         ];
-        mockScanner.ScanNuGetCache().Returns([.. packages]);
+        mockScanner.ScanDirectory(cachePath).Returns([.. packages]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
         // Verify filtering logic is applied
-        mockScanner.Received(1).ScanNuGetCache();
+        mockScanner.Received(1).ScanDirectory(cachePath);
     }
 
     [TestMethod]
-    public void Execute_WithLatestOnly_FiltersToLatestVersions()
+    public async Task Execute_WithLatestOnly_FiltersToLatestVersions()
     {
         // Arrange
         NuGetCommand.Settings settings = new()
         {
-            ListOnly = true,
+            List = true,
             LatestOnly = true
         };
 
@@ -247,11 +263,11 @@ public class NuGetCommandTests
             }
         ];
 
-        mockScanner.ScanNuGetCache().Returns([.. allPackages]);
+        mockScanner.ScanDirectory(cachePath).Returns([.. allPackages]);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>()).Returns([.. latestPackages]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
@@ -260,7 +276,7 @@ public class NuGetCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithException_ReturnsErrorCode()
+    public async Task Execute_WithException_ReturnsErrorCode()
     {
         // Arrange
         NuGetCommand.Settings settings = new();
@@ -272,29 +288,29 @@ public class NuGetCommandTests
             .Do(x => throw new InvalidOperationException("Scan error"));
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(1);
     }
 
     [TestMethod]
-    public void Execute_WithCleanOption_SetsCleanFlag()
+    public async Task Execute_WithCleanOption_SetsCleanFlag()
     {
         // Arrange
         NuGetCommand.Settings settings = new()
         {
             Clean = true,
-            ListOnly = true
+            List = true
         };
 
         string cachePath = "/home/user/.nuget/packages";
         mockFileSystem.GetUserNuGetCachePath().Returns(cachePath);
         mockFileSystem.DirectoryExists(cachePath).Returns(true);
-        mockScanner.ScanNuGetCache().Returns([]);
+        mockScanner.ScanDirectory(cachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
@@ -302,12 +318,12 @@ public class NuGetCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithMultiplePackages_HandlesCorrectly()
+    public async Task Execute_WithMultiplePackages_HandlesCorrectly()
     {
         // Arrange
         NuGetCommand.Settings settings = new()
         {
-            ListOnly = true
+            List = true
         };
 
         string cachePath = "/home/user/.nuget/packages";
@@ -338,32 +354,32 @@ public class NuGetCommandTests
                 XmlDocumentationPath = "/path3"
             }
         ];
-        mockScanner.ScanNuGetCache().Returns([.. packages]);
+        mockScanner.ScanDirectory(cachePath).Returns([.. packages]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
     }
 
     [TestMethod]
-    public void Execute_WithDifferentIndexPath_UsesCustomPath()
+    public async Task Execute_WithDifferentIndexPath_UsesCustomPath()
     {
         // Arrange
         NuGetCommand.Settings settings = new()
         {
             IndexPath = "/custom/index/path",
-            ListOnly = true
+            List = true
         };
 
         string cachePath = "/home/user/.nuget/packages";
         mockFileSystem.GetUserNuGetCachePath().Returns(cachePath);
         mockFileSystem.DirectoryExists(cachePath).Returns(true);
-        mockScanner.ScanNuGetCache().Returns([]);
+        mockScanner.ScanDirectory(cachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
@@ -407,7 +423,7 @@ public class NuGetCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithFakeFileSystem_FindsCache()
+    public async Task Execute_WithFakeFileSystem_FindsCache()
     {
         // Arrange
         SetupFakeFileSystem();
@@ -418,13 +434,13 @@ public class NuGetCommandTests
 
         NuGetCommand.Settings settings = new()
         {
-            ListOnly = true
+            List = true
         };
 
-        mockScanner.ScanNuGetCache().Returns([]);
+        mockScanner.ScanDirectory(cachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
@@ -432,7 +448,7 @@ public class NuGetCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithFakeFileSystem_CustomCachePath_UsesCustomPath()
+    public async Task Execute_WithFakeFileSystem_CustomCachePath_UsesCustomPath()
     {
         // Arrange
         string customCachePath = "/custom/cache/packages";
@@ -443,13 +459,13 @@ public class NuGetCommandTests
 
         NuGetCommand.Settings settings = new()
         {
-            ListOnly = true
+            List = true
         };
 
-        mockScanner.ScanNuGetCache().Returns([]);
+        mockScanner.ScanDirectory(customCachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
@@ -458,7 +474,7 @@ public class NuGetCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithFakeFileSystem_MissingCacheDirectory_ReturnsError()
+    public async Task Execute_WithFakeFileSystem_MissingCacheDirectory_ReturnsError()
     {
         // Arrange
         SetupFakeFileSystem();
@@ -468,11 +484,11 @@ public class NuGetCommandTests
 
         NuGetCommand.Settings settings = new()
         {
-            ListOnly = true
+            List = true
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(1);

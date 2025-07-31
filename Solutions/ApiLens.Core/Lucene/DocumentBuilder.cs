@@ -1,3 +1,4 @@
+using System.Text;
 using ApiLens.Core.Models;
 using Lucene.Net.Documents;
 
@@ -106,6 +107,44 @@ public class DocumentBuilder : IDocumentBuilder
                 doc.Add(new TextField("parameterDescription", parameter.Description, Field.Store.YES));
             }
         }
+
+        // Add combined content field for general content searches
+        StringBuilder contentBuilder = new();
+        contentBuilder.Append(memberInfo.Name).Append(' ');
+        contentBuilder.Append(memberInfo.FullName).Append(' ');
+
+        if (!string.IsNullOrWhiteSpace(memberInfo.Summary))
+            contentBuilder.Append(memberInfo.Summary).Append(' ');
+
+        if (!string.IsNullOrWhiteSpace(memberInfo.Remarks))
+            contentBuilder.Append(memberInfo.Remarks).Append(' ');
+
+        // Include code examples in content
+        foreach (CodeExample example in memberInfo.CodeExamples)
+        {
+            contentBuilder.Append(example.Code).Append(' ');
+            if (!string.IsNullOrWhiteSpace(example.Description))
+                contentBuilder.Append(example.Description).Append(' ');
+        }
+
+        // Include exception types in content
+        foreach (ExceptionInfo exception in memberInfo.Exceptions)
+        {
+            contentBuilder.Append(exception.Type).Append(' ');
+            if (!string.IsNullOrWhiteSpace(exception.Condition))
+                contentBuilder.Append(exception.Condition).Append(' ');
+        }
+
+        // Include parameter descriptions
+        foreach (ParameterInfo parameter in memberInfo.Parameters)
+        {
+            contentBuilder.Append(parameter.Type).Append(' ');
+            contentBuilder.Append(parameter.Name).Append(' ');
+            if (!string.IsNullOrWhiteSpace(parameter.Description))
+                contentBuilder.Append(parameter.Description).Append(' ');
+        }
+
+        doc.Add(new TextField("content", contentBuilder.ToString(), Field.Store.NO));
 
         // Add returns documentation
         if (!string.IsNullOrWhiteSpace(memberInfo.Returns))

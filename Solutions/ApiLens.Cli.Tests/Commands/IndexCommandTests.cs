@@ -5,7 +5,6 @@ using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
 using ApiLens.Core.Services;
-using Lucene.Net.Documents;
 using Spectre.Console.Cli;
 using Spectre.IO.Testing;
 
@@ -36,7 +35,34 @@ public class IndexCommandTests
 
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
 
-        command = new IndexCommand(mockParser, mockDocumentBuilder, mockFileSystem, mockIndexManagerFactory);
+        // Setup default IndexingResult
+        mockIndexManager.IndexXmlFilesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new IndexingResult
+            {
+                TotalDocuments = 0,
+                SuccessfulDocuments = 0,
+                FailedDocuments = 0,
+                ElapsedTime = TimeSpan.Zero,
+                BytesProcessed = 0,
+                Metrics = new PerformanceMetrics
+                {
+                    TotalAllocatedBytes = 0,
+                    Gen0Collections = 0,
+                    Gen1Collections = 0,
+                    Gen2Collections = 0,
+                    AverageParseTimeMs = 0,
+                    AverageIndexTimeMs = 0,
+                    AverageBatchCommitTimeMs = 0,
+                    PeakThreadCount = 1,
+                    CpuUsagePercent = 0,
+                    PeakWorkingSetBytes = 0,
+                    DocumentsPooled = 0,
+                    StringsInterned = 0
+                },
+                Errors = []
+            });
+
+        command = new IndexCommand(mockIndexManagerFactory, mockFileSystem);
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
     }
@@ -48,7 +74,7 @@ public class IndexCommandTests
         fakeFileSystemService = new FileSystemService(fakeFileSystem, fakeEnvironment);
 
         // Recreate command with fake file system
-        command = new IndexCommand(mockParser, mockDocumentBuilder, fakeFileSystemService, mockIndexManagerFactory);
+        command = new IndexCommand(mockIndexManagerFactory, fakeFileSystemService);
     }
 
     [TestMethod]
@@ -87,7 +113,7 @@ public class IndexCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithNonExistentPath_ReturnsError()
+    public async Task Execute_WithNonExistentPath_ReturnsError()
     {
         // Arrange
         IndexCommand.Settings settings = new() { Path = "/missing/path" };
@@ -95,7 +121,7 @@ public class IndexCommandTests
         mockFileSystem.DirectoryExists("/missing/path").Returns(false);
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = await command.ExecuteAsync(null!, settings);
 
         // Assert
         result.ShouldBe(1);
@@ -104,7 +130,7 @@ public class IndexCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithExistingFile_ProcessesSingleFile()
+    public async Task Execute_WithExistingFile_ProcessesSingleFile()
     {
         // Arrange
         IndexCommand.Settings settings = new() { Path = "/docs/test.xml" };
@@ -115,42 +141,46 @@ public class IndexCommandTests
         // This test verifies the file system calls are made correctly
         mockFileSystem.FileExists("/docs/test.xml").Returns(true);
         mockFileSystem.GetFileName("/docs/test.xml").Returns("test.xml");
+
+        await Task.CompletedTask;
     }
 
     [TestMethod]
     public void Constructor_WithNullParser_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new IndexCommand(null!, mockDocumentBuilder, mockFileSystem, mockIndexManagerFactory))
-            .ParamName.ShouldBe("parser");
+        Should.Throw<ArgumentNullException>(() => new IndexCommand(null!, mockFileSystem))
+            .ParamName.ShouldBe("indexManagerFactory");
     }
 
     [TestMethod]
     public void Constructor_WithNullDocumentBuilder_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new IndexCommand(mockParser, null!, mockFileSystem, mockIndexManagerFactory))
-            .ParamName.ShouldBe("documentBuilder");
+        Should.Throw<ArgumentNullException>(() => new IndexCommand(mockIndexManagerFactory, null!))
+            .ParamName.ShouldBe("fileSystem");
     }
 
     [TestMethod]
     public void Constructor_WithNullFileSystem_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new IndexCommand(mockParser, mockDocumentBuilder, null!, mockIndexManagerFactory))
-            .ParamName.ShouldBe("fileSystem");
+        // This test is no longer needed as we only have 2 parameters now
+        // Act & Assert
+        Should.NotThrow(() => new IndexCommand(mockIndexManagerFactory, mockFileSystem));
     }
 
     [TestMethod]
     public void Constructor_WithNullIndexManagerFactory_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new IndexCommand(mockParser, mockDocumentBuilder, mockFileSystem, null!))
-            .ParamName.ShouldBe("indexManagerFactory");
+        // This test is no longer needed as we only have 2 parameters now
+        // Act & Assert  
+        Should.NotThrow(() => new IndexCommand(mockIndexManagerFactory, mockFileSystem));
     }
 
     [TestMethod]
-    public void Execute_WithExistingDirectory_ChecksPath()
+    public async Task Execute_WithExistingDirectory_ChecksPath()
     {
         // Arrange
         IndexCommand.Settings settings = new() { Path = "/docs/folder" };
@@ -166,10 +196,12 @@ public class IndexCommandTests
         dirExists.ShouldBeTrue();
         mockFileSystem.Received(1).FileExists("/docs/folder");
         mockFileSystem.Received(1).DirectoryExists("/docs/folder");
+
+        await Task.CompletedTask;
     }
 
     [TestMethod]
-    public void Execute_WithMissingPath_ShowsErrorMessage()
+    public async Task Execute_WithMissingPath_ShowsErrorMessage()
     {
         // Arrange
         IndexCommand.Settings settings = new() { Path = "/non/existent/path" };
@@ -177,7 +209,7 @@ public class IndexCommandTests
         mockFileSystem.DirectoryExists("/non/existent/path").Returns(false);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(1);
@@ -231,7 +263,7 @@ public class IndexCommandTests
     [DataRow("path/to/file.xml", "file.xml")]
     [DataRow("C:\\Users\\test\\doc.xml", "doc.xml")]
     [DataRow("/usr/share/docs/api.xml", "api.xml")]
-    public void Execute_WithVariousPaths_ExtractsFileName(string filePath, string expectedFileName)
+    public async Task Execute_WithVariousPaths_ExtractsFileName(string filePath, string expectedFileName)
     {
         // Arrange
         IndexCommand.Settings settings = new() { Path = filePath };
@@ -244,6 +276,8 @@ public class IndexCommandTests
 
         // Assert
         mockFileSystem.Received(1).GetFileName(filePath);
+
+        await Task.CompletedTask;
     }
 
     [TestMethod]
@@ -259,7 +293,7 @@ public class IndexCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithFileExists_ChecksFileSystemCorrectly()
+    public async Task Execute_WithFileExists_ChecksFileSystemCorrectly()
     {
         // Arrange
         string testPath = "/test/file.xml";
@@ -276,10 +310,12 @@ public class IndexCommandTests
         fileExists.ShouldBeTrue();
         dirExists.ShouldBeFalse();
         mockFileSystem.Received(1).FileExists(testPath);
+
+        await Task.CompletedTask;
     }
 
     [TestMethod]
-    public void Execute_WithDirectoryExists_ChecksFileSystemCorrectly()
+    public async Task Execute_WithDirectoryExists_ChecksFileSystemCorrectly()
     {
         // Arrange
         string testPath = "/test/directory";
@@ -296,10 +332,12 @@ public class IndexCommandTests
         fileExists.ShouldBeFalse();
         dirExists.ShouldBeTrue();
         mockFileSystem.Received(1).DirectoryExists(testPath);
+
+        await Task.CompletedTask;
     }
 
     [TestMethod]
-    public void Execute_WithCleanOption_CleansIndex()
+    public async Task Execute_WithCleanOption_CleansIndex()
     {
         // Arrange
         IndexCommand.Settings settings = new()
@@ -327,16 +365,16 @@ public class IndexCommandTests
         });
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
         mockIndexManager.Received(1).DeleteAll();
-        mockIndexManager.Received(2).Commit(); // Once for clean, once for index
+        await mockIndexManager.Received(1).CommitAsync(); // Once for clean
     }
 
     [TestMethod]
-    public void Execute_WithNoXmlFiles_ReturnsSuccess()
+    public async Task Execute_WithNoXmlFiles_ReturnsSuccess()
     {
         // Arrange
         IndexCommand.Settings settings = new()
@@ -349,15 +387,15 @@ public class IndexCommandTests
         mockFileSystem.GetFiles("/empty/directory", "*.xml", false).Returns([]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
-        mockIndexManager.DidNotReceive().AddDocument(Arg.Any<Document>());
+        await mockIndexManager.DidNotReceive().IndexBatchAsync(Arg.Any<IEnumerable<MemberInfo>>());
     }
 
     [TestMethod]
-    public void Execute_WithXmlFile_ProcessesAndIndexes()
+    public async Task Execute_WithXmlFile_ProcessesAndIndexes()
     {
         // Note: This test is limited because IndexCommand uses XDocument.Load() directly
         // which tries to load from the actual file system. A full test would require
@@ -385,16 +423,16 @@ public class IndexCommandTests
         });
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
         // When no files are found, Commit is not called
-        mockIndexManager.DidNotReceive().Commit();
+        await mockIndexManager.DidNotReceive().CommitAsync();
     }
 
     [TestMethod]
-    public void Execute_WithPattern_FiltersFiles()
+    public async Task Execute_WithPattern_FiltersFiles()
     {
         // Arrange
         IndexCommand.Settings settings = new()
@@ -408,7 +446,7 @@ public class IndexCommandTests
         mockFileSystem.GetFiles("/docs", "*.xml", true).Returns(["/docs/sub/api.xml", "/docs/lib.xml"]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
@@ -416,7 +454,7 @@ public class IndexCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithParsingError_ContinuesProcessing()
+    public async Task Execute_WithParsingError_ContinuesProcessing()
     {
         // Note: This test is limited because IndexCommand uses XDocument.Load() directly
         // The actual parsing error handling would require real XML files
@@ -443,16 +481,16 @@ public class IndexCommandTests
         });
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
         // When no files are found, Commit is not called
-        mockIndexManager.DidNotReceive().Commit();
+        await mockIndexManager.DidNotReceive().CommitAsync();
     }
 
     [TestMethod]
-    public void Execute_WithCustomIndexPath_UsesSpecifiedPath()
+    public async Task Execute_WithCustomIndexPath_UsesSpecifiedPath()
     {
         // Arrange
         IndexCommand.Settings settings = new()
@@ -465,7 +503,7 @@ public class IndexCommandTests
         mockFileSystem.GetFiles(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>()).Returns([]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
@@ -473,7 +511,7 @@ public class IndexCommandTests
     }
 
     [TestMethod]
-    public void Execute_DisposesIndexManager()
+    public async Task Execute_DisposesIndexManager()
     {
         // Arrange
         IndexCommand.Settings settings = new()
@@ -485,14 +523,14 @@ public class IndexCommandTests
         mockFileSystem.GetFiles(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>()).Returns([]);
 
         // Act
-        command.Execute(context, settings);
+        await command.ExecuteAsync(context, settings);
 
         // Assert
         mockIndexManager.Received(1).Dispose();
     }
 
     [TestMethod]
-    public void Execute_WithFakeFileSystem_IndexesSingleFile()
+    public async Task Execute_WithFakeFileSystem_IndexesSingleFile()
     {
         // Note: This test demonstrates FakeFileSystem integration but has limitations
         // because IndexCommand uses XDocument.Load() directly which can't read from FakeFileSystem.
@@ -523,7 +561,7 @@ public class IndexCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert - The command runs but can't load the fake file
         result.ShouldBe(0); // Returns success even if no files processed
@@ -532,7 +570,7 @@ public class IndexCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithFakeFileSystem_IndexesDirectory()
+    public async Task Execute_WithFakeFileSystem_IndexesDirectory()
     {
         // Arrange
         SetupFakeFileSystem();
@@ -568,7 +606,7 @@ public class IndexCommandTests
         mockParser.ParseMembers(Arg.Any<XDocument>(), Arg.Any<string>()).Returns([]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
@@ -578,7 +616,7 @@ public class IndexCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithFakeFileSystem_EmptyDirectory_ReturnsSuccess()
+    public async Task Execute_WithFakeFileSystem_EmptyDirectory_ReturnsSuccess()
     {
         // Arrange
         SetupFakeFileSystem();
@@ -593,7 +631,7 @@ public class IndexCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0); // IndexCommand returns 0 when no XML files found, not an error
@@ -601,7 +639,7 @@ public class IndexCommandTests
     }
 
     [TestMethod]
-    public void Execute_WithFakeFileSystem_NonExistentPath_ReturnsError()
+    public async Task Execute_WithFakeFileSystem_NonExistentPath_ReturnsError()
     {
         // Arrange
         SetupFakeFileSystem();
@@ -613,7 +651,7 @@ public class IndexCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(1);
@@ -626,7 +664,7 @@ public class IndexCommandTests
         string path = "/home/user/.nuget/packages/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.xml";
 
         // Act
-        var result = IndexCommand.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = IndexCommand.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -642,7 +680,7 @@ public class IndexCommandTests
         string path = "/docs/api.xml";
 
         // Act
-        var result = IndexCommand.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = IndexCommand.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldBeNull();

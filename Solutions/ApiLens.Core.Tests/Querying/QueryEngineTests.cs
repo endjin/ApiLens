@@ -1,8 +1,7 @@
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
+using ApiLens.Core.Parsing;
 using ApiLens.Core.Querying;
-using Lucene.Net.Documents;
-using Lucene.Net.Store;
 
 namespace ApiLens.Core.Tests.Querying;
 
@@ -10,16 +9,16 @@ namespace ApiLens.Core.Tests.Querying;
 public class QueryEngineTests : IDisposable
 {
     private QueryEngine engine = null!;
-    private LuceneIndexManager indexManager = null!;
-    private DocumentBuilder documentBuilder = null!;
-    private RAMDirectory directory = null!;
+    private ILuceneIndexManager indexManager = null!;
+    private string tempIndexPath = null!;
 
     [TestInitialize]
     public void Setup()
     {
-        directory = new RAMDirectory();
-        indexManager = new LuceneIndexManager(directory);
-        documentBuilder = new DocumentBuilder();
+        tempIndexPath = Path.Combine(Path.GetTempPath(), $"apilens_test_{Guid.NewGuid()}");
+        XmlDocumentParser parser = new();
+        DocumentBuilder documentBuilder = new();
+        indexManager = new LuceneIndexManager(tempIndexPath, parser, documentBuilder);
         engine = new QueryEngine(indexManager);
 
         // Add test data
@@ -62,13 +61,12 @@ public class QueryEngineTests : IDisposable
             }
         ];
 
-        foreach (MemberInfo member in members)
-        {
-            Document doc = documentBuilder.BuildDocument(member);
-            indexManager.AddDocument(doc);
-        }
+        // Use the async API to index
+        Task<IndexingResult> task = indexManager.IndexBatchAsync(members);
+        task.Wait();
 
-        indexManager.Commit();
+        Task commitTask = indexManager.CommitAsync();
+        commitTask.Wait();
     }
 
     [TestMethod]
@@ -87,7 +85,7 @@ public class QueryEngineTests : IDisposable
     public void SearchByContent_WithKeyword_ReturnsMatchingMembers()
     {
         // Act - search for a simpler term
-        List<MemberInfo> results = engine.SearchByContent("list`1", 10);
+        List<MemberInfo> results = engine.SearchByContent("List`1", 10);
 
         // Assert
         results.Count.ShouldBe(1);
@@ -165,6 +163,19 @@ public class QueryEngineTests : IDisposable
     {
         engine?.Dispose();
         indexManager?.Dispose();
-        directory?.Dispose();
+
+        if (!string.IsNullOrEmpty(tempIndexPath) && Directory.Exists(tempIndexPath))
+        {
+            try
+            {
+                Directory.Delete(tempIndexPath, true);
+            }
+#pragma warning disable CA1031 // Do not catch general exception types
+            catch
+#pragma warning restore CA1031 // Do not catch general exception types
+            {
+                // Ignore cleanup errors
+            }
+        }
     }
 }

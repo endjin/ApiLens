@@ -1,6 +1,7 @@
 using ApiLens.Cli.Commands;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
+using ApiLens.Core.Parsing;
 using ApiLens.Core.Querying;
 using Lucene.Net.Documents;
 using Spectre.Console;
@@ -27,7 +28,12 @@ public class QueryCommandVersionTests
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
 
         // For these integration tests, we'll use real implementations
-        indexManagerFactory.Create(Arg.Any<string>()).Returns(callInfo => new LuceneIndexManager(callInfo.Arg<string>()));
+        indexManagerFactory.Create(Arg.Any<string>()).Returns(callInfo =>
+        {
+            XmlDocumentParser parser = new();
+            DocumentBuilder documentBuilder = new();
+            return new LuceneIndexManager(callInfo.Arg<string>(), parser, documentBuilder);
+        });
         queryEngineFactory.Create(Arg.Any<ILuceneIndexManager>()).Returns(callInfo => new QueryEngine(callInfo.Arg<ILuceneIndexManager>()));
 
         command = new QueryCommand(indexManagerFactory, queryEngineFactory);
@@ -159,8 +165,9 @@ public class QueryCommandVersionTests
 
     private void CreateIndexWithVersionInfo()
     {
-        using LuceneIndexManager indexManager = new(indexPath);
+        XmlDocumentParser parser = new();
         DocumentBuilder documentBuilder = new();
+        using LuceneIndexManager indexManager = new(indexPath, parser, documentBuilder);
 
         MemberInfo member = new()
         {
@@ -180,14 +187,16 @@ public class QueryCommandVersionTests
         };
 
         Document doc = documentBuilder.BuildDocument(member);
-        indexManager.AddDocument(doc);
-        indexManager.Commit();
+        MemberInfo[] members = [member];
+        indexManager.IndexBatchAsync(members).GetAwaiter().GetResult();
+        indexManager.CommitAsync().GetAwaiter().GetResult();
     }
 
     private void CreateIndexWithoutVersionInfo()
     {
-        using LuceneIndexManager indexManager = new(indexPath);
+        XmlDocumentParser parser = new();
         DocumentBuilder documentBuilder = new();
+        using LuceneIndexManager indexManager = new(indexPath, parser, documentBuilder);
 
         MemberInfo member = new()
         {
@@ -202,7 +211,8 @@ public class QueryCommandVersionTests
         };
 
         Document doc = documentBuilder.BuildDocument(member);
-        indexManager.AddDocument(doc);
-        indexManager.Commit();
+        MemberInfo[] members = [member];
+        indexManager.IndexBatchAsync(members).GetAwaiter().GetResult();
+        indexManager.CommitAsync().GetAwaiter().GetResult();
     }
 }

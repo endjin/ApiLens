@@ -2,6 +2,7 @@ using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
 using Lucene.Net.Documents;
+using Lucene.Net.Search;
 
 namespace ApiLens.Core.Tests.Querying;
 
@@ -10,6 +11,14 @@ public class QueryEngineVersionTests : IDisposable
 {
     private ILuceneIndexManager mockIndexManager = null!;
     private QueryEngine queryEngine = null!;
+
+    private static TopDocs CreateTopDocsWithDocument(Document doc)
+    {
+        // Create a mock TopDocs with one document
+        ScoreDoc[] scoreDocs = [new(0, 1.0f)];
+        // TopDocs constructor: (int totalHits, ScoreDoc[] scoreDocs, float maxScore)
+        return new TopDocs(1, scoreDocs, 1.0f);
+    }
 
     [TestInitialize]
     public void Setup()
@@ -38,7 +47,9 @@ public class QueryEngineVersionTests : IDisposable
                 "/home/user/.nuget/packages/system.runtime/8.0.0/lib/net8.0/System.Runtime.xml", Field.Store.YES)
         ];
 
-        mockIndexManager.SearchByField("nameText", "concat", 10).Returns([doc]);
+        TopDocs topDocs = CreateTopDocsWithDocument(doc);
+        mockIndexManager.SearchByField("nameText", "Concat", 10).Returns(topDocs);
+        mockIndexManager.GetDocument(0).Returns(doc);
 
         // Act
         List<MemberInfo> results = queryEngine.SearchByName("Concat", 10);
@@ -69,7 +80,9 @@ public class QueryEngineVersionTests : IDisposable
         ];
         // No version fields
 
-        mockIndexManager.SearchByField("nameText", "concat", 10).Returns([doc]);
+        TopDocs topDocs = CreateTopDocsWithDocument(doc);
+        mockIndexManager.SearchByField("nameText", "Concat", 10).Returns(topDocs);
+        mockIndexManager.GetDocument(0).Returns(doc);
 
         // Act
         List<MemberInfo> results = queryEngine.SearchByName("Concat", 10);
@@ -103,7 +116,9 @@ public class QueryEngineVersionTests : IDisposable
             new StringField("sourceFilePath", "", Field.Store.YES)
         ];
 
-        mockIndexManager.SearchByField("nameText", "concat", 10).Returns([doc]);
+        TopDocs topDocs = CreateTopDocsWithDocument(doc);
+        mockIndexManager.SearchByField("nameText", "Concat", 10).Returns(topDocs);
+        mockIndexManager.GetDocument(0).Returns(doc);
 
         // Act
         List<MemberInfo> results = queryEngine.SearchByName("Concat", 10);

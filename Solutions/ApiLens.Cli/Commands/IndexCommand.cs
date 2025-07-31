@@ -1,40 +1,29 @@
-using System.Collections.Immutable;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
-using ApiLens.Core.Parsing;
 using ApiLens.Core.Services;
-using Lucene.Net.Documents;
 
 namespace ApiLens.Cli.Commands;
 
-public class IndexCommand : Command<IndexCommand.Settings>
+public class IndexCommand : AsyncCommand<IndexCommand.Settings>
 {
-    private readonly IXmlDocumentParser parser;
-    private readonly IDocumentBuilder documentBuilder;
-    private readonly IFileSystemService fileSystem;
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
+    private readonly IFileSystemService fileSystem;
 
     public IndexCommand(
-        IXmlDocumentParser parser,
-        IDocumentBuilder documentBuilder,
-        IFileSystemService fileSystem,
-        ILuceneIndexManagerFactory indexManagerFactory)
+        ILuceneIndexManagerFactory indexManagerFactory,
+        IFileSystemService fileSystem)
     {
-        ArgumentNullException.ThrowIfNull(parser);
-        ArgumentNullException.ThrowIfNull(documentBuilder);
-        ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
+        ArgumentNullException.ThrowIfNull(fileSystem);
 
-        this.parser = parser;
-        this.documentBuilder = documentBuilder;
-        this.fileSystem = fileSystem;
         this.indexManagerFactory = indexManagerFactory;
+        this.fileSystem = fileSystem;
     }
 
-    public override int Execute(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
         if (!fileSystem.FileExists(settings.Path) && !fileSystem.DirectoryExists(settings.Path))
         {
@@ -44,96 +33,52 @@ public class IndexCommand : Command<IndexCommand.Settings>
 
         try
         {
-            // Create index manager with the specified path
+            // Get all XML files upfront
+            List<string> xmlFiles = GetXmlFiles(settings.Path, settings.Pattern);
+
+            if (xmlFiles.Count == 0)
+            {
+                AnsiConsole.MarkupLine("[yellow]No XML files found to index.[/]");
+                return 0;
+            }
+
+            AnsiConsole.MarkupLine($"[green]Found {xmlFiles.Count} XML file(s) to index.[/]");
+
+            // Create index manager
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
 
             if (settings.Clean)
             {
                 AnsiConsole.MarkupLine("[yellow]Cleaning index...[/]");
                 indexManager.DeleteAll();
-                indexManager.Commit();
+                await indexManager.CommitAsync();
             }
 
-            List<string> files = GetXmlFiles(settings.Path, settings.Pattern);
-
-            if (files.Count == 0)
-            {
-                AnsiConsole.MarkupLine("[yellow]No XML files found to index.[/]");
-                return 0;
-            }
-
-            AnsiConsole.MarkupLine($"[green]Found {files.Count} XML file(s) to index.[/]");
-
-            int indexed = 0;
-            int failed = 0;
-            int totalMembers = 0;
-
-            foreach (string file in files)
-            {
-                AnsiConsole.MarkupLine($"Processing: [blue]{fileSystem.GetFileName(file)}[/]");
-
-                try
+            // Create progress display
+            await AnsiConsole.Progress()
+                .AutoClear(false)
+                .Columns(
+                    new TaskDescriptionColumn(),
+                    new ProgressBarColumn(),
+                    new PercentageColumn(),
+                    new RemainingTimeColumn(),
+                    new SpinnerColumn())
+                .StartAsync(async ctx =>
                 {
-                    XDocument document = XDocument.Load(file);
-                    ApiAssemblyInfo assembly = parser.ParseAssembly(document);
-                    ImmutableArray<MemberInfo> members = parser.ParseMembers(document, assembly.Name);
+                    ProgressTask task = ctx.AddTask("[green]Indexing XML files[/]", maxValue: xmlFiles.Count);
 
-                    // Extract NuGet package info if this is from a NuGet cache
-                    (string PackageId, string Version, string Framework)? nugetInfo = ExtractNuGetInfo(file);
+                    // Index all files using high-performance batch operations
+                    Stopwatch stopwatch = Stopwatch.StartNew();
+                    IndexingResult result = await indexManager.IndexXmlFilesAsync(xmlFiles);
+                    stopwatch.Stop();
 
-                    foreach (MemberInfo member in members)
-                    {
-                        // If we have NuGet info, enhance the member with version information
-                        MemberInfo enrichedMember = member;
-                        if (nugetInfo.HasValue)
-                        {
-                            enrichedMember = member with
-                            {
-                                PackageId = nugetInfo.Value.PackageId,
-                                PackageVersion = nugetInfo.Value.Version,
-                                TargetFramework = nugetInfo.Value.Framework,
-                                IsFromNuGetCache = true,
-                                SourceFilePath = file
-                            };
-                        }
+                    task.Value = xmlFiles.Count;
+                    task.StopTask();
 
-                        Document doc = documentBuilder.BuildDocument(enrichedMember);
-                        indexManager.AddDocument(doc);
-                        totalMembers++;
-                    }
-
-                    indexed++;
-                }
-                catch (System.Xml.XmlException ex)
-                {
-                    AnsiConsole.MarkupLine($"[red]Failed to parse XML:[/] {file} - {ex.Message}");
-                    failed++;
-                }
-                catch (IOException ex)
-                {
-                    AnsiConsole.MarkupLine($"[red]Failed to read:[/] {file} - {ex.Message}");
-                    failed++;
-                }
-            }
-
-            indexManager.Commit();
-
-            // Get index statistics
-            IndexStatistics? stats = indexManager.GetIndexStatistics();
-
-            AnsiConsole.MarkupLine("[green]Indexing complete![/]");
-            AnsiConsole.MarkupLine($"  Files processed: {indexed}");
-            AnsiConsole.MarkupLine($"  Members indexed: {totalMembers}");
-            if (failed > 0)
-            {
-                AnsiConsole.MarkupLine($"  Failed: {failed} file(s)");
-            }
-
-            if (stats != null)
-            {
-                AnsiConsole.MarkupLine($"  Index size: {FormatSize(stats.TotalSizeInBytes)}");
-                AnsiConsole.MarkupLine($"  Index location: {stats.IndexPath}");
-            }
+                    // Display results
+                    AnsiConsole.WriteLine();
+                    DisplayResults(result, indexManager, settings.IndexPath);
+                });
 
             return 0;
         }
@@ -141,6 +86,74 @@ public class IndexCommand : Command<IndexCommand.Settings>
         {
             AnsiConsole.MarkupLine($"[red]Error during indexing:[/] {ex.Message}");
             return 1;
+        }
+#pragma warning disable CA1031 // Do not catch general exception types
+        catch (Exception ex)
+#pragma warning restore CA1031 // Do not catch general exception types
+        {
+            AnsiConsole.MarkupLine($"[red]Unexpected error:[/] {ex.Message}");
+            if (settings.Verbose)
+            {
+                AnsiConsole.WriteException(ex);
+            }
+            return 1;
+        }
+    }
+
+    private static void DisplayResults(IndexingResult result, ILuceneIndexManager indexManager, string indexPath)
+    {
+        Table table = new Table()
+            .Border(TableBorder.Rounded)
+            .Title("[bold yellow]Indexing Results[/]");
+
+        table.AddColumn("[bold]Metric[/]");
+        table.AddColumn("[bold]Value[/]", c => c.RightAligned());
+
+        // Basic stats
+        table.AddRow("Documents Indexed", result.SuccessfulDocuments.ToString("N0"));
+        table.AddRow("Failed Documents", result.FailedDocuments.ToString("N0"));
+        table.AddRow("Total Time", FormatDuration(result.ElapsedTime));
+        table.AddRow("Documents/Second", result.DocumentsPerSecond.ToString("N2"));
+        table.AddRow("Throughput", $"{result.MegabytesPerSecond:N2} MB/s");
+        table.AddRow("Data Processed", FormatSize(result.BytesProcessed));
+
+        // Performance metrics
+        if (result.Metrics != null)
+        {
+            table.AddEmptyRow();
+            table.AddRow("[dim]Performance Metrics[/]", "");
+            table.AddRow("Avg Batch Commit", $"{result.Metrics.AverageBatchCommitTimeMs:N2} ms");
+            table.AddRow("Peak Threads", result.Metrics.PeakThreadCount.ToString());
+            table.AddRow("Peak Memory", FormatSize(result.Metrics.PeakWorkingSetBytes));
+            table.AddRow("GC Gen0/1/2", $"{result.Metrics.Gen0Collections}/{result.Metrics.Gen1Collections}/{result.Metrics.Gen2Collections}");
+        }
+
+        // Index info
+        IndexStatistics? stats = indexManager.GetIndexStatistics();
+        if (stats != null)
+        {
+            table.AddEmptyRow();
+            table.AddRow("[dim]Index Statistics[/]", "");
+            table.AddRow("Total Documents", stats.DocumentCount.ToString("N0"));
+            table.AddRow("Index Size", FormatSize(stats.TotalSizeInBytes));
+            table.AddRow("Index Location", stats.IndexPath);
+        }
+
+        AnsiConsole.Write(table);
+
+        // Display errors if any
+        if (result.Errors.Length > 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[red]Errors encountered ({result.Errors.Length}):[/]");
+            foreach (string error in result.Errors.Take(10))
+            {
+                AnsiConsole.MarkupLine($"  [red]•[/] {error}");
+            }
+            if (result.Errors.Length > 10)
+            {
+                AnsiConsole.MarkupLine($"  [dim]... and {result.Errors.Length - 10} more[/]");
+            }
         }
     }
 
@@ -177,6 +190,16 @@ public class IndexCommand : Command<IndexCommand.Settings>
         }
 
         return $"{size:0.##} {sizes[order]}";
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalMilliseconds < 1000)
+            return $"{duration.TotalMilliseconds:N0} ms";
+        else if (duration.TotalSeconds < 60)
+            return $"{duration.TotalSeconds:N2} s";
+        else
+            return $"{duration.TotalMinutes:N2} min";
     }
 
     /// <summary>
@@ -217,5 +240,9 @@ public class IndexCommand : Command<IndexCommand.Settings>
         [Description("File pattern for matching files (when path is a directory)")]
         [CommandOption("-p|--pattern")]
         public string? Pattern { get; init; }
+
+        [Description("Show verbose output including stack traces")]
+        [CommandOption("-v|--verbose")]
+        public bool Verbose { get; init; }
     }
 }
