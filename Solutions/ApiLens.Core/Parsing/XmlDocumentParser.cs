@@ -6,6 +6,7 @@ using System.Xml.Linq;
 using ApiLens.Core.Helpers;
 using ApiLens.Core.Infrastructure;
 using ApiLens.Core.Models;
+using ApiLens.Core.Services;
 
 namespace ApiLens.Core.Parsing;
 
@@ -13,14 +14,21 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
 {
     private readonly StringInternCache stringCache;
     private readonly ObjectPool<StringBuilder> stringBuilderPool;
+    private readonly IFileHashHelper fileHashHelper;
+    private readonly IFileSystemService fileSystem;
 
     // Pre-interned common strings
     private readonly string memberElementName = "member";
     private readonly string nameAttributeName = "name";
     private readonly string assemblyElementName = "assembly";
 
-    public XmlDocumentParser()
+    public XmlDocumentParser(IFileHashHelper fileHashHelper, IFileSystemService fileSystem)
     {
+        ArgumentNullException.ThrowIfNull(fileHashHelper);
+        ArgumentNullException.ThrowIfNull(fileSystem);
+
+        this.fileHashHelper = fileHashHelper;
+        this.fileSystem = fileSystem;
         stringCache = new StringInternCache();
         stringBuilderPool = new ObjectPool<StringBuilder>(
             () => new StringBuilder(1024),
@@ -37,6 +45,13 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
         // Extract NuGet package information from the file path if available
         var nugetInfo = NuGetHelper.ExtractNuGetInfo(filePath);
 
+        // For non-NuGet files, we'll compute a hash for change detection
+        string? fileHash = null;
+        if (!nugetInfo.HasValue)
+        {
+            fileHash = await fileHashHelper.ComputeFileHashAsync(filePath);
+        }
+
         XmlReaderSettings settings = new()
         {
             Async = true,
@@ -45,7 +60,7 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
             IgnoreProcessingInstructions = true
         };
 
-        using FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
+        using Stream fileStream = await fileSystem.OpenReadAsync(filePath);
         using XmlReader reader = XmlReader.Create(fileStream, settings);
 
         string? assemblyName = null;
@@ -62,7 +77,7 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
                 }
                 else if (reader.Name == memberElementName && reader.Depth == 2)
                 {
-                    MemberInfo? member = await ParseMemberAsync(reader, assemblyName ?? "Unknown", filePath, nugetInfo);
+                    MemberInfo? member = await ParseMemberAsync(reader, assemblyName ?? "Unknown", filePath, nugetInfo, fileHash);
                     if (member != null)
                     {
                         yield return member;
@@ -136,10 +151,11 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
     }
 
     private async Task<MemberInfo?> ParseMemberAsync(
-        XmlReader reader, 
+        XmlReader reader,
         string assemblyName,
         string filePath,
-        (string PackageId, string Version, string Framework)? nugetInfo)
+        (string PackageId, string Version, string Framework)? nugetInfo,
+        string? fileHash)
     {
         string? nameAttribute = reader.GetAttribute(nameAttributeName);
         if (string.IsNullOrEmpty(nameAttribute))
@@ -218,12 +234,13 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
                 Exceptions = [.. exceptions],
                 CodeExamples = [.. examples],
                 IndexedAt = DateTime.UtcNow,
-                // Set NuGet package information if available
-                PackageId = nugetInfo?.PackageId,
-                PackageVersion = nugetInfo?.Version,
+                // Set package information - either from NuGet or from file
+                PackageId = nugetInfo?.PackageId ?? (fileHash != null ? assemblyName.ToLowerInvariant() : null),
+                PackageVersion = nugetInfo?.Version ?? fileHash,
                 TargetFramework = nugetInfo?.Framework,
                 IsFromNuGetCache = nugetInfo.HasValue,
-                SourceFilePath = filePath
+                SourceFilePath = filePath,
+                ContentHash = fileHash
             };
         }
         finally

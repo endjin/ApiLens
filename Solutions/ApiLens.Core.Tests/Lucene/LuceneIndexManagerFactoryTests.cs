@@ -11,7 +11,7 @@ public class LuceneIndexManagerFactoryTests
     [TestInitialize]
     public void Initialize()
     {
-        XmlDocumentParser parser = new();
+        XmlDocumentParser parser = TestHelpers.CreateTestXmlDocumentParser();
         DocumentBuilder documentBuilder = new();
         factory = new LuceneIndexManagerFactory(parser, documentBuilder);
     }
@@ -176,7 +176,7 @@ public class LuceneIndexManagerFactoryTests
     public void Factory_CanBeUsedWithDependencyInjection()
     {
         // Arrange
-        XmlDocumentParser parser = new();
+        XmlDocumentParser parser = TestHelpers.CreateTestXmlDocumentParser();
         DocumentBuilder documentBuilder = new();
         ILuceneIndexManagerFactory diFactory = new LuceneIndexManagerFactory(parser, documentBuilder);
 

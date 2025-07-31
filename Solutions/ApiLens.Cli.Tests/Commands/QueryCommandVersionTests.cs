@@ -1,8 +1,10 @@
 using ApiLens.Cli.Commands;
+using ApiLens.Core.Helpers;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
 using ApiLens.Core.Querying;
+using ApiLens.Core.Services;
 using Lucene.Net.Documents;
 using Spectre.Console;
 using Spectre.Console.Testing;
@@ -30,7 +32,9 @@ public class QueryCommandVersionTests
         // For these integration tests, we'll use real implementations
         indexManagerFactory.Create(Arg.Any<string>()).Returns(callInfo =>
         {
-            XmlDocumentParser parser = new();
+            var mockFileSystem = Substitute.For<IFileSystemService>();
+            var mockFileHashHelper = Substitute.For<IFileHashHelper>();
+            XmlDocumentParser parser = new(mockFileHashHelper, mockFileSystem);
             DocumentBuilder documentBuilder = new();
             return new LuceneIndexManager(callInfo.Arg<string>(), parser, documentBuilder);
         });
@@ -165,7 +169,9 @@ public class QueryCommandVersionTests
 
     private void CreateIndexWithVersionInfo()
     {
-        XmlDocumentParser parser = new();
+        var mockFileSystem = Substitute.For<IFileSystemService>();
+        var mockFileHashHelper = Substitute.For<IFileHashHelper>();
+        XmlDocumentParser parser = new(mockFileHashHelper, mockFileSystem);
         DocumentBuilder documentBuilder = new();
         using LuceneIndexManager indexManager = new(indexPath, parser, documentBuilder);
 
@@ -194,7 +200,9 @@ public class QueryCommandVersionTests
 
     private void CreateIndexWithoutVersionInfo()
     {
-        XmlDocumentParser parser = new();
+        var mockFileSystem = Substitute.For<IFileSystemService>();
+        var mockFileHashHelper = Substitute.For<IFileHashHelper>();
+        XmlDocumentParser parser = new(mockFileHashHelper, mockFileSystem);
         DocumentBuilder documentBuilder = new();
         using LuceneIndexManager indexManager = new(indexPath, parser, documentBuilder);
 

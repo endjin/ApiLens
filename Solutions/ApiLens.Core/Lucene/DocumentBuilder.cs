@@ -171,19 +171,19 @@ public class DocumentBuilder : IDocumentBuilder
         {
             doc.Add(new StringField("packageId", memberInfo.PackageId, Field.Store.YES));
         }
-        
+
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageVersion))
         {
             doc.Add(new StringField("packageVersion", memberInfo.PackageVersion, Field.Store.YES));
         }
-        
+
         if (!string.IsNullOrWhiteSpace(memberInfo.TargetFramework))
         {
             doc.Add(new StringField("targetFramework", memberInfo.TargetFramework, Field.Store.YES));
         }
-        
+
         doc.Add(new StringField("isFromNuGetCache", memberInfo.IsFromNuGetCache.ToString().ToLowerInvariant(), Field.Store.YES));
-        
+
         if (!string.IsNullOrWhiteSpace(memberInfo.SourceFilePath))
         {
             doc.Add(new StringField("sourceFilePath", memberInfo.SourceFilePath, Field.Store.YES));

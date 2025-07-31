@@ -77,4 +77,18 @@ public interface IFileSystemService
     /// <param name="recursive">Whether to search subdirectories.</param>
     /// <returns>Enumerable of file information.</returns>
     IEnumerable<FileInfo> EnumerateFiles(string path, string? pattern = null, bool recursive = false);
+
+    /// <summary>
+    /// Opens a file for reading.
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <returns>A stream for reading the file.</returns>
+    Stream OpenRead(string path);
+
+    /// <summary>
+    /// Opens a file for reading asynchronously.
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <returns>A stream for reading the file.</returns>
+    Task<Stream> OpenReadAsync(string path);
 }

@@ -30,7 +30,7 @@ public interface ILuceneIndexManager : IDisposable
     int GetTotalDocuments();
     long GetIndexSizeInBytes();
     IndexStatistics? GetIndexStatistics();
-    
+
     // Package tracking
     Dictionary<string, HashSet<string>> GetIndexedPackageVersions();
 

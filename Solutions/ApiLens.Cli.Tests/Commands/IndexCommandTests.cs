@@ -1,6 +1,7 @@
 using System.Xml.Linq;
 using ApiLens.Cli.Commands;
 using ApiLens.Cli.Services;
+using ApiLens.Core.Helpers;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
@@ -16,11 +17,13 @@ public class IndexCommandTests
     private IXmlDocumentParser mockParser = null!;
     private IDocumentBuilder mockDocumentBuilder = null!;
     private IFileSystemService mockFileSystem = null!;
+    private IFileHashHelper mockFileHashHelper = null!;
     private ILuceneIndexManagerFactory mockIndexManagerFactory = null!;
     private ILuceneIndexManager mockIndexManager = null!;
     private FakeFileSystem? fakeFileSystem;
     private FakeEnvironment? fakeEnvironment;
     private IFileSystemService? fakeFileSystemService;
+    private IFileHashHelper? fakeFileHashHelper;
     private IndexCommand command = null!;
     private CommandContext context = null!;
 
@@ -30,39 +33,73 @@ public class IndexCommandTests
         mockParser = Substitute.For<IXmlDocumentParser>();
         mockDocumentBuilder = Substitute.For<IDocumentBuilder>();
         mockFileSystem = Substitute.For<IFileSystemService>();
+        mockFileHashHelper = Substitute.For<IFileHashHelper>();
         mockIndexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         mockIndexManager = Substitute.For<ILuceneIndexManager>();
 
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
 
-        // Setup default IndexingResult
-        mockIndexManager.IndexXmlFilesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
-            .Returns(new IndexingResult
-            {
-                TotalDocuments = 0,
-                SuccessfulDocuments = 0,
-                FailedDocuments = 0,
-                ElapsedTime = TimeSpan.Zero,
-                BytesProcessed = 0,
-                Metrics = new PerformanceMetrics
-                {
-                    TotalAllocatedBytes = 0,
-                    Gen0Collections = 0,
-                    Gen1Collections = 0,
-                    Gen2Collections = 0,
-                    AverageParseTimeMs = 0,
-                    AverageIndexTimeMs = 0,
-                    AverageBatchCommitTimeMs = 0,
-                    PeakThreadCount = 1,
-                    CpuUsagePercent = 0,
-                    PeakWorkingSetBytes = 0,
-                    DocumentsPooled = 0,
-                    StringsInterned = 0
-                },
-                Errors = []
-            });
+        // Setup default for GetIndexedPackageVersions
+        mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
 
-        command = new IndexCommand(mockIndexManagerFactory, mockFileSystem);
+        // Setup default for GetTotalDocuments
+        mockIndexManager.GetTotalDocuments().Returns(0);
+
+        // Setup default GetIndexStatistics
+        mockIndexManager.GetIndexStatistics().Returns(new IndexStatistics
+        {
+            IndexPath = "./index",
+            DocumentCount = 0,
+            FieldCount = 0,
+            TotalSizeInBytes = 0,
+            FileCount = 0
+        });
+
+        // Setup default IndexingResult
+        var defaultIndexingResult = new IndexingResult
+        {
+            TotalDocuments = 0,
+            SuccessfulDocuments = 0,
+            FailedDocuments = 0,
+            ElapsedTime = TimeSpan.Zero,
+            BytesProcessed = 0,
+            Metrics = new PerformanceMetrics
+            {
+                TotalAllocatedBytes = 0,
+                Gen0Collections = 0,
+                Gen1Collections = 0,
+                Gen2Collections = 0,
+                AverageParseTimeMs = 0,
+                AverageIndexTimeMs = 0,
+                AverageBatchCommitTimeMs = 0,
+                PeakThreadCount = 1,
+                CpuUsagePercent = 0,
+                PeakWorkingSetBytes = 0,
+                DocumentsPooled = 0,
+                StringsInterned = 0
+            },
+            Errors = []
+        };
+
+        // Setup for all overloads of IndexXmlFilesAsync
+        mockIndexManager.IndexXmlFilesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(defaultIndexingResult);
+
+        mockIndexManager.IndexXmlFilesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<Action<int>>(), Arg.Any<CancellationToken>())
+            .Returns(defaultIndexingResult);
+
+        // This is the actual overload being called in the code
+        mockIndexManager.IndexXmlFilesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<Action<int>>())
+            .Returns(defaultIndexingResult);
+
+        // Setup CommitAsync to return completed task
+        mockIndexManager.CommitAsync().Returns(Task.CompletedTask);
+
+        // Setup FileHashHelper to return a test hash
+        mockFileHashHelper.ComputeFileHashAsync(Arg.Any<string>())
+            .Returns(Task.FromResult("testhash123"));
+
+        command = new IndexCommand(mockIndexManagerFactory, mockFileSystem, mockFileHashHelper);
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
     }
@@ -72,9 +109,10 @@ public class IndexCommandTests
         fakeEnvironment = FakeEnvironment.CreateLinuxEnvironment();
         fakeFileSystem = new FakeFileSystem(fakeEnvironment);
         fakeFileSystemService = new FileSystemService(fakeFileSystem, fakeEnvironment);
+        fakeFileHashHelper = new FileHashHelper(fakeFileSystemService);
 
         // Recreate command with fake file system
-        command = new IndexCommand(mockIndexManagerFactory, fakeFileSystemService);
+        command = new IndexCommand(mockIndexManagerFactory, fakeFileSystemService, fakeFileHashHelper);
     }
 
     [TestMethod]
@@ -149,7 +187,7 @@ public class IndexCommandTests
     public void Constructor_WithNullParser_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new IndexCommand(null!, mockFileSystem))
+        Should.Throw<ArgumentNullException>(() => new IndexCommand(null!, mockFileSystem, mockFileHashHelper))
             .ParamName.ShouldBe("indexManagerFactory");
     }
 
@@ -157,7 +195,7 @@ public class IndexCommandTests
     public void Constructor_WithNullDocumentBuilder_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new IndexCommand(mockIndexManagerFactory, null!))
+        Should.Throw<ArgumentNullException>(() => new IndexCommand(mockIndexManagerFactory, null!, mockFileHashHelper))
             .ParamName.ShouldBe("fileSystem");
     }
 
@@ -167,7 +205,7 @@ public class IndexCommandTests
         // Act & Assert
         // This test is no longer needed as we only have 2 parameters now
         // Act & Assert
-        Should.NotThrow(() => new IndexCommand(mockIndexManagerFactory, mockFileSystem));
+        Should.NotThrow(() => new IndexCommand(mockIndexManagerFactory, mockFileSystem, mockFileHashHelper));
     }
 
     [TestMethod]
@@ -176,7 +214,7 @@ public class IndexCommandTests
         // Act & Assert
         // This test is no longer needed as we only have 2 parameters now
         // Act & Assert  
-        Should.NotThrow(() => new IndexCommand(mockIndexManagerFactory, mockFileSystem));
+        Should.NotThrow(() => new IndexCommand(mockIndexManagerFactory, mockFileSystem, mockFileHashHelper));
     }
 
     [TestMethod]

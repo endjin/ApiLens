@@ -16,7 +16,7 @@ public class QueryEngineTests : IDisposable
     public void Setup()
     {
         tempIndexPath = Path.Combine(Path.GetTempPath(), $"apilens_test_{Guid.NewGuid()}");
-        XmlDocumentParser parser = new();
+        XmlDocumentParser parser = TestHelpers.CreateTestXmlDocumentParser();
         DocumentBuilder documentBuilder = new();
         indexManager = new LuceneIndexManager(tempIndexPath, parser, documentBuilder);
         engine = new QueryEngine(indexManager);

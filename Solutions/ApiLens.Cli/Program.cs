@@ -1,5 +1,6 @@
 using ApiLens.Cli.Commands;
 using ApiLens.Cli.Services;
+using ApiLens.Core.Helpers;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Parsing;
 using ApiLens.Core.Querying;
@@ -15,11 +16,12 @@ internal class Program
         ServiceCollection services = new();
 
         // Register services
-        services.AddSingleton<IXmlDocumentParser, XmlDocumentParser>();
-        services.AddSingleton<IDocumentBuilder, DocumentBuilder>();
         services.AddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<IEnvironment, Spectre.IO.Environment>();
         services.AddSingleton<IFileSystemService, FileSystemService>();
+        services.AddSingleton<IFileHashHelper, FileHashHelper>();
+        services.AddSingleton<IXmlDocumentParser, XmlDocumentParser>();
+        services.AddSingleton<IDocumentBuilder, DocumentBuilder>();
         services.AddSingleton<INuGetCacheScanner, NuGetCacheScanner>();
         services.AddSingleton<ILuceneIndexManagerFactory, LuceneIndexManagerFactory>();
         services.AddSingleton<IQueryEngineFactory, QueryEngineFactory>();

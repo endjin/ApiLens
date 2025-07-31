@@ -1,10 +1,33 @@
+using ApiLens.Core.Helpers;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
+using ApiLens.Core.Services;
 using Lucene.Net.Documents;
 using Lucene.Net.Search;
 
 namespace ApiLens.Core.Tests;
+
+/// <summary>
+/// Simple file system service implementation for testing.
+/// </summary>
+internal class SimpleFileSystemService : IFileSystemService
+{
+    public bool FileExists(string path) => File.Exists(path);
+    public bool DirectoryExists(string path) => Directory.Exists(path);
+    public IEnumerable<string> GetFiles(string path, string pattern, bool recursive) =>
+        Directory.GetFiles(path, pattern, recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+    public string CombinePath(params string[] paths) => Path.Combine(paths);
+    public FileInfo GetFileInfo(string path) => new FileInfo(path);
+    public DirectoryInfo GetDirectoryInfo(string path) => new DirectoryInfo(path);
+    public string GetUserNuGetCachePath() => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
+    public string GetFileName(string path) => Path.GetFileName(path);
+    public string? GetDirectoryName(string path) => Path.GetDirectoryName(path);
+    public IEnumerable<FileInfo> EnumerateFiles(string path, string? pattern = null, bool recursive = false) =>
+        new DirectoryInfo(path).EnumerateFiles(pattern ?? "*", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+    public Stream OpenRead(string path) => File.OpenRead(path);
+    public Task<Stream> OpenReadAsync(string path) => Task.FromResult<Stream>(File.OpenRead(path));
+}
 
 /// <summary>
 /// Helper methods for tests to work with the new async batch-based API.
@@ -16,7 +39,32 @@ public static class TestHelpers
     /// </summary>
     public static ILuceneIndexManager CreateTestIndexManager()
     {
-        XmlDocumentParser parser = new();
+        var mockFileSystem = Substitute.For<IFileSystemService>();
+        var mockFileHashHelper = Substitute.For<IFileHashHelper>();
+        XmlDocumentParser parser = new(mockFileHashHelper, mockFileSystem);
+        DocumentBuilder documentBuilder = new();
+        string tempPath = Path.Combine(Path.GetTempPath(), $"apilens_test_{Guid.NewGuid()}");
+        return new LuceneIndexManager(tempPath, parser, documentBuilder);
+    }
+
+    /// <summary>
+    /// Creates a test instance of XmlDocumentParser with mock dependencies.
+    /// </summary>
+    public static XmlDocumentParser CreateTestXmlDocumentParser()
+    {
+        var mockFileSystem = Substitute.For<IFileSystemService>();
+        var mockFileHashHelper = Substitute.For<IFileHashHelper>();
+        return new XmlDocumentParser(mockFileHashHelper, mockFileSystem);
+    }
+
+    /// <summary>
+    /// Creates a test instance of LuceneIndexManager with real file system services for tests that need file access.
+    /// </summary>
+    public static ILuceneIndexManager CreateTestIndexManagerWithRealFileSystem()
+    {
+        var realFileSystem = new SimpleFileSystemService();
+        var realFileHashHelper = new FileHashHelper(realFileSystem);
+        XmlDocumentParser parser = new(realFileHashHelper, realFileSystem);
         DocumentBuilder documentBuilder = new();
         string tempPath = Path.Combine(Path.GetTempPath(), $"apilens_test_{Guid.NewGuid()}");
         return new LuceneIndexManager(tempPath, parser, documentBuilder);

@@ -12,7 +12,7 @@ public class SpecializedQueryTests : IDisposable
     private readonly string tempIndexPath;
     private readonly ILuceneIndexManager indexManager;
     private readonly IDocumentBuilder documentBuilder = new DocumentBuilder();
-    private readonly IXmlDocumentParser parser = new XmlDocumentParser();
+    private readonly IXmlDocumentParser parser = TestHelpers.CreateTestXmlDocumentParser();
     private readonly IQueryEngine queryEngine;
 
     public SpecializedQueryTests()

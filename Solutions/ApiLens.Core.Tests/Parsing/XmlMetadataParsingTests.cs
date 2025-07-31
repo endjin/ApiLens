@@ -7,7 +7,7 @@ namespace ApiLens.Core.Tests.Parsing;
 [TestClass]
 public class XmlMetadataParsingTests
 {
-    private readonly XmlDocumentParser parser = new();
+    private readonly XmlDocumentParser parser = TestHelpers.CreateTestXmlDocumentParser();
 
     [TestMethod]
     public void ParseMember_WithCodeExample_ShouldExtractExample()

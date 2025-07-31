@@ -254,7 +254,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         // Track progress
         List<string> filePathList = filePaths.ToList();
         int filesProcessed = 0;
-        
+
         await Parallel.ForEachAsync(filePathList, parseOptions, async (filePath, ct) =>
         {
             try
@@ -269,7 +269,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                     Interlocked.Increment(ref totalDocuments);
                     Interlocked.Increment(ref successCount);
                 }
-                
+
                 // Report progress after each file
                 int currentProgress = Interlocked.Increment(ref filesProcessed);
                 progressCallback?.Invoke(currentProgress);
@@ -503,20 +503,20 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
     public Dictionary<string, HashSet<string>> GetIndexedPackageVersions()
     {
         Dictionary<string, HashSet<string>> packageVersions = new(StringComparer.OrdinalIgnoreCase);
-        
+
         using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
-        
+
         // Only load the fields we need for efficiency
         HashSet<string> fieldsToLoad = ["packageId", "packageVersion"];
-        
+
         // Iterate through all documents efficiently
         for (int i = 0; i < reader.MaxDoc; i++)
         {
             Document? doc = reader.Document(i, fieldsToLoad);
-            
+
             string? packageId = doc?.Get("packageId");
             string? version = doc?.Get("packageVersion");
-            
+
             if (!string.IsNullOrWhiteSpace(packageId) && !string.IsNullOrWhiteSpace(version))
             {
                 if (!packageVersions.TryGetValue(packageId, out HashSet<string>? versions))
@@ -527,7 +527,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                 versions.Add(version);
             }
         }
-        
+
         return packageVersions;
     }
 

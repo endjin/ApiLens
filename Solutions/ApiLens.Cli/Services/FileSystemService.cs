@@ -131,4 +131,18 @@ public class FileSystemService : IFileSystemService
         return directory.GetFiles(searchPattern, scope)
             .Select(f => new FileInfo(f.Path.FullPath));
     }
+
+    public Stream OpenRead(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        FilePath filePath = new(path);
+        IFile file = fileSystem.GetFile(filePath);
+        return file.OpenRead();
+    }
+
+    public Task<Stream> OpenReadAsync(string path)
+    {
+        // Spectre.IO doesn't have async file operations, so we return the sync result wrapped in a task
+        return Task.FromResult(OpenRead(path));
+    }
 }

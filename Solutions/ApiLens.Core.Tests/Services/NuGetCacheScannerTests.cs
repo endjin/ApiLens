@@ -120,6 +120,18 @@ public class NuGetCacheScannerTests
             return directory.GetFiles(searchPattern, scope)
                 .Select(f => new FileInfo(f.Path.FullPath));
         }
+
+        public Stream OpenRead(string path)
+        {
+            FilePath filePath = new(path);
+            IFile file = fileSystem.GetFile(filePath);
+            return file.OpenRead();
+        }
+
+        public Task<Stream> OpenReadAsync(string path)
+        {
+            return Task.FromResult(OpenRead(path));
+        }
     }
 
 

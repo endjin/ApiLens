@@ -12,7 +12,7 @@ public class XmlDocumentParserTests
     [TestInitialize]
     public void Setup()
     {
-        parser = new XmlDocumentParser();
+        parser = TestHelpers.CreateTestXmlDocumentParser();
     }
 
     [TestMethod]

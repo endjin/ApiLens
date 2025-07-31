@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Text.RegularExpressions;
 using ApiLens.Core.Helpers;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
@@ -12,16 +11,20 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
 {
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IFileSystemService fileSystem;
+    private readonly IFileHashHelper fileHashHelper;
 
     public IndexCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
-        IFileSystemService fileSystem)
+        IFileSystemService fileSystem,
+        IFileHashHelper fileHashHelper)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(fileSystem);
+        ArgumentNullException.ThrowIfNull(fileHashHelper);
 
         this.indexManagerFactory = indexManagerFactory;
         this.fileSystem = fileSystem;
+        this.fileHashHelper = fileHashHelper;
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
@@ -48,11 +51,136 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
             // Create index manager
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
 
+            List<string> filesToIndex;
+
             if (settings.Clean)
             {
                 AnsiConsole.MarkupLine("[yellow]Cleaning index...[/]");
                 indexManager.DeleteAll();
                 await indexManager.CommitAsync();
+                filesToIndex = xmlFiles;
+            }
+            else
+            {
+                // Get existing packages from index for change detection
+                Dictionary<string, HashSet<string>> indexedPackages = new();
+
+                await AnsiConsole.Status()
+                    .StartAsync("Analyzing index for change detection...", async ctx =>
+                    {
+                        ctx.Spinner(Spinner.Known.Star);
+                        ctx.SpinnerStyle(Style.Parse("yellow"));
+
+                        indexedPackages = await Task.Run(() => indexManager.GetIndexedPackageVersions());
+                    });
+
+                // Determine which files need indexing
+                filesToIndex = [];
+                HashSet<string> assembliesToUpdate = [];
+                int skippedFiles = 0;
+
+                await AnsiConsole.Status()
+                    .StartAsync("Computing file hashes for change detection...", async ctx =>
+                    {
+                        ctx.Spinner(Spinner.Known.Star);
+                        ctx.SpinnerStyle(Style.Parse("yellow"));
+
+                        foreach (string file in xmlFiles)
+                        {
+                            // Check if it's a NuGet file
+                            var nugetInfo = NuGetHelper.ExtractNuGetInfo(file);
+
+                            if (nugetInfo.HasValue)
+                            {
+                                // For NuGet files, check by package ID and version
+                                if (!indexedPackages.TryGetValue(nugetInfo.Value.PackageId, out HashSet<string>? versions) ||
+                                    !versions.Contains(nugetInfo.Value.Version))
+                                {
+                                    filesToIndex.Add(file);
+                                    assembliesToUpdate.Add(nugetInfo.Value.PackageId);
+                                }
+                                else
+                                {
+                                    skippedFiles++;
+                                }
+                            }
+                            else
+                            {
+                                try
+                                {
+                                    // For non-NuGet files, we need to compute hash
+                                    string fileHash = await fileHashHelper.ComputeFileHashAsync(file);
+
+                                    // We need to get the assembly name from the file
+                                    // For now, use filename as a proxy (will be replaced by actual assembly name during parsing)
+                                    string assemblyName = System.IO.Path.GetFileNameWithoutExtension(file).ToLowerInvariant();
+
+                                    if (!indexedPackages.TryGetValue(assemblyName, out HashSet<string>? versions) ||
+                                        !versions.Contains(fileHash))
+                                    {
+                                        filesToIndex.Add(file);
+                                        assembliesToUpdate.Add(assemblyName);
+                                    }
+                                    else
+                                    {
+                                        skippedFiles++;
+                                    }
+                                }
+                                catch (IOException)
+                                {
+                                    // If we can't compute the hash (e.g., file doesn't exist in test scenarios),
+                                    // treat it as a new file that needs indexing
+                                    filesToIndex.Add(file);
+                                    string assemblyName = System.IO.Path.GetFileNameWithoutExtension(file).ToLowerInvariant();
+                                    assembliesToUpdate.Add(assemblyName);
+                                }
+                            }
+                        }
+                    });
+
+                // Report what we're doing
+                int totalInIndex = indexedPackages.Sum(kvp => kvp.Value.Count);
+                AnsiConsole.MarkupLine($"[dim]Index contains {totalInIndex:N0} file versions across {indexedPackages.Count:N0} assemblies.[/]");
+
+                if (skippedFiles > 0)
+                {
+                    AnsiConsole.MarkupLine($"[green]Skipping {skippedFiles:N0} file(s) already up-to-date in index.[/]");
+                }
+
+                if (filesToIndex.Count == 0)
+                {
+                    AnsiConsole.MarkupLine("[yellow]All files are already up-to-date. Nothing to index.[/]");
+                    return 0;
+                }
+
+                AnsiConsole.MarkupLine($"[green]Found {filesToIndex.Count:N0} file(s) to index (new or updated).[/]");
+
+                // Clean up old versions if needed
+                if (assembliesToUpdate.Count > 0)
+                {
+                    int documentsBeforeCleanup = indexManager.GetTotalDocuments();
+
+                    await AnsiConsole.Status()
+                        .StartAsync($"Removing old versions from {assembliesToUpdate.Count:N0} assemblies...", async ctx =>
+                        {
+                            ctx.Spinner(Spinner.Known.Star);
+                            ctx.SpinnerStyle(Style.Parse("yellow"));
+
+                            await Task.Run(() =>
+                            {
+                                indexManager.DeleteDocumentsByPackageIds(assembliesToUpdate);
+                            });
+                            await indexManager.CommitAsync();
+                        });
+
+                    int documentsAfterCleanup = indexManager.GetTotalDocuments();
+                    int documentsRemoved = documentsBeforeCleanup - documentsAfterCleanup;
+
+                    if (documentsRemoved > 0)
+                    {
+                        AnsiConsole.MarkupLine($"[green]Removed {documentsRemoved:N0} API members from old versions.[/]");
+                    }
+                }
             }
 
             // Create progress display
@@ -66,14 +194,15 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
                     new SpinnerColumn())
                 .StartAsync(async ctx =>
                 {
-                    ProgressTask task = ctx.AddTask("[green]Indexing XML files[/]", maxValue: xmlFiles.Count);
+                    ProgressTask task = ctx.AddTask("[green]Indexing XML files[/]", maxValue: filesToIndex.Count);
 
                     // Index all files using high-performance batch operations
                     Stopwatch stopwatch = Stopwatch.StartNew();
-                    IndexingResult result = await indexManager.IndexXmlFilesAsync(xmlFiles);
+                    IndexingResult result = await indexManager.IndexXmlFilesAsync(
+                        filesToIndex,
+                        filesProcessed => task.Value = filesProcessed);
                     stopwatch.Stop();
 
-                    task.Value = xmlFiles.Count;
                     task.StopTask();
 
                     // Display results

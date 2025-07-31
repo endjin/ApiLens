@@ -18,7 +18,7 @@ public class LuceneIndexManagerTests : IDisposable
     public void Setup()
     {
         tempIndexPath = Path.Combine(Path.GetTempPath(), $"apilens_test_{Guid.NewGuid()}");
-        manager = TestHelpers.CreateTestIndexManager();
+        manager = TestHelpers.CreateTestIndexManagerWithRealFileSystem();
     }
 
     [TestMethod]
