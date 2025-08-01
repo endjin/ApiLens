@@ -342,7 +342,8 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
 
     private static async Task<CodeExample?> ParseExampleAsync(XmlReader reader, StringBuilder sb)
     {
-        string code = await ReadElementContentAsync(reader, sb);
+        // Use a special method that preserves whitespace for code examples
+        string code = await ReadCodeContentAsync(reader, sb);
         if (string.IsNullOrEmpty(code))
             return null;
 
@@ -351,6 +352,36 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             Code = code,
             Description = string.Empty
         };
+    }
+    
+    private static async Task<string> ReadCodeContentAsync(XmlReader reader, StringBuilder sb)
+    {
+        sb.Clear();
+
+        while (await reader.ReadAsync())
+        {
+            switch (reader.NodeType)
+            {
+                case XmlNodeType.Text:
+                case XmlNodeType.CDATA:
+                    sb.Append(reader.Value);
+                    break;
+                case XmlNodeType.Element:
+                    if (reader.Name is "see" or "paramref")
+                    {
+                        string? cref = reader.GetAttribute("cref") ?? reader.GetAttribute("name");
+                        if (!string.IsNullOrEmpty(cref))
+                            sb.Append(cref);
+                    }
+                    break;
+                case XmlNodeType.EndElement:
+                    // Don't normalize whitespace - preserve formatting for code
+                    return sb.ToString().Trim();
+            }
+        }
+
+        // Don't normalize whitespace - preserve formatting for code
+        return sb.ToString().Trim();
     }
 
     private static string NormalizeWhitespace(string text)
