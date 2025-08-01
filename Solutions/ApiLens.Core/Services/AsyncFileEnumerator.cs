@@ -72,7 +72,7 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
         await directoryChannel.Writer.WriteAsync(path, cancellationToken);
 
         // Track active directories to process
-        ScanState scanState = new ScanState();
+        ScanState scanState = new();
         scanState.IncrementDirectories(1); // Starting with root directory
 
         // Create scanner tasks

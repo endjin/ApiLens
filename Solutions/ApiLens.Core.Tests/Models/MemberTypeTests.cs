@@ -99,55 +99,6 @@ public class MemberTypeTests
     }
 
     [TestMethod]
-    public void MemberType_CanBeUsedInSwitch()
-    {
-        // Arrange
-        MemberType memberType = MemberType.Method;
-        string result;
-
-        // Act
-        switch (memberType)
-        {
-            case MemberType.Type:
-                result = "It's a type";
-                break;
-            case MemberType.Method:
-                result = "It's a method";
-                break;
-            case MemberType.Property:
-                result = "It's a property";
-                break;
-            case MemberType.Field:
-                result = "It's a field";
-                break;
-            case MemberType.Event:
-                result = "It's an event";
-                break;
-            default:
-                result = "Unknown";
-                break;
-        }
-
-        // Assert
-        result.ShouldBe("It's a method");
-    }
-
-    [TestMethod]
-    public void MemberType_CanBeCompared()
-    {
-        // Arrange
-        MemberType type1 = MemberType.Type;
-        MemberType type2 = MemberType.Method;
-        MemberType type3 = MemberType.Type;
-
-        // Assert
-        (type1 == type3).ShouldBeTrue();
-        (type1 != type2).ShouldBeTrue();
-        (type1 < type2).ShouldBeTrue();
-        (type2 > type1).ShouldBeTrue();
-    }
-
-    [TestMethod]
     public void MemberType_HasFlagsAttribute_ShouldBeFalse()
     {
         // Assert

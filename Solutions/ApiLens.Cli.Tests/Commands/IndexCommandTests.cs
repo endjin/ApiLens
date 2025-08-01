@@ -578,17 +578,19 @@ public class IndexCommandTests
         SetupFakeFileSystem();
 
         // Create test XML file in FakeFileSystem (for demonstration)
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>TestAssembly</name>
-    </assembly>
-    <members>
-        <member name=""T:TestNamespace.TestClass"">
-            <summary>Test class</summary>
-        </member>
-    </members>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>TestAssembly</name>
+                                </assembly>
+                                <members>
+                                    <member name="T:TestNamespace.TestClass">
+                                        <summary>Test class</summary>
+                                    </member>
+                                </members>
+                            </doc>
+                            """;
 
         fakeFileSystem!.CreateFile("/test/TestAssembly.xml").SetTextContent(xmlContent);
 
@@ -614,17 +616,19 @@ public class IndexCommandTests
         SetupFakeFileSystem();
 
         // Create multiple XML files in a directory
-        string xmlTemplate = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>{0}</name>
-    </assembly>
-    <members>
-        <member name=""T:{0}.TestClass"">
-            <summary>Test class in {0}</summary>
-        </member>
-    </members>
-</doc>";
+        string xmlTemplate = """
+                             <?xml version="1.0"?>
+                             <doc>
+                                 <assembly>
+                                     <name>{0}</name>
+                                 </assembly>
+                                 <members>
+                                     <member name="T:{0}.TestClass">
+                                         <summary>Test class in {0}</summary>
+                                     </member>
+                                 </members>
+                             </doc>
+                             """;
 
         fakeFileSystem!.CreateFile("/docs/Assembly1.xml").SetTextContent(string.Format(xmlTemplate, "Assembly1"));
         fakeFileSystem.CreateFile("/docs/Assembly2.xml").SetTextContent(string.Format(xmlTemplate, "Assembly2"));

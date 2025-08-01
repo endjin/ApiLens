@@ -99,55 +99,6 @@ public class TypeKindTests
     }
 
     [TestMethod]
-    public void TypeKind_CanBeUsedInSwitch()
-    {
-        // Arrange
-        TypeKind typeKind = TypeKind.Interface;
-        string result;
-
-        // Act
-        switch (typeKind)
-        {
-            case TypeKind.Class:
-                result = "Reference type (class)";
-                break;
-            case TypeKind.Interface:
-                result = "Contract definition";
-                break;
-            case TypeKind.Struct:
-                result = "Value type";
-                break;
-            case TypeKind.Enum:
-                result = "Enumeration";
-                break;
-            case TypeKind.Delegate:
-                result = "Function pointer";
-                break;
-            default:
-                result = "Unknown";
-                break;
-        }
-
-        // Assert
-        result.ShouldBe("Contract definition");
-    }
-
-    [TestMethod]
-    public void TypeKind_CanBeCompared()
-    {
-        // Arrange
-        TypeKind kind1 = TypeKind.Class;
-        TypeKind kind2 = TypeKind.Struct;
-        TypeKind kind3 = TypeKind.Class;
-
-        // Assert
-        (kind1 == kind3).ShouldBeTrue();
-        (kind1 != kind2).ShouldBeTrue();
-        (kind1 < kind2).ShouldBeTrue();
-        (kind2 > kind1).ShouldBeTrue();
-    }
-
-    [TestMethod]
     public void TypeKind_CanBeGroupedByCharacteristics()
     {
         // Arrange

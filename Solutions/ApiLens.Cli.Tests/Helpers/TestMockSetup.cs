@@ -34,7 +34,7 @@ internal static class TestMockSetup
         int skippedPackages,
         DeduplicationStats stats)
     {
-        PackageDeduplicationResult result = new PackageDeduplicationResult
+        PackageDeduplicationResult result = new()
         {
             PackagesToIndex = packagesToIndex,
             PackageIdsToDelete = packageIdsToDelete,
@@ -49,28 +49,5 @@ internal static class TestMockSetup
             Arg.Any<IReadOnlySet<string>>(),
             Arg.Any<bool>())
             .Returns(result);
-    }
-
-    /// <summary>
-    /// Creates a simple deduplication result that passes all packages through.
-    /// </summary>
-    public static PackageDeduplicationResult CreatePassThroughDeduplicationResult(
-        IReadOnlyList<NuGetPackageInfo> packages)
-    {
-        return new PackageDeduplicationResult
-        {
-            PackagesToIndex = packages,
-            PackageIdsToDelete = new HashSet<string>(),
-            SkippedPackages = 0,
-            Stats = new DeduplicationStats
-            {
-                TotalScannedPackages = packages.Count,
-                UniqueXmlFiles = packages.Count,
-                EmptyXmlFilesSkipped = 0,
-                AlreadyIndexedSkipped = 0,
-                NewPackages = packages.Count,
-                UpdatedPackages = 0
-            }
-        };
     }
 }

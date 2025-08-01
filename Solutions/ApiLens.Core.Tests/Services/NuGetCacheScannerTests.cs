@@ -117,8 +117,7 @@ public class NuGetCacheScannerTests
             string searchPattern = pattern ?? "*";
             SearchScope scope = recursive ? SearchScope.Recursive : SearchScope.Current;
 
-            return directory.GetFiles(searchPattern, scope)
-                .Select(f => new FileInfo(f.Path.FullPath));
+            return directory.GetFiles(searchPattern, scope).Select(f => new FileInfo(f.Path.FullPath));
         }
 
         public Stream OpenRead(string path)
@@ -140,8 +139,7 @@ public class NuGetCacheScannerTests
                 return [];
 
             IDirectory directory = fileSystem.GetDirectory(dirPath);
-            return directory.GetDirectories("*", SearchScope.Current)
-                .Select(d => new DirectoryInfo(d.Path.FullPath));
+            return directory.GetDirectories("*", SearchScope.Current).Select(d => new DirectoryInfo(d.Path.FullPath));
         }
     }
 
@@ -150,8 +148,7 @@ public class NuGetCacheScannerTests
     public void Constructor_WithNullFileSystem_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new NuGetCacheScanner(null!))
-            .ParamName.ShouldBe("fileSystem");
+        Should.Throw<ArgumentNullException>(() => new NuGetCacheScanner(null!)).ParamName.ShouldBe("fileSystem");
     }
 
     [TestMethod]
@@ -194,8 +191,7 @@ public class NuGetCacheScannerTests
 
         // Create a realistic NuGet cache structure
         string xmlPath = $"{cachePath}/newtonsoft.json/13.0.1/lib/net6.0/Newtonsoft.Json.xml";
-        fakeFileSystem!.CreateFile(xmlPath)
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem!.CreateFile(xmlPath).SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
 
         // Act
         ImmutableArray<NuGetPackageInfo> result = scanner.ScanNuGetCache();
@@ -217,12 +213,9 @@ public class NuGetCacheScannerTests
         string cachePath = fakeEnvironment!.HomeDirectory.FullPath + "/.nuget/packages";
 
         // Create multiple versions and frameworks
-        fakeFileSystem!.CreateFile($"{cachePath}/newtonsoft.json/13.0.1/lib/net6.0/Newtonsoft.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
-        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/12.0.3/lib/netstandard2.0/Newtonsoft.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
-        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/13.0.1/lib/net5.0/Newtonsoft.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem!.CreateFile($"{cachePath}/newtonsoft.json/13.0.1/lib/net6.0/Newtonsoft.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/12.0.3/lib/netstandard2.0/Newtonsoft.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/13.0.1/lib/net5.0/Newtonsoft.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
 
         // Act
         ImmutableArray<NuGetPackageInfo> result = scanner.ScanNuGetCache();
@@ -242,12 +235,9 @@ public class NuGetCacheScannerTests
         string cachePath = fakeEnvironment!.HomeDirectory.FullPath + "/.nuget/packages";
 
         // Create valid and invalid file structures
-        fakeFileSystem!.CreateFile($"{cachePath}/newtonsoft.json/13.0.1/lib/net6.0/Newtonsoft.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
-        fakeFileSystem.CreateFile($"{cachePath}/invalid.xml") // Invalid structure
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
-        fakeFileSystem.CreateFile($"{cachePath}/package/version/invalid.xml") // Missing lib folder
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem!.CreateFile($"{cachePath}/newtonsoft.json/13.0.1/lib/net6.0/Newtonsoft.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem.CreateFile($"{cachePath}/invalid.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>"); // Invalid structure
+        fakeFileSystem.CreateFile($"{cachePath}/package/version/invalid.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");// Missing lib folder
 
         // Act
         ImmutableArray<NuGetPackageInfo> result = scanner.ScanNuGetCache();
@@ -265,8 +255,7 @@ public class NuGetCacheScannerTests
         string cachePath = fakeEnvironment!.HomeDirectory.FullPath + "/.nuget/packages";
 
         // Create ref assembly (reference assembly) structure
-        fakeFileSystem!.CreateFile($"{cachePath}/system.text.json/6.0.0/ref/net6.0/System.Text.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem!.CreateFile($"{cachePath}/system.text.json/6.0.0/ref/net6.0/System.Text.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
 
         // Act
         ImmutableArray<NuGetPackageInfo> result = scanner.ScanNuGetCache();
@@ -287,16 +276,11 @@ public class NuGetCacheScannerTests
         string cachePath = fakeEnvironment!.HomeDirectory.FullPath + "/.nuget/packages";
 
         // Create multiple versions for version comparison testing
-        fakeFileSystem!.CreateFile($"{cachePath}/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
-        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/13.0.1/lib/net6.0/Newtonsoft.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
-        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/12.0.3/lib/net6.0/Newtonsoft.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
-        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/13.0.2/lib/net5.0/Newtonsoft.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
-        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/13.0.1/lib/net5.0/Newtonsoft.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem!.CreateFile($"{cachePath}/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/13.0.1/lib/net6.0/Newtonsoft.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/12.0.3/lib/net6.0/Newtonsoft.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/13.0.2/lib/net5.0/Newtonsoft.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/13.0.1/lib/net5.0/Newtonsoft.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
 
         // Act
         ImmutableArray<NuGetPackageInfo> allPackages = scanner.ScanNuGetCache();
@@ -316,12 +300,9 @@ public class NuGetCacheScannerTests
         string cachePath = fakeEnvironment!.HomeDirectory.FullPath + "/.nuget/packages";
 
         // Create a realistic NuGet cache structure
-        fakeFileSystem!.CreateFile($"{cachePath}/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
-        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/13.0.3/lib/net5.0/Newtonsoft.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
-        fakeFileSystem.CreateFile($"{cachePath}/system.text.json/6.0.0/lib/net6.0/System.Text.Json.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem!.CreateFile($"{cachePath}/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/13.0.3/lib/net5.0/Newtonsoft.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem.CreateFile($"{cachePath}/system.text.json/6.0.0/lib/net6.0/System.Text.Json.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
 
         // Create some non-XML files that should be ignored
         fakeFileSystem.CreateFile($"{cachePath}/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.dll");
@@ -362,10 +343,8 @@ public class NuGetCacheScannerTests
         SetupFakeFileSystem(customCachePath);
 
         // Create packages in custom location
-        fakeFileSystem!.CreateFile($"{customCachePath}/serilog/2.10.0/lib/netstandard2.0/Serilog.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
-        fakeFileSystem.CreateFile($"{customCachePath}/serilog/2.10.0/lib/netstandard2.1/Serilog.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem!.CreateFile($"{customCachePath}/serilog/2.10.0/lib/netstandard2.0/Serilog.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem.CreateFile($"{customCachePath}/serilog/2.10.0/lib/netstandard2.1/Serilog.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
 
         // Act
         ImmutableArray<NuGetPackageInfo> result = scanner.ScanNuGetCache();
@@ -384,12 +363,10 @@ public class NuGetCacheScannerTests
         string cachePath = fakeEnvironment!.HomeDirectory.FullPath + "/.nuget/packages";
 
         // Create ref assemblies (reference assemblies)
-        fakeFileSystem!.CreateFile($"{cachePath}/microsoft.extensions.logging/6.0.0/ref/net6.0/Microsoft.Extensions.Logging.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem!.CreateFile($"{cachePath}/microsoft.extensions.logging/6.0.0/ref/net6.0/Microsoft.Extensions.Logging.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
 
         // Also create lib assemblies for comparison
-        fakeFileSystem.CreateFile($"{cachePath}/microsoft.extensions.logging/6.0.0/lib/net6.0/Microsoft.Extensions.Logging.xml")
-            .SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
+        fakeFileSystem.CreateFile($"{cachePath}/microsoft.extensions.logging/6.0.0/lib/net6.0/Microsoft.Extensions.Logging.xml").SetTextContent("<?xml version=\"1.0\"?><doc></doc>");
 
         // Act
         ImmutableArray<NuGetPackageInfo> result = scanner.ScanNuGetCache();

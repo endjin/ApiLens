@@ -168,10 +168,12 @@ public class CodeExampleTests
     public void CodeExample_WithMultilineCode_PreservesFormatting()
     {
         // Arrange
-        string multilineCode = @"public int Calculate(int a, int b)
-{
-    return a + b;
-}";
+        string multilineCode = """
+                               public int Calculate(int a, int b)
+                               {
+                                   return a + b;
+                               }
+                               """;
 
         // Act
         CodeExample example = new()

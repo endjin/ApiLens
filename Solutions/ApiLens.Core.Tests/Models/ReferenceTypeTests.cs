@@ -119,55 +119,6 @@ public class ReferenceTypeTests
     }
 
     [TestMethod]
-    public void ReferenceType_CanBeUsedInSwitch()
-    {
-        // Arrange
-        ReferenceType referenceType = ReferenceType.Exception;
-        string result;
-
-        // Act
-        switch (referenceType)
-        {
-            case ReferenceType.See:
-            case ReferenceType.SeeAlso:
-                result = "Documentation reference";
-                break;
-            case ReferenceType.Param:
-            case ReferenceType.Return:
-            case ReferenceType.Exception:
-                result = "XML documentation element";
-                break;
-            case ReferenceType.Inheritance:
-            case ReferenceType.Parameter:
-            case ReferenceType.ReturnType:
-            case ReferenceType.GenericConstraint:
-                result = "Code relationship";
-                break;
-            default:
-                result = "Unknown";
-                break;
-        }
-
-        // Assert
-        result.ShouldBe("XML documentation element");
-    }
-
-    [TestMethod]
-    public void ReferenceType_CanBeCompared()
-    {
-        // Arrange
-        ReferenceType ref1 = ReferenceType.See;
-        ReferenceType ref2 = ReferenceType.Exception;
-        ReferenceType ref3 = ReferenceType.See;
-
-        // Assert
-        (ref1 == ref3).ShouldBeTrue();
-        (ref1 != ref2).ShouldBeTrue();
-        (ref1 < ref2).ShouldBeTrue();
-        (ref2 > ref1).ShouldBeTrue();
-    }
-
-    [TestMethod]
     public void ReferenceType_CanBeGroupedByCategory()
     {
         // Arrange

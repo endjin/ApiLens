@@ -186,8 +186,10 @@ public class LuceneIndexManagerTests : IDisposable
         await manager.CommitAsync();
 
         // Act
-        QueryParser parser = new(global::Lucene.Net.Util.LuceneVersion.LUCENE_48, "nameText", new WhitespaceAnalyzer(global::Lucene.Net.Util.LuceneVersion.LUCENE_48));
-        parser.LowercaseExpandedTerms = false; // Don't lowercase wildcard terms
+        QueryParser parser = new(global::Lucene.Net.Util.LuceneVersion.LUCENE_48, "nameText", new WhitespaceAnalyzer(global::Lucene.Net.Util.LuceneVersion.LUCENE_48))
+        {
+            LowercaseExpandedTerms = false // Don't lowercase wildcard terms
+        };
         Query? query = parser.Parse("String*");
         TopDocs topDocs = manager.SearchWithQuery(query, 10);
 
@@ -200,20 +202,22 @@ public class LuceneIndexManagerTests : IDisposable
     {
         // Arrange
         string testFile = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid()}.xml");
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>TestAssembly</name>
-    </assembly>
-    <members>
-        <member name=""T:TestNamespace.TestClass"">
-            <summary>Test class summary</summary>
-        </member>
-        <member name=""M:TestNamespace.TestClass.TestMethod"">
-            <summary>Test method summary</summary>
-        </member>
-    </members>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>TestAssembly</name>
+                                </assembly>
+                                <members>
+                                    <member name="T:TestNamespace.TestClass">
+                                        <summary>Test class summary</summary>
+                                    </member>
+                                    <member name="M:TestNamespace.TestClass.TestMethod">
+                                        <summary>Test method summary</summary>
+                                    </member>
+                                </members>
+                            </doc>
+                            """;
         await File.WriteAllTextAsync(testFile, xmlContent);
 
         try

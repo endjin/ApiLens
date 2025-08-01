@@ -33,7 +33,7 @@ internal static class FixTestsMockSetup
         this IPackageDeduplicationService mockDeduplicationService,
         NuGetPackageInfo[] packages)
     {
-        PackageDeduplicationResult result = new PackageDeduplicationResult
+        PackageDeduplicationResult result = new()
         {
             PackagesToIndex = packages,
             PackageIdsToDelete = new HashSet<string>(),
@@ -49,22 +49,6 @@ internal static class FixTestsMockSetup
             }
         };
 
-        mockDeduplicationService.DeduplicatePackages(
-            Arg.Any<IReadOnlyList<NuGetPackageInfo>>(),
-            Arg.Any<IReadOnlyDictionary<string, HashSet<(string Version, string Framework)>>>(),
-            Arg.Any<IReadOnlySet<string>>(),
-            Arg.Any<IReadOnlySet<string>>(),
-            Arg.Any<bool>())
-            .Returns(result);
-    }
-
-    /// <summary>
-    /// Sets up deduplication service with custom result.
-    /// </summary>
-    public static void SetupDeduplicationWithResult(
-        this IPackageDeduplicationService mockDeduplicationService,
-        PackageDeduplicationResult result)
-    {
         mockDeduplicationService.DeduplicatePackages(
             Arg.Any<IReadOnlyList<NuGetPackageInfo>>(),
             Arg.Any<IReadOnlyDictionary<string, HashSet<(string Version, string Framework)>>>(),

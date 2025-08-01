@@ -103,8 +103,7 @@ public class TypeHierarchyResolverTests
             RelatedTypes = []
         };
 
-        mockQueryEngine.GetByType(MemberType.Type, 1000)
-            .Returns([derivedType1, derivedType2, unrelatedType]);
+        mockQueryEngine.GetByType(MemberType.Type, 1000).Returns([derivedType1, derivedType2, unrelatedType]);
 
         // Act
         List<MemberInfo> derivedTypes = resolver.GetDerivedTypes("MyNamespace.BaseClass");

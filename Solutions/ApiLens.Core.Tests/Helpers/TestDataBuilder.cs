@@ -29,13 +29,4 @@ public static class TestDataBuilder
             Context = context
         };
     }
-
-    public static AttributeInfo CreateAttribute(string type, Dictionary<string, string>? properties = null)
-    {
-        return new AttributeInfo
-        {
-            Type = type,
-            Properties = properties?.ToImmutableDictionary() ?? ImmutableDictionary<string, string>.Empty
-        };
-    }
 }

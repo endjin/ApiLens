@@ -89,7 +89,7 @@ public class SpecializedQueryTests : IDisposable
 
         // Assert
         results.Count.ShouldBe(2);
-        results.All(r => r.Complexity?.ParameterCount >= 2 && r.Complexity?.ParameterCount <= 3).ShouldBeTrue();
+        results.All(r => r.Complexity?.ParameterCount is >= 2 and <= 3).ShouldBeTrue();
     }
 
     [TestMethod]

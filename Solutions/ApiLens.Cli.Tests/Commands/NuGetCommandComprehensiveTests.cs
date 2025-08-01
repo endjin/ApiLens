@@ -532,7 +532,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         int skippedPackages = 0,
         int emptyXmlFilesSkipped = 0)
     {
-        PackageDeduplicationResult result = new PackageDeduplicationResult
+        PackageDeduplicationResult result = new()
         {
             PackagesToIndex = packagesToIndex,
             PackageIdsToDelete = packageIdsToDelete ?? new HashSet<string>(),

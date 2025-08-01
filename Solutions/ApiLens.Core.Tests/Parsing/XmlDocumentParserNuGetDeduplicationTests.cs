@@ -24,20 +24,22 @@ public class XmlDocumentParserNuGetDeduplicationTests
     public async Task ParseXmlFileStreamAsync_WithDifferentNuGetPackages_GeneratesUniqueIds()
     {
         // Arrange
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>TestAssembly</name>
-    </assembly>
-    <members>
-        <member name=""T:TestNamespace.TestClass"">
-            <summary>Test class</summary>
-        </member>
-        <member name=""M:TestNamespace.TestClass.TestMethod"">
-            <summary>Test method</summary>
-        </member>
-    </members>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>TestAssembly</name>
+                                </assembly>
+                                <members>
+                                    <member name="T:TestNamespace.TestClass">
+                                        <summary>Test class</summary>
+                                    </member>
+                                    <member name="M:TestNamespace.TestClass.TestMethod">
+                                        <summary>Test method</summary>
+                                    </member>
+                                </members>
+                            </doc>
+                            """;
 
         // Create paths that simulate different NuGet packages
         string path1 = @"C:\Users\test\.nuget\packages\testpackage\1.0.0\lib\net6.0\TestAssembly.xml";
@@ -99,17 +101,19 @@ public class XmlDocumentParserNuGetDeduplicationTests
     public async Task ParseXmlFileStreamAsync_WithNonNuGetFile_UsesFileHash()
     {
         // Arrange
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>TestAssembly</name>
-    </assembly>
-    <members>
-        <member name=""T:TestNamespace.TestClass"">
-            <summary>Test class</summary>
-        </member>
-    </members>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>TestAssembly</name>
+                                </assembly>
+                                <members>
+                                    <member name="T:TestNamespace.TestClass">
+                                        <summary>Test class</summary>
+                                    </member>
+                                </members>
+                            </doc>
+                            """;
 
         string localPath = @"C:\Projects\MyProject\bin\Debug\TestAssembly.xml";
         string fileHash = "abc123hash";
@@ -136,17 +140,19 @@ public class XmlDocumentParserNuGetDeduplicationTests
     public async Task ParseXmlFileStreamAsync_WithSameMemberInDifferentPackages_AllIndexed()
     {
         // Arrange
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>Newtonsoft.Json</name>
-    </assembly>
-    <members>
-        <member name=""T:Newtonsoft.Json.JsonSerializer"">
-            <summary>Serializes and deserializes objects into and from the JSON format.</summary>
-        </member>
-    </members>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>Newtonsoft.Json</name>
+                                </assembly>
+                                <members>
+                                    <member name="T:Newtonsoft.Json.JsonSerializer">
+                                        <summary>Serializes and deserializes objects into and from the JSON format.</summary>
+                                    </member>
+                                </members>
+                            </doc>
+                            """;
 
         // Simulate the same type in different framework targets
         string[] paths =

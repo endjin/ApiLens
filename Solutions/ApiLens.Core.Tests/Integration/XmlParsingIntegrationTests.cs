@@ -87,8 +87,7 @@ public class XmlParsingIntegrationTests
             r.Type == ReferenceType.Exception);
 
         // Dictionary.Add should have multiple exception references
-        crossReferences.Where(r => r.SourceId == "M:System.Collections.Generic.Dictionary`2.Add(`0,`1)" && r.Type == ReferenceType.Exception)
-            .Count().ShouldBe(2);
+        crossReferences.Count(r => r is { SourceId: "M:System.Collections.Generic.Dictionary`2.Add(`0,`1)", Type: ReferenceType.Exception }).ShouldBe(2);
     }
 
     [TestMethod]

@@ -54,48 +54,54 @@ public class NuGetIndexingIntegrationTests : IDisposable
         // Arrange - Create test XML files with different scenarios
         List<(string path, string content)> testFiles =
         [
-            this.CreateNuGetXmlFile("microsoft.extensions.logging", "8.0.0", "net6.0", @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>Microsoft.Extensions.Logging</name>
-    </assembly>
-    <members>
-        <member name=""T:Microsoft.Extensions.Logging.ILogger"">
-            <summary>Represents a type used to perform logging.</summary>
-        </member>
-        <member name=""M:Microsoft.Extensions.Logging.LoggerExtensions.LogDebug(Microsoft.Extensions.Logging.ILogger,System.String)"">
-            <summary>Logs a debug message.</summary>
-        </member>
-        <member name=""P:Microsoft.Extensions.Logging.LogLevel.Debug"">
-            <summary>Debug logging level.</summary>
-        </member>
-    </members>
-</doc>"),
+            this.CreateNuGetXmlFile("microsoft.extensions.logging", "8.0.0", "net6.0", """
+                <?xml version="1.0"?>
+                <doc>
+                    <assembly>
+                        <name>Microsoft.Extensions.Logging</name>
+                    </assembly>
+                    <members>
+                        <member name="T:Microsoft.Extensions.Logging.ILogger">
+                            <summary>Represents a type used to perform logging.</summary>
+                        </member>
+                        <member name="M:Microsoft.Extensions.Logging.LoggerExtensions.LogDebug(Microsoft.Extensions.Logging.ILogger,System.String)">
+                            <summary>Logs a debug message.</summary>
+                        </member>
+                        <member name="P:Microsoft.Extensions.Logging.LogLevel.Debug">
+                            <summary>Debug logging level.</summary>
+                        </member>
+                    </members>
+                </doc>
+                """),
 
             // Empty XML file
 
-            this.CreateNuGetXmlFile("empty.package", "1.0.0", "net6.0", @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>Empty.Package</name>
-    </assembly>
-    <members>
-    </members>
-</doc>"),
+            this.CreateNuGetXmlFile("empty.package", "1.0.0", "net6.0", """
+                                                                        <?xml version="1.0"?>
+                                                                        <doc>
+                                                                            <assembly>
+                                                                                <name>Empty.Package</name>
+                                                                            </assembly>
+                                                                            <members>
+                                                                            </members>
+                                                                        </doc>
+                                                                        """),
 
             // Shared XML file (same content, different framework paths)
 
-            this.CreateNuGetXmlFile("shared.package", "1.0.0", "netstandard2.0", @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>Shared.Package</name>
-    </assembly>
-    <members>
-        <member name=""T:Shared.Package.SharedType"">
-            <summary>A type shared across frameworks.</summary>
-        </member>
-    </members>
-</doc>")
+            this.CreateNuGetXmlFile("shared.package", "1.0.0", "netstandard2.0", """
+                <?xml version="1.0"?>
+                <doc>
+                    <assembly>
+                        <name>Shared.Package</name>
+                    </assembly>
+                    <members>
+                        <member name="T:Shared.Package.SharedType">
+                            <summary>A type shared across frameworks.</summary>
+                        </member>
+                    </members>
+                </doc>
+                """)
         ];
 
         // Create the test files
@@ -143,20 +149,22 @@ public class NuGetIndexingIntegrationTests : IDisposable
     public async Task SharedXmlFileScenario_MultipleFrameworks_DeduplicatesCorrectly()
     {
         // Arrange - Create shared XML file scenario
-        string sharedContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>Microsoft.Extensions.DependencyInjection</name>
-    </assembly>
-    <members>
-        <member name=""T:Microsoft.Extensions.DependencyInjection.IServiceCollection"">
-            <summary>Specifies the contract for a collection of service descriptors.</summary>
-        </member>
-        <member name=""M:Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton``1(Microsoft.Extensions.DependencyInjection.IServiceCollection)"">
-            <summary>Adds a singleton service.</summary>
-        </member>
-    </members>
-</doc>";
+        string sharedContent = """
+                               <?xml version="1.0"?>
+                               <doc>
+                                   <assembly>
+                                       <name>Microsoft.Extensions.DependencyInjection</name>
+                                   </assembly>
+                                   <members>
+                                       <member name="T:Microsoft.Extensions.DependencyInjection.IServiceCollection">
+                                           <summary>Specifies the contract for a collection of service descriptors.</summary>
+                                       </member>
+                                       <member name="M:Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton``1(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+                                           <summary>Adds a singleton service.</summary>
+                                       </member>
+                                   </members>
+                               </doc>
+                               """;
 
         // Same XML file path for different frameworks (common in real packages)
         string sharedPath = Path.Combine(testDataPath, ".nuget/packages/microsoft.extensions.dependencyinjection/8.0.0/lib/netstandard2.0/Microsoft.Extensions.DependencyInjection.xml");
@@ -195,17 +203,19 @@ public class NuGetIndexingIntegrationTests : IDisposable
         string windowsPath = Path.Combine(testDataPath, @".nuget\packages\windows.package\1.0.0\lib\net6.0\Windows.Package.xml");
         string linuxPath = Path.Combine(testDataPath, ".nuget/packages/linux.package/1.0.0/lib/net6.0/Linux.Package.xml");
 
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>Test.Package</name>
-    </assembly>
-    <members>
-        <member name=""T:Test.Type"">
-            <summary>Test type.</summary>
-        </member>
-    </members>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>Test.Package</name>
+                                </assembly>
+                                <members>
+                                    <member name="T:Test.Type">
+                                        <summary>Test type.</summary>
+                                    </member>
+                                </members>
+                            </doc>
+                            """;
 
         CreateTestFile(windowsPath, xmlContent);
         CreateTestFile(linuxPath, xmlContent);
@@ -232,17 +242,19 @@ public class NuGetIndexingIntegrationTests : IDisposable
     public async Task VersionUpdateScenario_NewVersionArrives_UpdatesCorrectly()
     {
         // Arrange - Index old version
-        (string path, string content) oldVersionFile = CreateNuGetXmlFile("evolving.package", "1.0.0", "net6.0", @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>Evolving.Package</name>
-    </assembly>
-    <members>
-        <member name=""T:Evolving.Package.OldClass"">
-            <summary>Old class in v1.</summary>
-        </member>
-    </members>
-</doc>");
+        (string path, string content) oldVersionFile = CreateNuGetXmlFile("evolving.package", "1.0.0", "net6.0", """
+            <?xml version="1.0"?>
+            <doc>
+                <assembly>
+                    <name>Evolving.Package</name>
+                </assembly>
+                <members>
+                    <member name="T:Evolving.Package.OldClass">
+                        <summary>Old class in v1.</summary>
+                    </member>
+                </members>
+            </doc>
+            """);
 
         CreateTestFile(oldVersionFile.path, oldVersionFile.content);
         await indexManager.IndexXmlFilesAsync([oldVersionFile.path]);
@@ -252,20 +264,22 @@ public class NuGetIndexingIntegrationTests : IDisposable
         versions1["evolving.package"].ShouldContain(("1.0.0", "net6.0"));
 
         // Arrange - New version
-        (string path, string content) newVersionFile = CreateNuGetXmlFile("evolving.package", "2.0.0", "net6.0", @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>Evolving.Package</name>
-    </assembly>
-    <members>
-        <member name=""T:Evolving.Package.OldClass"">
-            <summary>Old class updated in v2.</summary>
-        </member>
-        <member name=""T:Evolving.Package.NewClass"">
-            <summary>New class added in v2.</summary>
-        </member>
-    </members>
-</doc>");
+        (string path, string content) newVersionFile = CreateNuGetXmlFile("evolving.package", "2.0.0", "net6.0", """
+            <?xml version="1.0"?>
+            <doc>
+                <assembly>
+                    <name>Evolving.Package</name>
+                </assembly>
+                <members>
+                    <member name="T:Evolving.Package.OldClass">
+                        <summary>Old class updated in v2.</summary>
+                    </member>
+                    <member name="T:Evolving.Package.NewClass">
+                        <summary>New class added in v2.</summary>
+                    </member>
+                </members>
+            </doc>
+            """);
 
         CreateTestFile(newVersionFile.path, newVersionFile.content);
 
@@ -461,31 +475,37 @@ public class NuGetIndexingIntegrationTests : IDisposable
     private static string CreateXmlWithMembers(params (string name, string summary)[] members)
     {
         string memberElements = string.Join("\n", members.Select(m =>
-            $@"        <member name=""{m.name}"">
-            <summary>{m.summary}</summary>
-        </member>"));
+            $"""
+                     <member name="{m.name}">
+                         <summary>{m.summary}</summary>
+                     </member>
+             """));
 
-        return $@"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>TestAssembly</name>
-    </assembly>
-    <members>
-{memberElements}
-    </members>
-</doc>";
+        return $"""
+                <?xml version="1.0"?>
+                <doc>
+                    <assembly>
+                        <name>TestAssembly</name>
+                    </assembly>
+                    <members>
+                {memberElements}
+                    </members>
+                </doc>
+                """;
     }
 
     private static string CreateEmptyXml(string assemblyName)
     {
-        return $@"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>{assemblyName}</name>
-    </assembly>
-    <members>
-    </members>
-</doc>";
+        return $"""
+                <?xml version="1.0"?>
+                <doc>
+                    <assembly>
+                        <name>{assemblyName}</name>
+                    </assembly>
+                    <members>
+                    </members>
+                </doc>
+                """;
     }
 
     public void Dispose()

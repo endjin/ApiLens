@@ -122,7 +122,7 @@ public partial class RelatedTypeResolver
         }
 
         // Property type inference from name
-        if (member.MemberType == MemberType.Property && member.Name == "Name")
+        if (member is { MemberType: MemberType.Property, Name: "Name" })
         {
             relatedTypes.Add("T:System.String");
         }

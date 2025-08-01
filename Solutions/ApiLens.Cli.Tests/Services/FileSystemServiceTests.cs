@@ -32,16 +32,14 @@ public class FileSystemServiceTests
     public void Constructor_WithNullFileSystem_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new FileSystemService(null!, fakeEnvironment))
-            .ParamName.ShouldBe("fileSystem");
+        Should.Throw<ArgumentNullException>(() => new FileSystemService(null!, fakeEnvironment)).ParamName.ShouldBe("fileSystem");
     }
 
     [TestMethod]
     public void Constructor_WithNullEnvironment_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new FileSystemService(fakeFileSystem, null!))
-            .ParamName.ShouldBe("environment");
+        Should.Throw<ArgumentNullException>(() => new FileSystemService(fakeFileSystem, null!)).ParamName.ShouldBe("environment");
     }
 
     [TestMethod]

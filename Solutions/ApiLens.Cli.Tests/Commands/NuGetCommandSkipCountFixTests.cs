@@ -320,7 +320,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
         IReadOnlySet<string>? packageIdsToDelete = null,
         int skippedPackages = 0)
     {
-        PackageDeduplicationResult result = new PackageDeduplicationResult
+        PackageDeduplicationResult result = new()
         {
             PackagesToIndex = packagesToIndex,
             PackageIdsToDelete = packageIdsToDelete ?? new HashSet<string>(),

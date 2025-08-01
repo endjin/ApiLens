@@ -43,26 +43,28 @@ internal class Program
                 .WithExample("index", "./MyLib.xml", "--index", "./custom-index");
 
             config.AddCommand<QueryCommand>("query")
-                .WithDescription(@"Query the API documentation index.
+                .WithDescription("""
+                                 Query the API documentation index.
 
-QUERY SYNTAX:
-  Name searches (default): Require exact matches, case-insensitive
-  Content searches: Support full Lucene query syntax including:
-    - Wildcards: * (multiple chars), ? (single char)
-      Example: string* matches string, strings, stringify
-    - Fuzzy: ~ for similar terms
-      Example: roam~ matches foam, roams
-    - Boolean: AND, OR, NOT (must be uppercase)
-      Example: string AND utility
-    - Phrases: Use quotes for exact phrases
-      Example: ""strongly typed""
-    
-SEARCH TYPES:
-  name      - Exact name match (default)
-  content   - Full-text search in documentation
-  namespace - Exact namespace match
-  id        - Exact member ID (e.g., T:System.String)
-  assembly  - Exact assembly name match")
+                                 QUERY SYNTAX:
+                                   Name searches (default): Require exact matches, case-insensitive
+                                   Content searches: Support full Lucene query syntax including:
+                                     - Wildcards: * (multiple chars), ? (single char)
+                                       Example: string* matches string, strings, stringify
+                                     - Fuzzy: ~ for similar terms
+                                       Example: roam~ matches foam, roams
+                                     - Boolean: AND, OR, NOT (must be uppercase)
+                                       Example: string AND utility
+                                     - Phrases: Use quotes for exact phrases
+                                       Example: "strongly typed"
+                                     
+                                 SEARCH TYPES:
+                                   name      - Exact name match (default)
+                                   content   - Full-text search in documentation
+                                   namespace - Exact namespace match
+                                   id        - Exact member ID (e.g., T:System.String)
+                                   assembly  - Exact assembly name match
+                                 """)
                 .WithExample("query", "String")
                 .WithExample("query", "List<T>")
                 .WithExample("query", "string*", "--type", "content")
@@ -98,11 +100,13 @@ SEARCH TYPES:
                 .WithExample("stats", "--format", "json");
 
             config.AddCommand<NuGetCommand>("nuget")
-                .WithDescription(@"Scan and index NuGet package cache.
+                .WithDescription("""
+                                 Scan and index NuGet package cache.
 
-Automatically discovers your NuGet cache location and indexes all packages
-with XML documentation. Supports filtering, latest-version selection, and
-listing packages without indexing.")
+                                 Automatically discovers your NuGet cache location and indexes all packages
+                                 with XML documentation. Supports filtering, latest-version selection, and
+                                 listing packages without indexing.
+                                 """)
                 .WithExample("nuget")
                 .WithExample("nuget", "--clean", "--latest")
                 .WithExample("nuget", "--filter", "microsoft.*", "--latest")

@@ -311,12 +311,10 @@ public class LuceneIndexManagerAdvancedTests : IDisposable
             List<MemberInfo> members = Enumerable.Range(1, 5).Select(j =>
                 CreateMemberInfo($"package{i + 1}", "1.0.0", "net6.0", file, $"Type{j}")).ToList();
 
-            mockParser.ParseXmlFileStreamAsync(file, Arg.Any<CancellationToken>())
-                .Returns(CreateAsyncEnumerable(members.ToArray()));
+            mockParser.ParseXmlFileStreamAsync(file, Arg.Any<CancellationToken>()).Returns(CreateAsyncEnumerable(members.ToArray()));
 
             // Use Arg.Any<MemberInfo>() to match any member
-            mockDocumentBuilder.BuildDocument(Arg.Any<MemberInfo>())
-                .Returns(args => CreateDocument((MemberInfo)args[0]));
+            mockDocumentBuilder.BuildDocument(Arg.Any<MemberInfo>()).Returns(args => CreateDocument((MemberInfo)args[0]));
         }
 
         // Act

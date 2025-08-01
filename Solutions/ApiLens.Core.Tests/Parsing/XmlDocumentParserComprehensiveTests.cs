@@ -28,17 +28,19 @@ public class XmlDocumentParserComprehensiveTests
     {
         // Arrange
         string filePath = @"C:\Users\test\.nuget\packages\newtonsoft.json\13.0.3\lib\net6.0\Newtonsoft.Json.xml";
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>Newtonsoft.Json</name>
-    </assembly>
-    <members>
-        <member name=""M:Newtonsoft.Json.JsonConvert.SerializeObject(System.Object)"">
-            <summary>Serializes an object to JSON.</summary>
-        </member>
-    </members>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>Newtonsoft.Json</name>
+                                </assembly>
+                                <members>
+                                    <member name="M:Newtonsoft.Json.JsonConvert.SerializeObject(System.Object)">
+                                        <summary>Serializes an object to JSON.</summary>
+                                    </member>
+                                </members>
+                            </doc>
+                            """;
 
         SetupMockFileSystem(filePath, xmlContent);
 
@@ -62,26 +64,28 @@ public class XmlDocumentParserComprehensiveTests
     {
         // Arrange - Common scenario: netstandard2.0 XML shared by multiple frameworks
         string sharedXmlPath = @"C:\Users\test\.nuget\packages\microsoft.extensions.logging\8.0.0\lib\netstandard2.0\Microsoft.Extensions.Logging.xml";
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>Microsoft.Extensions.Logging</name>
-    </assembly>
-    <members>
-        <member name=""T:Microsoft.Extensions.Logging.ILogger"">
-            <summary>Represents a type used to perform logging.</summary>
-        </member>
-    </members>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>Microsoft.Extensions.Logging</name>
+                                </assembly>
+                                <members>
+                                    <member name="T:Microsoft.Extensions.Logging.ILogger">
+                                        <summary>Represents a type used to perform logging.</summary>
+                                    </member>
+                                </members>
+                            </doc>
+                            """;
 
         SetupMockFileSystem(sharedXmlPath, xmlContent);
 
         // Simulate parsing for different framework contexts
         NuGetPackageInfo[] packageInfos =
         [
-            new NuGetPackageInfo { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net6.0", XmlDocumentationPath = sharedXmlPath },
-            new NuGetPackageInfo { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net7.0", XmlDocumentationPath = sharedXmlPath },
-            new NuGetPackageInfo { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net8.0", XmlDocumentationPath = sharedXmlPath }
+            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net6.0", XmlDocumentationPath = sharedXmlPath },
+            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net7.0", XmlDocumentationPath = sharedXmlPath },
+            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net8.0", XmlDocumentationPath = sharedXmlPath }
         ];
 
         List<MemberInfo> allMembers = [];
@@ -112,17 +116,19 @@ public class XmlDocumentParserComprehensiveTests
     {
         // Arrange
         string localPath = @"C:\Projects\MyLib\bin\Debug\MyLib.xml";
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>MyLib</name>
-    </assembly>
-    <members>
-        <member name=""T:MyLib.MyClass"">
-            <summary>Test class.</summary>
-        </member>
-    </members>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>MyLib</name>
+                                </assembly>
+                                <members>
+                                    <member name="T:MyLib.MyClass">
+                                        <summary>Test class.</summary>
+                                    </member>
+                                </members>
+                            </doc>
+                            """;
 
         SetupMockFileSystem(localPath, xmlContent);
         mockFileHashHelper.ComputeFileHashAsync(localPath).Returns("ABC123HASH");
@@ -215,14 +221,16 @@ public class XmlDocumentParserComprehensiveTests
     {
         // Arrange
         string filePath = @"C:\test\empty.xml";
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>EmptyAssembly</name>
-    </assembly>
-    <members>
-    </members>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>EmptyAssembly</name>
+                                </assembly>
+                                <members>
+                                </members>
+                            </doc>
+                            """;
 
         SetupMockFileSystem(filePath, xmlContent);
 
@@ -238,12 +246,14 @@ public class XmlDocumentParserComprehensiveTests
     {
         // Arrange
         string filePath = @"C:\test\no-members.xml";
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>NoMembersAssembly</name>
-    </assembly>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>NoMembersAssembly</name>
+                                </assembly>
+                            </doc>
+                            """;
 
         SetupMockFileSystem(filePath, xmlContent);
 
@@ -259,26 +269,28 @@ public class XmlDocumentParserComprehensiveTests
     {
         // Arrange
         string filePath = @"C:\test\invalid-prefixes.xml";
-        string xmlContent = @"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>TestAssembly</name>
-    </assembly>
-    <members>
-        <member name=""X:Invalid.Member"">
-            <summary>Invalid prefix X</summary>
-        </member>
-        <member name=""T:Valid.Type"">
-            <summary>Valid type</summary>
-        </member>
-        <member name=""InvalidFormat"">
-            <summary>No prefix</summary>
-        </member>
-        <member name="""">
-            <summary>Empty name</summary>
-        </member>
-    </members>
-</doc>";
+        string xmlContent = """
+                            <?xml version="1.0"?>
+                            <doc>
+                                <assembly>
+                                    <name>TestAssembly</name>
+                                </assembly>
+                                <members>
+                                    <member name="X:Invalid.Member">
+                                        <summary>Invalid prefix X</summary>
+                                    </member>
+                                    <member name="T:Valid.Type">
+                                        <summary>Valid type</summary>
+                                    </member>
+                                    <member name="InvalidFormat">
+                                        <summary>No prefix</summary>
+                                    </member>
+                                    <member name="">
+                                        <summary>Empty name</summary>
+                                    </member>
+                                </members>
+                            </doc>
+                            """;
 
         SetupMockFileSystem(filePath, xmlContent);
 
@@ -393,17 +405,19 @@ public class XmlDocumentParserComprehensiveTests
 
     private static string CreateSimpleXmlContent(string assemblyName, string memberName)
     {
-        return $@"<?xml version=""1.0""?>
-<doc>
-    <assembly>
-        <name>{assemblyName}</name>
-    </assembly>
-    <members>
-        <member name=""{memberName}"">
-            <summary>Test summary.</summary>
-        </member>
-    </members>
-</doc>";
+        return $"""
+                <?xml version="1.0"?>
+                <doc>
+                    <assembly>
+                        <name>{assemblyName}</name>
+                    </assembly>
+                    <members>
+                        <member name="{memberName}">
+                            <summary>Test summary.</summary>
+                        </member>
+                    </members>
+                </doc>
+                """;
     }
 
     #endregion

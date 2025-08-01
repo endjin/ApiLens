@@ -43,8 +43,7 @@ public class QueryEngineVersionTests : IDisposable
             new StringField("packageVersion", "8.0.0", Field.Store.YES),
             new StringField("targetFramework", "net8.0", Field.Store.YES),
             new StringField("isFromNuGetCache", "true", Field.Store.YES),
-            new StringField("sourceFilePath",
-                "/home/user/.nuget/packages/system.runtime/8.0.0/lib/net8.0/System.Runtime.xml", Field.Store.YES)
+            new StringField("sourceFilePath", "/home/user/.nuget/packages/system.runtime/8.0.0/lib/net8.0/System.Runtime.xml", Field.Store.YES)
         ];
 
         TopDocs topDocs = CreateTopDocsWithDocument(doc);
