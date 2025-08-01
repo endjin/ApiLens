@@ -148,4 +148,21 @@ public class FileSystemService : IFileSystemService
             bufferSize: 4096, useAsync: true);
         return Task.FromResult<Stream>(fileStream);
     }
+
+    public IEnumerable<DirectoryInfo> EnumerateDirectories(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        DirectoryPath dirPath = new(path);
+
+        if (!fileSystem.Exist(dirPath))
+        {
+            return [];
+        }
+
+        IDirectory directory = fileSystem.GetDirectory(dirPath);
+
+        return directory.GetDirectories("*", SearchScope.Current)
+            .Select(d => new DirectoryInfo(d.Path.FullPath));
+    }
 }

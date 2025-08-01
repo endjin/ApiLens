@@ -12,6 +12,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 {
     private IFileSystemService mockFileSystem = null!;
     private INuGetCacheScanner mockScanner = null!;
+    private IPackageDeduplicationService mockDeduplicationService = null!;
     private ILuceneIndexManagerFactory mockIndexManagerFactory = null!;
     private ILuceneIndexManager mockIndexManager = null!;
     private NuGetCommand command = null!;
@@ -22,11 +23,12 @@ public class NuGetCommandComprehensiveTests : IDisposable
     {
         mockFileSystem = Substitute.For<IFileSystemService>();
         mockScanner = Substitute.For<INuGetCacheScanner>();
+        mockDeduplicationService = Substitute.For<IPackageDeduplicationService>();
         mockIndexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         mockIndexManager = Substitute.For<ILuceneIndexManager>();
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
 
-        command = new NuGetCommand(mockFileSystem, mockScanner, mockIndexManagerFactory);
+        command = new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, mockIndexManagerFactory);
         console = new TestConsole();
         AnsiConsole.Console = console;
     }
@@ -77,12 +79,13 @@ public class NuGetCommandComprehensiveTests : IDisposable
             }
         ];
 
-        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
+        SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
             .Returns([..packages]);
 
         // First run - empty index
         SetupEmptyIndex();
+        SetupDeduplicationService(packages); // All packages should be indexed on first run
 
         IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 100, elapsedMs: 50, bytesProcessed: 10000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
@@ -117,6 +120,9 @@ public class NuGetCommandComprehensiveTests : IDisposable
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(indexedPackages);
         mockIndexManager.GetIndexedXmlPaths().Returns(indexedPaths);
         mockIndexManager.GetEmptyXmlPaths().Returns(emptyPaths);
+
+        // Second run - all packages should be skipped
+        SetupDeduplicationService(new List<NuGetPackageInfo>(), skippedPackages: packages.Count, emptyXmlFilesSkipped: 2);
 
         // Act - Second run
         await command.ExecuteAsync(null!, settings);
@@ -171,11 +177,14 @@ public class NuGetCommandComprehensiveTests : IDisposable
             }
         ];
 
-        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
+        SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
             .Returns([..packages]);
 
         SetupEmptyIndex();
+        
+        // Deduplication should keep only one package since they all share the same XML
+        SetupDeduplicationService(packages.Take(1).ToList(), skippedPackages: packages.Count - 1);
 
         IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 500, elapsedMs: 100, bytesProcessed: 50000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
@@ -246,7 +255,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
             }
         ];
 
-        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
+        SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
             .Returns([..packages]);
 
@@ -261,6 +270,10 @@ public class NuGetCommandComprehensiveTests : IDisposable
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(indexedPackages);
         mockIndexManager.GetIndexedXmlPaths().Returns(indexedPaths);
         mockIndexManager.GetEmptyXmlPaths().Returns([]);
+
+        // Deduplication should skip existing package
+        List<NuGetPackageInfo> packagesToIndex = packages.Where(p => p.PackageId != "existing.package").ToList();
+        SetupDeduplicationService(packagesToIndex, skippedPackages: 1);
 
         IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 300, elapsedMs: 75, bytesProcessed: 30000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
@@ -303,7 +316,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
             }
         ];
 
-        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
+        SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
             .Returns([..packages]);
 
@@ -317,6 +330,9 @@ public class NuGetCommandComprehensiveTests : IDisposable
         mockIndexManager.GetIndexedXmlPaths().Returns([]);
         mockIndexManager.GetEmptyXmlPaths().Returns([]);
         mockIndexManager.GetTotalDocuments().Returns(200);
+
+        // Deduplication should index new version and mark old package id for deletion
+        SetupDeduplicationService(packages, packageIdsToDelete: new HashSet<string> { "mypackage" });
 
         IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 50, elapsedMs: 25, bytesProcessed: 5000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
@@ -350,7 +366,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
             }
         ];
 
-        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
+        SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
             .Returns([..packages]);
 
@@ -363,6 +379,9 @@ public class NuGetCommandComprehensiveTests : IDisposable
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(indexedPackages);
         mockIndexManager.GetIndexedXmlPaths().Returns([]);
         mockIndexManager.GetEmptyXmlPaths().Returns([]);
+
+        // Deduplication should index prerelease version and mark old version for deletion
+        SetupDeduplicationService(packages, packageIdsToDelete: new HashSet<string> { "prerelease.package" });
 
         IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 50, elapsedMs: 25, bytesProcessed: 5000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
@@ -410,7 +429,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
             }
         ];
 
-        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
+        SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
             .Returns([..packages]);
 
@@ -424,6 +443,9 @@ public class NuGetCommandComprehensiveTests : IDisposable
             });
         mockIndexManager.GetIndexedXmlPaths().Returns(indexedPaths);
         mockIndexManager.GetEmptyXmlPaths().Returns([]);
+
+        // Deduplication should only index package2 since package1 is already indexed (after path normalization)
+        SetupDeduplicationService(packages.Where(p => p.PackageId == "package2").ToList(), skippedPackages: 1);
 
         IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 50, elapsedMs: 25, bytesProcessed: 5000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
@@ -454,6 +476,8 @@ public class NuGetCommandComprehensiveTests : IDisposable
         SetupBasicMocks(cachePath);
 
         mockScanner.ScanDirectory(cachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
+        mockScanner.ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
+            .Returns(Task.FromResult(ImmutableArray<NuGetPackageInfo>.Empty));
 
         NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
@@ -461,6 +485,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         int result = await command.ExecuteAsync(null!, settings);
 
         // Assert
+        console.Output.ShouldNotContain("Error:");
         result.ShouldBe(0);
         console.Output.ShouldContain("No packages found");
     }
@@ -491,6 +516,45 @@ public class NuGetCommandComprehensiveTests : IDisposable
     {
         mockFileSystem.GetUserNuGetCachePath().Returns(cachePath);
         mockFileSystem.DirectoryExists(cachePath).Returns(true);
+    }
+
+    private void SetupScannerWithPackages(IReadOnlyList<NuGetPackageInfo> packages)
+    {
+        ImmutableArray<NuGetPackageInfo> packagesArray = [..packages.ToArray()];
+        mockScanner.ScanDirectory(Arg.Any<string>()).Returns(packagesArray);
+        mockScanner.ScanDirectoryAsync(Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
+            .Returns(Task.FromResult(packagesArray));
+    }
+
+    private void SetupDeduplicationService(
+        IReadOnlyList<NuGetPackageInfo> packagesToIndex,
+        IReadOnlySet<string>? packageIdsToDelete = null,
+        int skippedPackages = 0,
+        int emptyXmlFilesSkipped = 0)
+    {
+        PackageDeduplicationResult result = new PackageDeduplicationResult
+        {
+            PackagesToIndex = packagesToIndex,
+            PackageIdsToDelete = packageIdsToDelete ?? new HashSet<string>(),
+            SkippedPackages = skippedPackages,
+            Stats = new DeduplicationStats
+            {
+                TotalScannedPackages = packagesToIndex.Count + skippedPackages,
+                UniqueXmlFiles = packagesToIndex.Count > 0 ? packagesToIndex.Select(p => p.XmlDocumentationPath).Distinct().Count() : 0,
+                EmptyXmlFilesSkipped = emptyXmlFilesSkipped,
+                AlreadyIndexedSkipped = skippedPackages,
+                NewPackages = packagesToIndex.Count,
+                UpdatedPackages = 0
+            }
+        };
+
+        mockDeduplicationService.DeduplicatePackages(
+            Arg.Any<IReadOnlyList<NuGetPackageInfo>>(),
+            Arg.Any<IReadOnlyDictionary<string, HashSet<(string Version, string Framework)>>>(),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<bool>())
+            .Returns(result);
     }
 
     private void SetupEmptyIndex()

@@ -12,6 +12,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
 {
     private IFileSystemService mockFileSystem = null!;
     private INuGetCacheScanner mockScanner = null!;
+    private IPackageDeduplicationService mockDeduplicationService = null!;
     private ILuceneIndexManagerFactory mockIndexManagerFactory = null!;
     private ILuceneIndexManager mockIndexManager = null!;
     private NuGetCommand command = null!;
@@ -22,11 +23,12 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
     {
         mockFileSystem = Substitute.For<IFileSystemService>();
         mockScanner = Substitute.For<INuGetCacheScanner>();
+        mockDeduplicationService = Substitute.For<IPackageDeduplicationService>();
         mockIndexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         mockIndexManager = Substitute.For<ILuceneIndexManager>();
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
 
-        command = new NuGetCommand(mockFileSystem, mockScanner, mockIndexManagerFactory);
+        command = new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, mockIndexManagerFactory);
 
         console = new TestConsole();
         AnsiConsole.Console = console;
@@ -60,7 +62,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
                    XmlDocumentationPath = "/cache/newtonsoft.json/13.0.3/lib/netstandard2.0/Newtonsoft.Json.xml" }
         ];
 
-        mockScanner.ScanDirectory(cachePath).Returns([..allPackages]);
+        SetupScannerWithPackages(allPackages);
 
         // GetLatestVersions returns all of them (grouped by package+framework)
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
@@ -86,6 +88,9 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
             FieldCount = 10,
             FileCount = 3  // 3 unique XML files
         });
+
+        // Setup deduplication service
+        SetupDeduplicationService(allPackages);
 
         NuGetCommand.Settings settings = new()
         {
@@ -124,7 +129,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
                    XmlDocumentationPath = "/cache/mypackage/1.0.0/lib/net6.0/MyPackage.xml" }
         ];
 
-        mockScanner.ScanDirectory(cachePath).Returns([..allPackages]);
+        SetupScannerWithPackages(allPackages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
             .Returns([..allPackages]);
 
@@ -147,6 +152,9 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
             FieldCount = 10,
             FileCount = 3
         });
+
+        // Setup deduplication service
+        SetupDeduplicationService(allPackages);
 
         NuGetCommand.Settings settings = new()
         {
@@ -204,7 +212,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
             });
         }
 
-        mockScanner.ScanDirectory(cachePath).Returns([..allPackages]);
+        SetupScannerWithPackages(allPackages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
             .Returns([..allPackages]);
 
@@ -237,6 +245,10 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
             FieldCount = 10,
             FileCount = 4
         });
+
+        // Setup deduplication service - should skip package1 (3 frameworks) since it's already indexed
+        List<NuGetPackageInfo> packagesToIndex = allPackages.Where(p => p.PackageId != "package1").ToList();
+        SetupDeduplicationService(packagesToIndex, skippedPackages: 3);
 
         NuGetCommand.Settings settings = new()
         {
@@ -293,5 +305,43 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
     public void Dispose()
     {
         console?.Dispose();
+    }
+
+    private void SetupScannerWithPackages(IReadOnlyList<NuGetPackageInfo> packages)
+    {
+        ImmutableArray<NuGetPackageInfo> packagesArray = [..packages.ToArray()];
+        mockScanner.ScanDirectory(Arg.Any<string>()).Returns(packagesArray);
+        mockScanner.ScanDirectoryAsync(Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
+            .Returns(Task.FromResult(packagesArray));
+    }
+
+    private void SetupDeduplicationService(
+        IReadOnlyList<NuGetPackageInfo> packagesToIndex,
+        IReadOnlySet<string>? packageIdsToDelete = null,
+        int skippedPackages = 0)
+    {
+        PackageDeduplicationResult result = new PackageDeduplicationResult
+        {
+            PackagesToIndex = packagesToIndex,
+            PackageIdsToDelete = packageIdsToDelete ?? new HashSet<string>(),
+            SkippedPackages = skippedPackages,
+            Stats = new DeduplicationStats
+            {
+                TotalScannedPackages = packagesToIndex.Count + skippedPackages,
+                UniqueXmlFiles = packagesToIndex.Count > 0 ? packagesToIndex.Select(p => p.XmlDocumentationPath).Distinct().Count() : 0,
+                EmptyXmlFilesSkipped = 0,
+                AlreadyIndexedSkipped = skippedPackages,
+                NewPackages = packagesToIndex.Count,
+                UpdatedPackages = 0
+            }
+        };
+
+        mockDeduplicationService.DeduplicatePackages(
+            Arg.Any<IReadOnlyList<NuGetPackageInfo>>(),
+            Arg.Any<IReadOnlyDictionary<string, HashSet<(string Version, string Framework)>>>(),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<bool>())
+            .Returns(result);
     }
 }

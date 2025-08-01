@@ -1,5 +1,6 @@
 using ApiLens.Cli.Commands;
 using ApiLens.Cli.Services;
+using ApiLens.Cli.Tests.Helpers;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
@@ -15,6 +16,7 @@ public sealed class NuGetCommandTests : IDisposable
 {
     private IFileSystemService mockFileSystem = null!;
     private INuGetCacheScanner mockScanner = null!;
+    private IPackageDeduplicationService mockDeduplicationService = null!;
     private ILuceneIndexManagerFactory mockIndexManagerFactory = null!;
     private ILuceneIndexManager mockIndexManager = null!;
     private FakeFileSystem? fakeFileSystem;
@@ -29,12 +31,13 @@ public sealed class NuGetCommandTests : IDisposable
     {
         mockFileSystem = Substitute.For<IFileSystemService>();
         mockScanner = Substitute.For<INuGetCacheScanner>();
+        mockDeduplicationService = Substitute.For<IPackageDeduplicationService>();
         mockIndexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         mockIndexManager = Substitute.For<ILuceneIndexManager>();
 
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
 
-        command = new NuGetCommand(mockFileSystem, mockScanner, mockIndexManagerFactory);
+        command = new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, mockIndexManagerFactory);
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
 
@@ -51,7 +54,7 @@ public sealed class NuGetCommandTests : IDisposable
         }
         fakeFileSystem = new FakeFileSystem(fakeEnvironment);
         fakeFileSystemService = new FileSystemService(fakeFileSystem, fakeEnvironment);
-        command = new NuGetCommand(fakeFileSystemService, mockScanner, mockIndexManagerFactory);
+        command = new NuGetCommand(fakeFileSystemService, mockScanner, mockDeduplicationService, mockIndexManagerFactory);
     }
 
     [TestMethod]
@@ -113,14 +116,17 @@ public sealed class NuGetCommandTests : IDisposable
             }
         ];
         mockScanner.ScanDirectory(cachePath).Returns([.. packages]);
+        mockScanner.ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
+            .Returns(Task.FromResult(ImmutableArray.Create(packages)));
 
         // Act
         int result = await command.ExecuteAsync(context, settings);
 
         // Assert
+        console.Output.ShouldNotContain("Error:");
         result.ShouldBe(0);
         // Should scan but not index
-        mockScanner.Received(1).ScanDirectory(cachePath);
+        await mockScanner.Received(1).ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>());
         mockFileSystem.DidNotReceive().FileExists(Arg.Any<string>());
     }
 
@@ -128,7 +134,7 @@ public sealed class NuGetCommandTests : IDisposable
     public void Constructor_WithNullFileSystem_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new NuGetCommand(null!, mockScanner, mockIndexManagerFactory))
+        Should.Throw<ArgumentNullException>(() => new NuGetCommand(null!, mockScanner, mockDeduplicationService, mockIndexManagerFactory))
             .ParamName.ShouldBe("fileSystem");
     }
 
@@ -136,15 +142,23 @@ public sealed class NuGetCommandTests : IDisposable
     public void Constructor_WithNullScanner_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, null!, mockIndexManagerFactory))
+        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, null!, mockDeduplicationService, mockIndexManagerFactory))
             .ParamName.ShouldBe("scanner");
+    }
+
+    [TestMethod]
+    public void Constructor_WithNullDeduplicationService_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, mockScanner, null!, mockIndexManagerFactory))
+            .ParamName.ShouldBe("deduplicationService");
     }
 
     [TestMethod]
     public void Constructor_WithNullIndexManagerFactory_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, mockScanner, null!))
+        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, null!))
             .ParamName.ShouldBe("indexManagerFactory");
     }
 
@@ -175,13 +189,15 @@ public sealed class NuGetCommandTests : IDisposable
         mockFileSystem.GetUserNuGetCachePath().Returns(cachePath);
         mockFileSystem.DirectoryExists(cachePath).Returns(true);
         mockScanner.ScanDirectory(cachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
+        mockScanner.ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
+            .Returns(Task.FromResult(ImmutableArray<NuGetPackageInfo>.Empty));
 
         // Act
         int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
-        mockScanner.Received(1).ScanDirectory(cachePath);
+        await mockScanner.Received(1).ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>());
     }
 
     [TestMethod]
@@ -215,15 +231,20 @@ public sealed class NuGetCommandTests : IDisposable
                 XmlDocumentationPath = "/home/user/.nuget/packages/microsoft.extensions/6.0.0/lib/net6.0/Microsoft.Extensions.xml"
             }
         ];
-        mockScanner.ScanDirectory(cachePath).Returns([.. packages]);
+        
+        // Setup mocks with helper methods
+        mockScanner.SetupScannerWithPackages(cachePath, packages);
+        // Filter should only return newtonsoft.json
+        NuGetPackageInfo[] filteredPackages = [packages[0]];
+        mockDeduplicationService.SetupPassThroughDeduplication(filteredPackages);
 
         // Act
         int result = await command.ExecuteAsync(context, settings);
 
         // Assert
         result.ShouldBe(0);
-        // Verify filtering logic is applied
-        mockScanner.Received(1).ScanDirectory(cachePath);
+        // Verify async method was called
+        await mockScanner.Received(1).ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>());
     }
 
     [TestMethod]
@@ -269,13 +290,30 @@ public sealed class NuGetCommandTests : IDisposable
             }
         ];
 
-        mockScanner.ScanDirectory(cachePath).Returns([.. allPackages]);
+        TestMockSetup.SetupScannerMock(mockScanner, cachePath, [.. allPackages]);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>()).Returns([.. latestPackages]);
+        
+        // Setup deduplication to return latest packages
+        TestMockSetup.SetupDeduplicationMock(
+            mockDeduplicationService,
+            latestPackages,
+            new HashSet<string>(),
+            allPackages.Length - latestPackages.Length,
+            new DeduplicationStats
+            {
+                TotalScannedPackages = allPackages.Length,
+                UniqueXmlFiles = latestPackages.Length,
+                EmptyXmlFilesSkipped = 0,
+                AlreadyIndexedSkipped = 0,
+                NewPackages = latestPackages.Length,
+                UpdatedPackages = 0
+            });
 
         // Act
         int result = await command.ExecuteAsync(context, settings);
 
         // Assert
+        console.Output.ShouldNotContain("Error:");
         result.ShouldBe(0);
         // Should call GetLatestVersions
         mockScanner.Received(1).GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>());
@@ -314,11 +352,14 @@ public sealed class NuGetCommandTests : IDisposable
         mockFileSystem.GetUserNuGetCachePath().Returns(cachePath);
         mockFileSystem.DirectoryExists(cachePath).Returns(true);
         mockScanner.ScanDirectory(cachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
+        mockScanner.ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
+            .Returns(Task.FromResult(ImmutableArray<NuGetPackageInfo>.Empty));
 
         // Act
         int result = await command.ExecuteAsync(context, settings);
 
         // Assert
+        console.Output.ShouldNotContain("Error:");
         result.ShouldBe(0);
         settings.Clean.ShouldBeTrue();
     }
@@ -361,6 +402,8 @@ public sealed class NuGetCommandTests : IDisposable
             }
         ];
         mockScanner.ScanDirectory(cachePath).Returns([.. packages]);
+        mockScanner.ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
+            .Returns(Task.FromResult(ImmutableArray.Create(packages)));
 
         // Act
         int result = await command.ExecuteAsync(context, settings);
@@ -383,6 +426,8 @@ public sealed class NuGetCommandTests : IDisposable
         mockFileSystem.GetUserNuGetCachePath().Returns(cachePath);
         mockFileSystem.DirectoryExists(cachePath).Returns(true);
         mockScanner.ScanDirectory(cachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
+        mockScanner.ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
+            .Returns(Task.FromResult(ImmutableArray<NuGetPackageInfo>.Empty));
 
         // Act
         int result = await command.ExecuteAsync(context, settings);
@@ -444,6 +489,8 @@ public sealed class NuGetCommandTests : IDisposable
         };
 
         mockScanner.ScanDirectory(cachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
+        mockScanner.ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
+            .Returns(Task.FromResult(ImmutableArray<NuGetPackageInfo>.Empty));
 
         // Act
         int result = await command.ExecuteAsync(context, settings);
@@ -469,6 +516,8 @@ public sealed class NuGetCommandTests : IDisposable
         };
 
         mockScanner.ScanDirectory(customCachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
+        mockScanner.ScanDirectoryAsync(customCachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
+            .Returns(Task.FromResult(ImmutableArray<NuGetPackageInfo>.Empty));
 
         // Act
         int result = await command.ExecuteAsync(context, settings);

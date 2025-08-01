@@ -132,6 +132,17 @@ public class NuGetCacheScannerTests
         {
             return Task.FromResult(OpenRead(path));
         }
+
+        public IEnumerable<DirectoryInfo> EnumerateDirectories(string path)
+        {
+            DirectoryPath dirPath = new(path);
+            if (!fileSystem.Exist(dirPath))
+                return [];
+
+            IDirectory directory = fileSystem.GetDirectory(dirPath);
+            return directory.GetDirectories("*", SearchScope.Current)
+                .Select(d => new DirectoryInfo(d.Path.FullPath));
+        }
     }
 
 

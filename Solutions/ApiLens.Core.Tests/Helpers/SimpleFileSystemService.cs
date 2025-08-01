@@ -21,4 +21,6 @@ internal class SimpleFileSystemService : IFileSystemService
         new DirectoryInfo(path).EnumerateFiles(pattern ?? "*", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
     public Stream OpenRead(string path) => File.OpenRead(path);
     public Task<Stream> OpenReadAsync(string path) => Task.FromResult<Stream>(File.OpenRead(path));
+    public IEnumerable<DirectoryInfo> EnumerateDirectories(string path) =>
+        new DirectoryInfo(path).EnumerateDirectories();
 }

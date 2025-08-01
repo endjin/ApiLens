@@ -105,4 +105,18 @@ public partial class NuGetCacheScanner : INuGetCacheScanner
         string paddedVersion = string.Join(".", paddedParts);
         return Version.TryParse(paddedVersion, out version) ? version : new Version(0, 0, 0, 0);
     }
+
+    // Async methods (delegate to sync versions for backward compatibility)
+    public Task<ImmutableArray<NuGetPackageInfo>> ScanNuGetCacheAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(ScanNuGetCache());
+    }
+
+    public Task<ImmutableArray<NuGetPackageInfo>> ScanDirectoryAsync(
+        string cachePath, 
+        CancellationToken cancellationToken = default,
+        IProgress<int>? progress = null)
+    {
+        return Task.FromResult(ScanDirectory(cachePath));
+    }
 }

@@ -19,10 +19,12 @@ internal class Program
         services.AddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<IEnvironment, Spectre.IO.Environment>();
         services.AddSingleton<IFileSystemService, FileSystemService>();
+        services.AddSingleton<IAsyncFileEnumerator, AsyncFileEnumerator>();
         services.AddSingleton<IFileHashHelper, FileHashHelper>();
         services.AddSingleton<IXmlDocumentParser, XmlDocumentParser>();
         services.AddSingleton<IDocumentBuilder, DocumentBuilder>();
-        services.AddSingleton<INuGetCacheScanner, NuGetCacheScanner>();
+        services.AddSingleton<INuGetCacheScanner, AsyncNuGetCacheScanner>();
+        services.AddSingleton<IPackageDeduplicationService, PackageDeduplicationService>();
         services.AddSingleton<ILuceneIndexManagerFactory, LuceneIndexManagerFactory>();
         services.AddSingleton<IQueryEngineFactory, QueryEngineFactory>();
 

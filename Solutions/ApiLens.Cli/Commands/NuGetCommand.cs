@@ -15,19 +15,23 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 {
     private readonly IFileSystemService fileSystem;
     private readonly INuGetCacheScanner scanner;
+    private readonly IPackageDeduplicationService deduplicationService;
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
 
     public NuGetCommand(
         IFileSystemService fileSystem,
         INuGetCacheScanner scanner,
+        IPackageDeduplicationService deduplicationService,
         ILuceneIndexManagerFactory indexManagerFactory)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(scanner);
+        ArgumentNullException.ThrowIfNull(deduplicationService);
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
 
         this.fileSystem = fileSystem;
         this.scanner = scanner;
+        this.deduplicationService = deduplicationService;
         this.indexManagerFactory = indexManagerFactory;
     }
 
@@ -54,16 +58,17 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     ctx.Spinner(Spinner.Known.Star);
                     ctx.SpinnerStyle(Style.Parse("green"));
 
-                    packages = await Task.Run(() =>
+                    ImmutableArray<NuGetPackageInfo> allPackages = await scanner.ScanDirectoryAsync(cachePath, cancellationToken: default);
+                    
+                    if (!string.IsNullOrEmpty(settings.PackageFilter))
                     {
-                        ImmutableArray<NuGetPackageInfo> allPackages = scanner.ScanDirectory(cachePath);
-                        if (!string.IsNullOrEmpty(settings.PackageFilter))
-                        {
-                            Regex regex = new(settings.PackageFilter.Replace("*", ".*"), RegexOptions.IgnoreCase);
-                            return allPackages.Where(p => regex.IsMatch(p.PackageId)).ToList();
-                        }
-                        return allPackages.ToList();
-                    });
+                        Regex regex = new(settings.PackageFilter.Replace("*", ".*"), RegexOptions.IgnoreCase);
+                        packages = allPackages.Where(p => regex.IsMatch(p.PackageId)).ToList();
+                    }
+                    else
+                    {
+                        packages = allPackages.ToList();
+                    }
                 });
 
             if (packages.Count == 0)
@@ -96,14 +101,14 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             if (settings.LatestOnly)
             {
                 await AnsiConsole.Status()
-                    .StartAsync("Filtering to latest versions only...", async ctx =>
+                    .StartAsync("Filtering to latest versions only...", ctx =>
                     {
                         ctx.Spinner(Spinner.Known.Star);
                         ctx.SpinnerStyle(Style.Parse("yellow"));
 
-                        ImmutableArray<NuGetPackageInfo> latestPackages = await Task.Run(() =>
-                            scanner.GetLatestVersions([.. packages]));
+                        ImmutableArray<NuGetPackageInfo> latestPackages = scanner.GetLatestVersions([.. packages]);
                         packages = latestPackages.ToList();
+                        return Task.CompletedTask;
                     });
                 AnsiConsole.MarkupLine($"[green]After latest-only filter: {packages.Count} package(s) to process.[/]");
             }
@@ -145,170 +150,37 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         emptyXmlPaths = await Task.Run(() => indexManager.GetEmptyXmlPaths());
                     });
 
-                // Determine which packages need indexing
-                packagesToIndex = [];
-                int skippedPackages = 0;
+                // Use deduplication service for efficient single-pass processing
+                PackageDeduplicationResult deduplicationResult = deduplicationService.DeduplicatePackages(
+                    packages,
+                    indexedPackagesWithFramework,
+                    indexedXmlPaths,
+                    emptyXmlPaths,
+                    settings.LatestOnly);
 
-                // First, check all packages to determine what needs indexing
-                HashSet<string> xmlFilesToIndex = new(StringComparer.OrdinalIgnoreCase);
+                packagesToIndex = deduplicationResult.PackagesToIndex.ToList();
+                packageIdsToDelete = deduplicationResult.PackageIdsToDelete.ToHashSet();
 
-                // PERFORMANCE: Optimize path normalization with helper method
-                HashSet<string> normalizedIndexedPaths = NormalizePathCollection(indexedXmlPaths);
-                HashSet<string> normalizedEmptyPaths = NormalizePathCollection(emptyXmlPaths);
-
-                // Track which packages have truly new versions (for deletion logic)
-                Dictionary<string, string> packagesWithNewVersions = new(StringComparer.OrdinalIgnoreCase);
-
-                // Add logging for debugging
-                List<string> filesBeingReindexed = [];
-
-                foreach (NuGetPackageInfo package in packages)
-                {
-                    bool shouldIndex = false;
-
-                    // First check if the XML file has already been indexed
-                    // PERFORMANCE: Use helper method for path normalization
-                    string normalizedPath = NormalizePath(package.XmlDocumentationPath);
-
-                    if (normalizedIndexedPaths.Contains(normalizedPath) || normalizedEmptyPaths.Contains(normalizedPath))
-                    {
-                        // XML file is already indexed or known to be empty, skip this package
-                        shouldIndex = false;
-                    }
-                    else if (!indexedPackagesWithFramework.TryGetValue(package.PackageId, out HashSet<(string Version, string Framework)>? indexedVersions))
-                    {
-                        // Package not in index at all
-                        shouldIndex = true;
-                    }
-                    else if (!indexedVersions.Any(v =>
-                        v.Version == package.Version &&
-                        (v.Framework == package.TargetFramework ||
-                         (v.Framework == "unknown" && !indexedVersions.Any(iv =>
-                            iv.Version == package.Version &&
-                            iv.Framework != "unknown")))))
-                    {
-                        // This version+framework combination not in index
-                        // Note: "unknown" framework entries (from legacy index) match any specific framework
-                        // unless a specific framework entry already exists for that version
-                        shouldIndex = true;
-
-                        // Check if this is a newer version for deletion logic
-                        // Only track for deletion if we're actually going to index this package
-                        if (shouldIndex && settings.LatestOnly && !indexedVersions.Any(v => v.Version == package.Version))
-                        {
-                            // This is a new version (not just a new framework)
-                            // Track the highest version we're adding
-                            if (!packagesWithNewVersions.TryGetValue(package.PackageId, out string? currentHighest))
-                            {
-                                packagesWithNewVersions[package.PackageId] = package.Version;
-                            }
-                            else
-                            {
-                                try
-                                {
-                                    if (Version.TryParse(package.Version, out Version? pkgVer) &&
-                                        Version.TryParse(currentHighest, out Version? curVer) &&
-                                        pkgVer > curVer)
-                                    {
-                                        packagesWithNewVersions[package.PackageId] = package.Version;
-                                    }
-                                }
-                                catch (FormatException)
-                                {
-                                    // Fall back to string comparison
-                                    if (string.Compare(package.Version, currentHighest, StringComparison.OrdinalIgnoreCase) > 0)
-                                    {
-                                        packagesWithNewVersions[package.PackageId] = package.Version;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (shouldIndex)
-                    {
-                        xmlFilesToIndex.Add(package.XmlDocumentationPath);
-
-                        // Log files being reindexed for debugging
-                        if (settings.Verbose && normalizedIndexedPaths.Count > 0)
-                        {
-                            filesBeingReindexed.Add($"{package.PackageId} v{package.Version} ({package.TargetFramework}): {normalizedPath}");
-                        }
-                    }
-                }
-
-                // Now determine which packages should have old versions deleted
-                foreach (KeyValuePair<string, string> kvp in packagesWithNewVersions)
-                {
-                    string packageId = kvp.Key;
-                    string newVersion = kvp.Value;
-
-                    // Only delete if the new version is actually newer than ALL existing versions
-                    if (indexedPackagesWithFramework.TryGetValue(packageId, out HashSet<(string Version, string Framework)>? existingVersions))
-                    {
-                        bool isNewerThanAll = true;
-
-                        foreach ((string Version, string Framework) existing in existingVersions)
-                        {
-                            try
-                            {
-                                if (Version.TryParse(newVersion, out Version? newVer) &&
-                                    Version.TryParse(existing.Version, out Version? existVer))
-                                {
-                                    if (newVer <= existVer)
-                                    {
-                                        isNewerThanAll = false;
-                                        break;
-                                    }
-                                }
-                            }
-                            catch (FormatException)
-                            {
-                                // Fall back to string comparison
-                                if (string.Compare(newVersion, existing.Version, StringComparison.OrdinalIgnoreCase) <= 0)
-                                {
-                                    isNewerThanAll = false;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (isNewerThanAll)
-                        {
-                            packageIdsToDelete.Add(packageId);
-                        }
-                    }
-                }
-
-                // Group packages by XML path to handle shared files
-                List<IGrouping<string, NuGetPackageInfo>> packagesByXmlPath = packages
-                    .Where(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath))
-                    .GroupBy(p => p.XmlDocumentationPath, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                // For indexing, we still deduplicate by XML path
-                packagesToIndex = packagesByXmlPath.Select(g => g.First()).ToList();
-                skippedPackages = packages.Count - packages.Count(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath));
-
-                // Report what we're doing
+                // Report deduplication statistics
+                DeduplicationStats stats = deduplicationResult.Stats;
                 int totalInIndex = indexedPackagesWithFramework.Sum(kvp => kvp.Value.Count);
                 int uniquePackageVersions = indexedPackagesWithFramework.Sum(kvp => kvp.Value.Select(v => v.Version).Distinct().Count());
+                
                 AnsiConsole.MarkupLine($"[dim]Index contains {uniquePackageVersions:N0} package versions across {indexedPackagesWithFramework.Count:N0} packages.[/]");
 
-                if (emptyXmlPaths.Count > 0)
+                if (stats.EmptyXmlFilesSkipped > 0)
                 {
-                    AnsiConsole.MarkupLine($"[dim]Skipping {emptyXmlPaths.Count:N0} known empty XML files.[/]");
+                    AnsiConsole.MarkupLine($"[dim]Skipping {stats.EmptyXmlFilesSkipped:N0} known empty XML files.[/]");
                 }
 
-                // Report deduplication if it occurred
-                if (xmlFilesToIndex.Count > 0 && xmlFilesToIndex.Count < packages.Count(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath)))
+                if (stats.UniqueXmlFiles > 0 && stats.TotalScannedPackages > stats.UniqueXmlFiles)
                 {
-                    AnsiConsole.MarkupLine($"[dim]Found {packages.Count(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath)):N0} package entries sharing {xmlFilesToIndex.Count:N0} unique XML files.[/]");
+                    AnsiConsole.MarkupLine($"[dim]Found {stats.TotalScannedPackages:N0} package entries sharing {stats.UniqueXmlFiles:N0} unique XML files.[/]");
                 }
 
-                if (skippedPackages > 0)
+                if (deduplicationResult.SkippedPackages > 0)
                 {
-                    AnsiConsole.MarkupLine($"[green]Skipping {skippedPackages:N0} package(s) already up-to-date in index.[/]");
+                    AnsiConsole.MarkupLine($"[green]Skipping {deduplicationResult.SkippedPackages:N0} package(s) already up-to-date in index.[/]");
                 }
 
                 if (packagesToIndex.Count == 0)
@@ -317,21 +189,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     return 0;
                 }
 
-                AnsiConsole.MarkupLine($"[green]Found {packagesToIndex.Count:N0} XML file(s) to index (new or updated).[/]");
-
-                // Show files being reindexed if verbose
-                if (settings.Verbose && filesBeingReindexed.Count > 0)
-                {
-                    AnsiConsole.MarkupLine($"[yellow]Files being reindexed ({filesBeingReindexed.Count}):[/]");
-                    foreach (string file in filesBeingReindexed.Take(10))
-                    {
-                        AnsiConsole.MarkupLine($"  [dim]• {file}[/]");
-                    }
-                    if (filesBeingReindexed.Count > 10)
-                    {
-                        AnsiConsole.MarkupLine($"  [dim]... and {filesBeingReindexed.Count - 10} more[/]");
-                    }
-                }
+                AnsiConsole.MarkupLine($"[green]Found {packagesToIndex.Count:N0} XML file(s) to index ({stats.NewPackages:N0} new, {stats.UpdatedPackages:N0} updated).[/]");
 
                 // Clean up old versions if needed
                 if (packageIdsToDelete.Count > 0)
@@ -376,7 +234,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     ProgressTask task = ctx.AddTask("[green]Indexing NuGet packages[/]", maxValue: packagesToIndex.Count);
 
                     // Get all XML files from packages
-                    List<string> xmlFiles = packagesToIndex.Select(p => p.XmlDocumentationPath).ToList();
+                    List<string> xmlFiles = packagesToIndex.Select(p => p.XmlDocumentationPath).Distinct().ToList();
 
                     // Index all files using high-performance batch operations
                     Stopwatch stopwatch = Stopwatch.StartNew();
@@ -534,38 +392,6 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             return $"{duration.TotalMinutes:N2} min";
     }
 
-    // PERFORMANCE: Helper method to optimize path normalization
-    private static HashSet<string> NormalizePathCollection(IEnumerable<string> paths)
-    {
-        HashSet<string> normalizedPaths = new(StringComparer.OrdinalIgnoreCase);
-        
-        foreach (string path in paths)
-        {
-            if (!string.IsNullOrWhiteSpace(path))
-            {
-                string normalizedPath = NormalizePath(path);
-                normalizedPaths.Add(normalizedPath);
-            }
-        }
-        
-        return normalizedPaths;
-    }
-
-    private static string NormalizePath(string path)
-    {
-        try
-        {
-            return System.IO.Path.GetFullPath(path).Replace('\\', '/');
-        }
-        catch (ArgumentException)
-        {
-            return path.Replace('\\', '/');
-        }
-        catch (NotSupportedException)
-        {
-            return path.Replace('\\', '/');
-        }
-    }
 
     public sealed class Settings : CommandSettings
     {

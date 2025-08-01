@@ -91,4 +91,11 @@ public interface IFileSystemService
     /// <param name="path">The file path.</param>
     /// <returns>A stream for reading the file.</returns>
     Task<Stream> OpenReadAsync(string path);
+
+    /// <summary>
+    /// Enumerates all directories in a directory.
+    /// </summary>
+    /// <param name="path">The directory path.</param>
+    /// <returns>Enumerable of directory information.</returns>
+    IEnumerable<DirectoryInfo> EnumerateDirectories(string path);
 }
