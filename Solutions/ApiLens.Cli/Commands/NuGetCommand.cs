@@ -37,6 +37,8 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
+        Stopwatch commandStopwatch = Stopwatch.StartNew();
+        
         try
         {
             // Get NuGet cache path
@@ -74,6 +76,9 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             if (packages.Count == 0)
             {
                 AnsiConsole.MarkupLine("[yellow]No packages found matching the filter.[/]");
+                commandStopwatch.Stop();
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[dim]Total command execution time: {FormatDuration(commandStopwatch.Elapsed)}[/]");
                 return 0;
             }
 
@@ -116,6 +121,9 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             if (settings.List)
             {
                 DisplayPackageList(packages);
+                commandStopwatch.Stop();
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[dim]Total command execution time: {FormatDuration(commandStopwatch.Elapsed)}[/]");
                 return 0;
             }
 
@@ -186,6 +194,9 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 if (packagesToIndex.Count == 0)
                 {
                     AnsiConsole.MarkupLine("[yellow]All packages are already up-to-date. Nothing to index.[/]");
+                    commandStopwatch.Stop();
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine($"[dim]Total command execution time: {FormatDuration(commandStopwatch.Elapsed)}[/]");
                     return 0;
                 }
 
@@ -249,6 +260,10 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             // Display results after progress context
             AnsiConsole.WriteLine();
             DisplayResults(result, indexManager, settings.IndexPath);
+
+            commandStopwatch.Stop();
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[dim]Total command execution time: {FormatDuration(commandStopwatch.Elapsed)}[/]");
 
             return 0;
         }
