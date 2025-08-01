@@ -6,28 +6,7 @@ using ApiLens.Core.Services;
 using Lucene.Net.Documents;
 using Lucene.Net.Search;
 
-namespace ApiLens.Core.Tests;
-
-/// <summary>
-/// Simple file system service implementation for testing.
-/// </summary>
-internal class SimpleFileSystemService : IFileSystemService
-{
-    public bool FileExists(string path) => File.Exists(path);
-    public bool DirectoryExists(string path) => Directory.Exists(path);
-    public IEnumerable<string> GetFiles(string path, string pattern, bool recursive) =>
-        Directory.GetFiles(path, pattern, recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
-    public string CombinePath(params string[] paths) => Path.Combine(paths);
-    public FileInfo GetFileInfo(string path) => new FileInfo(path);
-    public DirectoryInfo GetDirectoryInfo(string path) => new DirectoryInfo(path);
-    public string GetUserNuGetCachePath() => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
-    public string GetFileName(string path) => Path.GetFileName(path);
-    public string? GetDirectoryName(string path) => Path.GetDirectoryName(path);
-    public IEnumerable<FileInfo> EnumerateFiles(string path, string? pattern = null, bool recursive = false) =>
-        new DirectoryInfo(path).EnumerateFiles(pattern ?? "*", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
-    public Stream OpenRead(string path) => File.OpenRead(path);
-    public Task<Stream> OpenReadAsync(string path) => Task.FromResult<Stream>(File.OpenRead(path));
-}
+namespace ApiLens.Core.Tests.Helpers;
 
 /// <summary>
 /// Helper methods for tests to work with the new async batch-based API.
@@ -39,8 +18,8 @@ public static class TestHelpers
     /// </summary>
     public static ILuceneIndexManager CreateTestIndexManager()
     {
-        var mockFileSystem = Substitute.For<IFileSystemService>();
-        var mockFileHashHelper = Substitute.For<IFileHashHelper>();
+        IFileSystemService? mockFileSystem = Substitute.For<IFileSystemService>();
+        IFileHashHelper? mockFileHashHelper = Substitute.For<IFileHashHelper>();
         XmlDocumentParser parser = new(mockFileHashHelper, mockFileSystem);
         DocumentBuilder documentBuilder = new();
         string tempPath = Path.Combine(Path.GetTempPath(), $"apilens_test_{Guid.NewGuid()}");
@@ -52,8 +31,8 @@ public static class TestHelpers
     /// </summary>
     public static XmlDocumentParser CreateTestXmlDocumentParser()
     {
-        var mockFileSystem = Substitute.For<IFileSystemService>();
-        var mockFileHashHelper = Substitute.For<IFileHashHelper>();
+        IFileSystemService? mockFileSystem = Substitute.For<IFileSystemService>();
+        IFileHashHelper? mockFileHashHelper = Substitute.For<IFileHashHelper>();
         return new XmlDocumentParser(mockFileHashHelper, mockFileSystem);
     }
 
@@ -62,8 +41,8 @@ public static class TestHelpers
     /// </summary>
     public static ILuceneIndexManager CreateTestIndexManagerWithRealFileSystem()
     {
-        var realFileSystem = new SimpleFileSystemService();
-        var realFileHashHelper = new FileHashHelper(realFileSystem);
+        SimpleFileSystemService realFileSystem = new();
+        FileHashHelper realFileHashHelper = new(realFileSystem);
         XmlDocumentParser parser = new(realFileHashHelper, realFileSystem);
         DocumentBuilder documentBuilder = new();
         string tempPath = Path.Combine(Path.GetTempPath(), $"apilens_test_{Guid.NewGuid()}");
@@ -132,7 +111,7 @@ public static class TestHelpers
         string memberTypeStr = document.Get("memberType") ?? "Type";
         string fullName = document.Get("fullName") ?? $"{namespaceName}.{name}";
 
-        if (!Enum.TryParse<MemberType>(memberTypeStr, out MemberType memberType))
+        if (!Enum.TryParse(memberTypeStr, out MemberType memberType))
         {
             memberType = MemberType.Type;
         }

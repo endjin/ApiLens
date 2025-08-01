@@ -9,9 +9,9 @@ public static class AsyncEnumerable
 
     public static async IAsyncEnumerable<T> Create<T>(Func<IAsyncEnumerableWriter<T>, CancellationToken, Task> writeFunc)
     {
-        var writer = new AsyncEnumerableWriter<T>();
+        AsyncEnumerableWriter<T> writer = new();
         await writeFunc(writer, CancellationToken.None);
-        foreach (var item in writer.Items)
+        foreach (T item in writer.Items)
         {
             yield return item;
         }
@@ -19,7 +19,7 @@ public static class AsyncEnumerable
 
     public static async IAsyncEnumerable<T> CreateFromEnumerable<T>(IEnumerable<T> items)
     {
-        foreach (var item in items)
+        foreach (T item in items)
         {
             yield return item;
             await Task.Yield();
@@ -44,11 +44,11 @@ public static class AsyncEnumerable
 
     private class AsyncEnumerableWriter<T> : IAsyncEnumerableWriter<T>
     {
-        public List<T> Items { get; } = new();
+        public List<T> Items { get; } = [];
 
         public Task YieldAsync(T item)
         {
-            Items.Add(item);
+            this.Items.Add(item);
             return Task.CompletedTask;
         }
     }

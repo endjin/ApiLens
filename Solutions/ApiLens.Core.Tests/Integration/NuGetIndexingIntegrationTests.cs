@@ -1,7 +1,11 @@
+using System.Diagnostics;
 using ApiLens.Core.Helpers;
 using ApiLens.Core.Lucene;
+using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
 using ApiLens.Core.Services;
+using Lucene.Net.Documents;
+using Lucene.Net.Search;
 
 namespace ApiLens.Core.Tests.Integration;
 
@@ -48,10 +52,9 @@ public class NuGetIndexingIntegrationTests : IDisposable
     public async Task FullIndexingWorkflow_WithMixedPackages_IndexesCorrectly()
     {
         // Arrange - Create test XML files with different scenarios
-        var testFiles = new List<(string path, string content)>
-        {
-            // Package with multiple members
-            CreateNuGetXmlFile("microsoft.extensions.logging", "8.0.0", "net6.0", @"<?xml version=""1.0""?>
+        List<(string path, string content)> testFiles =
+        [
+            this.CreateNuGetXmlFile("microsoft.extensions.logging", "8.0.0", "net6.0", @"<?xml version=""1.0""?>
 <doc>
     <assembly>
         <name>Microsoft.Extensions.Logging</name>
@@ -68,9 +71,10 @@ public class NuGetIndexingIntegrationTests : IDisposable
         </member>
     </members>
 </doc>"),
-            
+
             // Empty XML file
-            CreateNuGetXmlFile("empty.package", "1.0.0", "net6.0", @"<?xml version=""1.0""?>
+
+            this.CreateNuGetXmlFile("empty.package", "1.0.0", "net6.0", @"<?xml version=""1.0""?>
 <doc>
     <assembly>
         <name>Empty.Package</name>
@@ -78,9 +82,10 @@ public class NuGetIndexingIntegrationTests : IDisposable
     <members>
     </members>
 </doc>"),
-            
+
             // Shared XML file (same content, different framework paths)
-            CreateNuGetXmlFile("shared.package", "1.0.0", "netstandard2.0", @"<?xml version=""1.0""?>
+
+            this.CreateNuGetXmlFile("shared.package", "1.0.0", "netstandard2.0", @"<?xml version=""1.0""?>
 <doc>
     <assembly>
         <name>Shared.Package</name>
@@ -91,45 +96,45 @@ public class NuGetIndexingIntegrationTests : IDisposable
         </member>
     </members>
 </doc>")
-        };
+        ];
 
         // Create the test files
-        foreach (var (path, content) in testFiles)
+        foreach ((string path, string content) in testFiles)
         {
             CreateTestFile(path, content);
         }
 
         // Act - First indexing run
-        var result1 = await indexManager.IndexXmlFilesAsync(testFiles.Select(t => t.path));
+        IndexingResult result1 = await indexManager.IndexXmlFilesAsync(testFiles.Select(t => t.path));
 
         // Assert first run
         result1.SuccessfulDocuments.ShouldBe(5); // 3 members from logging + 1 empty file marker + 1 member from shared
         result1.FailedDocuments.ShouldBe(0);
 
-        var stats1 = indexManager.GetIndexStatistics();
+        IndexStatistics? stats1 = indexManager.GetIndexStatistics();
         stats1.ShouldNotBeNull();
         stats1.DocumentCount.ShouldBe(5);
 
         // Verify framework-aware tracking
-        var packageVersions = indexManager.GetIndexedPackageVersionsWithFramework();
+        Dictionary<string, HashSet<(string Version, string Framework)>> packageVersions = indexManager.GetIndexedPackageVersionsWithFramework();
         packageVersions.Count.ShouldBe(2); // Only packages with actual members are tracked
         packageVersions["microsoft.extensions.logging"].ShouldContain(("8.0.0", "net6.0"));
         packageVersions["shared.package"].ShouldContain(("1.0.0", "netstandard2.0"));
         // empty.package is not tracked because it has no members
 
         // Verify empty file tracking
-        var emptyPaths = indexManager.GetEmptyXmlPaths();
+        HashSet<string> emptyPaths = indexManager.GetEmptyXmlPaths();
         emptyPaths.Count.ShouldBe(1);
         emptyPaths.ShouldContain(p => p.EndsWith("empty.package/1.0.0/lib/net6.0/empty-package.xml")); // Note: packageId dots are replaced with dashes
 
         // Act - Second indexing run (should skip all)
-        var result2 = await indexManager.IndexXmlFilesAsync(testFiles.Select(t => t.path));
+        IndexingResult result2 = await indexManager.IndexXmlFilesAsync(testFiles.Select(t => t.path));
 
         // Assert second run - Re-indexes same documents
         result2.SuccessfulDocuments.ShouldBe(5);
 
         // Index should remain unchanged (documents are updated, not duplicated)
-        var stats2 = indexManager.GetIndexStatistics();
+        IndexStatistics? stats2 = indexManager.GetIndexStatistics();
         stats2.ShouldNotBeNull();
         stats2.DocumentCount.ShouldBe(5);
     }
@@ -158,28 +163,28 @@ public class NuGetIndexingIntegrationTests : IDisposable
         CreateTestFile(sharedPath, sharedContent);
 
         // Simulate multiple framework references to same XML
-        var frameworkPaths = new[]
-        {
+        string[] frameworkPaths =
+        [
             sharedPath, // net6.0 uses netstandard2.0 XML
             sharedPath, // net7.0 uses netstandard2.0 XML
             sharedPath  // net8.0 uses netstandard2.0 XML
-        };
+        ];
 
         // Act - Index with duplicate paths
-        var result = await indexManager.IndexXmlFilesAsync(frameworkPaths);
+        IndexingResult result = await indexManager.IndexXmlFilesAsync(frameworkPaths);
 
         // Assert
         result.SuccessfulDocuments.ShouldBe(6); // 2 members × 3 times indexed
 
         // XML paths should show only one unique path
-        var xmlPaths = indexManager.GetIndexedXmlPaths();
+        HashSet<string> xmlPaths = indexManager.GetIndexedXmlPaths();
         xmlPaths.Count.ShouldBe(1);
 
         // But the actual documents in the index should be unique (2 members)
-        var totalDocs = indexManager.GetTotalDocuments();
+        int totalDocs = indexManager.GetTotalDocuments();
         totalDocs.ShouldBe(2); // Documents are updated, not duplicated
 
-        var docs = indexManager.SearchByField("namespace", "Microsoft.Extensions.DependencyInjection", 10);
+        TopDocs docs = indexManager.SearchByField("namespace", "Microsoft.Extensions.DependencyInjection", 10);
         docs.TotalHits.ShouldBe(2);
     }
 
@@ -187,8 +192,8 @@ public class NuGetIndexingIntegrationTests : IDisposable
     public async Task PathNormalizationScenario_MixedPathFormats_HandlesCorrectly()
     {
         // Arrange - Create files with different path formats
-        var windowsPath = Path.Combine(testDataPath, @".nuget\packages\windows.package\1.0.0\lib\net6.0\Windows.Package.xml");
-        var linuxPath = Path.Combine(testDataPath, ".nuget/packages/linux.package/1.0.0/lib/net6.0/Linux.Package.xml");
+        string windowsPath = Path.Combine(testDataPath, @".nuget\packages\windows.package\1.0.0\lib\net6.0\Windows.Package.xml");
+        string linuxPath = Path.Combine(testDataPath, ".nuget/packages/linux.package/1.0.0/lib/net6.0/Linux.Package.xml");
 
         string xmlContent = @"<?xml version=""1.0""?>
 <doc>
@@ -206,17 +211,17 @@ public class NuGetIndexingIntegrationTests : IDisposable
         CreateTestFile(linuxPath, xmlContent);
 
         // Act
-        var result = await indexManager.IndexXmlFilesAsync(new[] { windowsPath, linuxPath });
+        IndexingResult result = await indexManager.IndexXmlFilesAsync([windowsPath, linuxPath]);
 
         // Assert
         result.SuccessfulDocuments.ShouldBe(2);
 
         // Both paths should be tracked with normalized format
-        var xmlPaths = indexManager.GetIndexedXmlPaths();
+        HashSet<string> xmlPaths = indexManager.GetIndexedXmlPaths();
         xmlPaths.Count.ShouldBe(2);
 
         // All paths should use forward slashes
-        foreach (var path in xmlPaths)
+        foreach (string path in xmlPaths)
         {
             path.ShouldContain("/");
             path.ShouldNotContain("\\");
@@ -227,7 +232,7 @@ public class NuGetIndexingIntegrationTests : IDisposable
     public async Task VersionUpdateScenario_NewVersionArrives_UpdatesCorrectly()
     {
         // Arrange - Index old version
-        var oldVersionFile = CreateNuGetXmlFile("evolving.package", "1.0.0", "net6.0", @"<?xml version=""1.0""?>
+        (string path, string content) oldVersionFile = CreateNuGetXmlFile("evolving.package", "1.0.0", "net6.0", @"<?xml version=""1.0""?>
 <doc>
     <assembly>
         <name>Evolving.Package</name>
@@ -240,14 +245,14 @@ public class NuGetIndexingIntegrationTests : IDisposable
 </doc>");
 
         CreateTestFile(oldVersionFile.path, oldVersionFile.content);
-        await indexManager.IndexXmlFilesAsync(new[] { oldVersionFile.path });
+        await indexManager.IndexXmlFilesAsync([oldVersionFile.path]);
 
         // Verify old version is indexed
-        var versions1 = indexManager.GetIndexedPackageVersionsWithFramework();
+        Dictionary<string, HashSet<(string Version, string Framework)>> versions1 = indexManager.GetIndexedPackageVersionsWithFramework();
         versions1["evolving.package"].ShouldContain(("1.0.0", "net6.0"));
 
         // Arrange - New version
-        var newVersionFile = CreateNuGetXmlFile("evolving.package", "2.0.0", "net6.0", @"<?xml version=""1.0""?>
+        (string path, string content) newVersionFile = CreateNuGetXmlFile("evolving.package", "2.0.0", "net6.0", @"<?xml version=""1.0""?>
 <doc>
     <assembly>
         <name>Evolving.Package</name>
@@ -265,41 +270,41 @@ public class NuGetIndexingIntegrationTests : IDisposable
         CreateTestFile(newVersionFile.path, newVersionFile.content);
 
         // Act - Clean old version and index new
-        indexManager.DeleteDocumentsByPackageIds(new[] { "evolving.package" });
+        indexManager.DeleteDocumentsByPackageIds(["evolving.package"]);
         await indexManager.CommitAsync();
 
-        var result = await indexManager.IndexXmlFilesAsync(new[] { newVersionFile.path });
+        IndexingResult result = await indexManager.IndexXmlFilesAsync([newVersionFile.path]);
         await indexManager.CommitAsync(); // Ensure documents are committed
 
         // Assert
         result.SuccessfulDocuments.ShouldBe(2); // 2 members in new version
 
-        var versions2 = indexManager.GetIndexedPackageVersionsWithFramework();
+        Dictionary<string, HashSet<(string Version, string Framework)>> versions2 = indexManager.GetIndexedPackageVersionsWithFramework();
         versions2["evolving.package"].ShouldContain(("2.0.0", "net6.0"));
         versions2["evolving.package"].ShouldNotContain(("1.0.0", "net6.0"));
 
         // Debug: Check if any documents exist
-        var totalDocs = indexManager.GetTotalDocuments();
+        int totalDocs = indexManager.GetTotalDocuments();
         totalDocs.ShouldBe(2); // Should have exactly 2 documents
 
         // Search by name to verify documents are indexed
-        var nameSearchResults = indexManager.SearchByField("name", "NewClass", 10);
+        TopDocs nameSearchResults = indexManager.SearchByField("name", "NewClass", 10);
         nameSearchResults.TotalHits.ShouldBe(1);
 
         // Search should find new content in summary
         // First, let's try to get the first document and check its fields
-        var firstDoc = indexManager.GetDocument(0);
+        Document? firstDoc = indexManager.GetDocument(0);
         firstDoc.ShouldNotBeNull();
-        var summaryField = firstDoc.Get("summary");
+        string? summaryField = firstDoc.Get("summary");
         summaryField.ShouldNotBeNull();
         summaryField.ShouldContain("v2");
 
         // Search for a word that should definitely be in the summary
-        var searchResults = indexManager.SearchByField("summary", "updated", 10);
+        TopDocs searchResults = indexManager.SearchByField("summary", "updated", 10);
         searchResults.TotalHits.ShouldBe(1); // Only OldClass has "updated"
 
         // Search for "added" which should be in NewClass
-        var searchResults2 = indexManager.SearchByField("summary", "added", 10);
+        TopDocs searchResults2 = indexManager.SearchByField("summary", "added", 10);
         searchResults2.TotalHits.ShouldBe(1);
     }
 
@@ -307,43 +312,47 @@ public class NuGetIndexingIntegrationTests : IDisposable
     public async Task ComplexRealWorldScenario_HandlesAllEdgeCases()
     {
         // Arrange - Complex scenario with all edge cases
-        var testScenarios = new List<(string path, string content)>
-        {
-            // Regular package with content
-            CreateNuGetXmlFile("regular.package", "1.0.0", "net6.0", CreateXmlWithMembers(
+        List<(string path, string content)> testScenarios =
+        [
+            this.CreateNuGetXmlFile("regular.package", "1.0.0", "net6.0", CreateXmlWithMembers(
                 ("T:Regular.Package.Class1", "Class 1 summary"),
                 ("M:Regular.Package.Class1.Method1", "Method 1 summary"),
                 ("P:Regular.Package.Class1.Property1", "Property 1 summary")
             )),
-            
+
             // Package with shared XML across frameworks
-            CreateNuGetXmlFile("shared.xml.package", "1.0.0", "netstandard2.0", CreateXmlWithMembers(
+
+            this.CreateNuGetXmlFile("shared.xml.package", "1.0.0", "netstandard2.0", CreateXmlWithMembers(
                 ("T:Shared.Xml.SharedType", "Shared type")
             )),
-            
+
             // Empty package
-            CreateNuGetXmlFile("empty.docs", "1.0.0", "net7.0", CreateEmptyXml("Empty.Docs")),
-            
+
+            this.CreateNuGetXmlFile("empty.docs", "1.0.0", "net7.0", CreateEmptyXml("Empty.Docs")),
+
             // Package with special characters
-            CreateNuGetXmlFile("special-chars.package", "1.0.0-beta+build.123", "net8.0", CreateXmlWithMembers(
+            this.CreateNuGetXmlFile("special-chars.package", "1.0.0-beta+build.123", "net8.0", CreateXmlWithMembers(
                 ("T:Special.Chars.Class`1", "Generic class with special chars"),
                 ("M:Special.Chars.Method(System.String@,System.Int32&)", "Method with ref/out params")
             )),
-            
+
             // Package with very long names
-            CreateNuGetXmlFile("com.company.product.feature.component.subcomponent", "10.5.3", "net9.0", CreateXmlWithMembers(
-                ("T:Com.Company.Product.Feature.Component.SubComponent.Implementation.VeryLongClassName", "Long name class")
-            ))
-        };
+
+            this.CreateNuGetXmlFile("com.company.product.feature.component.subcomponent", "10.5.3", "net9.0",
+                CreateXmlWithMembers(
+                    ("T:Com.Company.Product.Feature.Component.SubComponent.Implementation.VeryLongClassName",
+                        "Long name class")
+                ))
+        ];
 
         // Create all test files
-        foreach (var (path, content) in testScenarios)
+        foreach ((string path, string content) in testScenarios)
         {
             CreateTestFile(path, content);
         }
 
         // Act - Index all files
-        var result = await indexManager.IndexXmlFilesAsync(testScenarios.Select(t => t.path));
+        IndexingResult result = await indexManager.IndexXmlFilesAsync(testScenarios.Select(t => t.path));
         await indexManager.CommitAsync(); // Ensure all documents are committed
 
         // Assert comprehensive results
@@ -352,14 +361,14 @@ public class NuGetIndexingIntegrationTests : IDisposable
         result.FailedDocuments.ShouldBe(0);
 
         // Check total documents
-        var totalDocs = indexManager.GetTotalDocuments();
+        int totalDocs = indexManager.GetTotalDocuments();
         totalDocs.ShouldBe(7);
 
-        var emptyFiles = indexManager.GetEmptyXmlPaths();
-        var hasEmptyFile = emptyFiles.Count > 0;
+        HashSet<string> emptyFiles = indexManager.GetEmptyXmlPaths();
+        bool hasEmptyFile = emptyFiles.Count > 0;
 
         // Verify package tracking
-        var packages = indexManager.GetIndexedPackageVersionsWithFramework();
+        Dictionary<string, HashSet<(string Version, string Framework)>> packages = indexManager.GetIndexedPackageVersionsWithFramework();
         packages.Count.ShouldBe(4); // empty.docs is not tracked because it has no members
 
         // Verify framework-specific tracking
@@ -374,11 +383,11 @@ public class NuGetIndexingIntegrationTests : IDisposable
         emptyFiles.First().ShouldEndWith("empty.docs/1.0.0/lib/net7.0/empty-docs.xml"); // Note: packageId dots replaced with dashes
 
         // Verify searchability
-        var genericSearch = indexManager.SearchByField("summary", "Generic", 10);
+        TopDocs genericSearch = indexManager.SearchByField("summary", "Generic", 10);
         genericSearch.TotalHits.ShouldBeGreaterThan(0);
 
         // Search for a method we know exists
-        var methodSearch = indexManager.SearchByField("name", "Method1", 10);
+        TopDocs methodSearch = indexManager.SearchByField("name", "Method1", 10);
         methodSearch.TotalHits.ShouldBeGreaterThan(0);
     }
 
@@ -390,11 +399,11 @@ public class NuGetIndexingIntegrationTests : IDisposable
     public async Task ConcurrentIndexing_MultipleFiles_HandlesCorrectly()
     {
         // Arrange - Create many files for concurrent processing
-        var files = new List<(string path, string content)>();
+        List<(string path, string content)> files = [];
 
         for (int i = 0; i < 20; i++)
         {
-            var file = CreateNuGetXmlFile($"concurrent.package{i}", "1.0.0", "net6.0", CreateXmlWithMembers(
+            (string path, string content) file = CreateNuGetXmlFile($"concurrent.package{i}", "1.0.0", "net6.0", CreateXmlWithMembers(
                 ($"T:Concurrent.Package{i}.Type1", $"Type 1 in package {i}"),
                 ($"T:Concurrent.Package{i}.Type2", $"Type 2 in package {i}"),
                 ($"M:Concurrent.Package{i}.Method1", $"Method 1 in package {i}")
@@ -404,8 +413,8 @@ public class NuGetIndexingIntegrationTests : IDisposable
         }
 
         // Act - Index concurrently
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var result = await indexManager.IndexXmlFilesAsync(files.Select(f => f.path));
+        Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        IndexingResult result = await indexManager.IndexXmlFilesAsync(files.Select(f => f.path));
         stopwatch.Stop();
 
         // Assert
@@ -413,7 +422,7 @@ public class NuGetIndexingIntegrationTests : IDisposable
         result.FailedDocuments.ShouldBe(0);
 
         // Verify all packages are tracked
-        var packages = indexManager.GetIndexedPackageVersionsWithFramework();
+        Dictionary<string, HashSet<(string Version, string Framework)>> packages = indexManager.GetIndexedPackageVersionsWithFramework();
         packages.Count.ShouldBe(20);
 
         // Performance should be reasonable (parallel processing)
@@ -441,8 +450,8 @@ public class NuGetIndexingIntegrationTests : IDisposable
 
     private static Stream CreateStreamFromString(string content)
     {
-        var stream = new MemoryStream();
-        var writer = new StreamWriter(stream);
+        MemoryStream stream = new();
+        StreamWriter writer = new(stream);
         writer.Write(content);
         writer.Flush();
         stream.Position = 0;
@@ -451,7 +460,7 @@ public class NuGetIndexingIntegrationTests : IDisposable
 
     private static string CreateXmlWithMembers(params (string name, string summary)[] members)
     {
-        var memberElements = string.Join("\n", members.Select(m =>
+        string memberElements = string.Join("\n", members.Select(m =>
             $@"        <member name=""{m.name}"">
             <summary>{m.summary}</summary>
         </member>"));

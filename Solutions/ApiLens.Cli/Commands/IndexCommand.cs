@@ -88,7 +88,7 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
                         foreach (string file in xmlFiles)
                         {
                             // Check if it's a NuGet file
-                            var nugetInfo = NuGetHelper.ExtractNuGetInfo(file);
+                            (string PackageId, string Version, string Framework)? nugetInfo = NuGetHelper.ExtractNuGetInfo(file);
 
                             if (nugetInfo.HasValue)
                             {

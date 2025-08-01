@@ -131,8 +131,8 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             {
                 // Get existing packages from index for change detection
                 Dictionary<string, HashSet<(string Version, string Framework)>> indexedPackagesWithFramework = new();
-                HashSet<string> indexedXmlPaths = new();
-                HashSet<string> emptyXmlPaths = new();
+                HashSet<string> indexedXmlPaths = [];
+                HashSet<string> emptyXmlPaths = [];
 
                 await AnsiConsole.Status()
                     .StartAsync("Analyzing index for change detection...", async ctx =>
@@ -152,75 +152,23 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 // First, check all packages to determine what needs indexing
                 HashSet<string> xmlFilesToIndex = new(StringComparer.OrdinalIgnoreCase);
 
-                // Normalize all indexed paths once for efficient comparison
-                HashSet<string> normalizedIndexedPaths = new(StringComparer.OrdinalIgnoreCase);
-                foreach (string path in indexedXmlPaths)
-                {
-                    if (!string.IsNullOrWhiteSpace(path))
-                    {
-                        try
-                        {
-                            normalizedIndexedPaths.Add(System.IO.Path.GetFullPath(path).Replace('\\', '/'));
-                        }
-                        catch (ArgumentException)
-                        {
-                            // If path normalization fails, use as-is
-                            normalizedIndexedPaths.Add(path.Replace('\\', '/'));
-                        }
-                        catch (NotSupportedException)
-                        {
-                            // If path normalization fails, use as-is
-                            normalizedIndexedPaths.Add(path.Replace('\\', '/'));
-                        }
-                    }
-                }
-
-                // Also normalize empty XML paths
-                HashSet<string> normalizedEmptyPaths = new(StringComparer.OrdinalIgnoreCase);
-                foreach (string path in emptyXmlPaths)
-                {
-                    if (!string.IsNullOrWhiteSpace(path))
-                    {
-                        try
-                        {
-                            normalizedEmptyPaths.Add(System.IO.Path.GetFullPath(path).Replace('\\', '/'));
-                        }
-                        catch (ArgumentException)
-                        {
-                            normalizedEmptyPaths.Add(path.Replace('\\', '/'));
-                        }
-                        catch (NotSupportedException)
-                        {
-                            normalizedEmptyPaths.Add(path.Replace('\\', '/'));
-                        }
-                    }
-                }
+                // PERFORMANCE: Optimize path normalization with helper method
+                HashSet<string> normalizedIndexedPaths = NormalizePathCollection(indexedXmlPaths);
+                HashSet<string> normalizedEmptyPaths = NormalizePathCollection(emptyXmlPaths);
 
                 // Track which packages have truly new versions (for deletion logic)
                 Dictionary<string, string> packagesWithNewVersions = new(StringComparer.OrdinalIgnoreCase);
 
                 // Add logging for debugging
-                List<string> filesBeingReindexed = new();
+                List<string> filesBeingReindexed = [];
 
                 foreach (NuGetPackageInfo package in packages)
                 {
                     bool shouldIndex = false;
 
                     // First check if the XML file has already been indexed
-                    // Normalize the path for comparison (handle case and separator differences)
-                    string normalizedPath;
-                    try
-                    {
-                        normalizedPath = System.IO.Path.GetFullPath(package.XmlDocumentationPath).Replace('\\', '/');
-                    }
-                    catch (ArgumentException)
-                    {
-                        normalizedPath = package.XmlDocumentationPath.Replace('\\', '/');
-                    }
-                    catch (NotSupportedException)
-                    {
-                        normalizedPath = package.XmlDocumentationPath.Replace('\\', '/');
-                    }
+                    // PERFORMANCE: Use helper method for path normalization
+                    string normalizedPath = NormalizePath(package.XmlDocumentationPath);
 
                     if (normalizedIndexedPaths.Contains(normalizedPath) || normalizedEmptyPaths.Contains(normalizedPath))
                     {
@@ -258,8 +206,8 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                             {
                                 try
                                 {
-                                    if (Version.TryParse(package.Version, out var pkgVer) &&
-                                        Version.TryParse(currentHighest, out var curVer) &&
+                                    if (Version.TryParse(package.Version, out Version? pkgVer) &&
+                                        Version.TryParse(currentHighest, out Version? curVer) &&
                                         pkgVer > curVer)
                                     {
                                         packagesWithNewVersions[package.PackageId] = package.Version;
@@ -290,22 +238,22 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 }
 
                 // Now determine which packages should have old versions deleted
-                foreach (var kvp in packagesWithNewVersions)
+                foreach (KeyValuePair<string, string> kvp in packagesWithNewVersions)
                 {
                     string packageId = kvp.Key;
                     string newVersion = kvp.Value;
 
                     // Only delete if the new version is actually newer than ALL existing versions
-                    if (indexedPackagesWithFramework.TryGetValue(packageId, out var existingVersions))
+                    if (indexedPackagesWithFramework.TryGetValue(packageId, out HashSet<(string Version, string Framework)>? existingVersions))
                     {
                         bool isNewerThanAll = true;
 
-                        foreach (var existing in existingVersions)
+                        foreach ((string Version, string Framework) existing in existingVersions)
                         {
                             try
                             {
-                                if (Version.TryParse(newVersion, out var newVer) &&
-                                    Version.TryParse(existing.Version, out var existVer))
+                                if (Version.TryParse(newVersion, out Version? newVer) &&
+                                    Version.TryParse(existing.Version, out Version? existVer))
                                 {
                                     if (newVer <= existVer)
                                     {
@@ -333,7 +281,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 }
 
                 // Group packages by XML path to handle shared files
-                var packagesByXmlPath = packages
+                List<IGrouping<string, NuGetPackageInfo>> packagesByXmlPath = packages
                     .Where(p => xmlFilesToIndex.Contains(p.XmlDocumentationPath))
                     .GroupBy(p => p.XmlDocumentationPath, StringComparer.OrdinalIgnoreCase)
                     .ToList();
@@ -584,6 +532,39 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             return $"{duration.TotalSeconds:N2} s";
         else
             return $"{duration.TotalMinutes:N2} min";
+    }
+
+    // PERFORMANCE: Helper method to optimize path normalization
+    private static HashSet<string> NormalizePathCollection(IEnumerable<string> paths)
+    {
+        HashSet<string> normalizedPaths = new(StringComparer.OrdinalIgnoreCase);
+        
+        foreach (string path in paths)
+        {
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                string normalizedPath = NormalizePath(path);
+                normalizedPaths.Add(normalizedPath);
+            }
+        }
+        
+        return normalizedPaths;
+    }
+
+    private static string NormalizePath(string path)
+    {
+        try
+        {
+            return System.IO.Path.GetFullPath(path).Replace('\\', '/');
+        }
+        catch (ArgumentException)
+        {
+            return path.Replace('\\', '/');
+        }
+        catch (NotSupportedException)
+        {
+            return path.Replace('\\', '/');
+        }
     }
 
     public sealed class Settings : CommandSettings

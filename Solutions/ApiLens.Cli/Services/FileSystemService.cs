@@ -142,7 +142,10 @@ public class FileSystemService : IFileSystemService
 
     public Task<Stream> OpenReadAsync(string path)
     {
-        // Spectre.IO doesn't have async file operations, so we return the sync result wrapped in a task
-        return Task.FromResult(OpenRead(path));
+        // FIXED: Use FileStream with async support for better I/O performance
+        // The async benefit comes from the stream operations, not opening it
+        FileStream fileStream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read, 
+            bufferSize: 4096, useAsync: true);
+        return Task.FromResult<Stream>(fileStream);
     }
 }

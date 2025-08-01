@@ -1,5 +1,6 @@
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Parsing;
+using ApiLens.Core.Tests.Helpers;
 
 namespace ApiLens.Core.Tests.Lucene;
 

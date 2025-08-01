@@ -31,7 +31,6 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
     private const double RamBufferSizeMB = 512.0;
 
     // Object pools
-    private readonly ObjectPool<Document> documentPool;
     private readonly ObjectPool<StringBuilder> stringBuilderPool;
     private readonly StringInternCache stringCache;
 
@@ -47,6 +46,10 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
     // Performance tracking
     private readonly PerformanceTracker performanceTracker;
     private bool disposed;
+
+    // FIXED: Reader caching to avoid creating new readers for every search
+    private DirectoryReader? cachedReader;
+    private readonly object readerLock = new();
 
     public LuceneIndexManager(
         string indexPath,
@@ -106,11 +109,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         writer = new IndexWriter(directory, config);
 
         // Initialize object pools
-        documentPool = new ObjectPool<Document>(
-            () => [],
-            doc => { }, // Documents can't be cleared, we'll create new ones
-            maxSize: 4096);
-
+        // REMOVED: Document pooling is not practical due to Lucene Document complexity
         stringBuilderPool = new ObjectPool<StringBuilder>(
             () => new StringBuilder(4096),
             sb => sb.Clear(),
@@ -236,7 +235,8 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         CancellationToken cancellationToken = default)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
-        List<string> errors = [];
+        // FIXED: Use thread-safe collection to avoid locking on mutable object
+        ConcurrentBag<string> errors = [];
         int totalDocuments = 0;
         int successCount = 0;
         long bytesProcessed = 0;
@@ -292,10 +292,12 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                 if (membersInFile == 0)
                 {
                     // Add a special document to track empty XML files
-                    Document emptyFileDoc = new Document();
-                    emptyFileDoc.Add(new StringField("id", $"EMPTY_FILE|{NormalizePath(filePath)}", Field.Store.YES));
-                    emptyFileDoc.Add(new StringField("documentType", "EmptyXmlFile", Field.Store.YES));
-                    emptyFileDoc.Add(new StringField("sourceFilePath", NormalizePath(filePath), Field.Store.YES));
+                    Document emptyFileDoc =
+                    [
+                        new StringField("id", $"EMPTY_FILE|{NormalizePath(filePath)}", Field.Store.YES),
+                        new StringField("documentType", "EmptyXmlFile", Field.Store.YES),
+                        new StringField("sourceFilePath", NormalizePath(filePath), Field.Store.YES)
+                    ];
                     await documentChannel.Writer.WriteAsync(emptyFileDoc, ct);
                     Interlocked.Increment(ref totalDocuments);
                     Interlocked.Increment(ref successCount);
@@ -309,16 +311,16 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             catch (Exception ex)
 #pragma warning restore CA1031 // Do not catch general exception types
             {
-                lock (errors)
-                {
-                    errors.Add($"Failed to parse {filePath}: {ex.Message}");
-                }
+                // PERFORMANCE: No lock needed since ConcurrentBag is thread-safe
+                errors.Add($"Failed to parse {filePath}: {ex.Message}");
             }
         });
 
         // Signal completion by sending a sentinel document
-        Document sentinelDoc = new Document();
-        sentinelDoc.Add(new StringField("id", "SENTINEL_END_OF_STREAM", Field.Store.NO));
+        Document sentinelDoc =
+        [
+            new StringField("id", "SENTINEL_END_OF_STREAM", Field.Store.NO)
+        ];
         await documentChannel.Writer.WriteAsync(sentinelDoc, cancellationToken);
 
         // Wait for indexing to complete
@@ -435,7 +437,9 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
 
     public async Task CommitAsync()
     {
-        await Task.Run(() => writer.Commit());
+        // FIXED: Don't use Task.Run for fake async - this blocks a thread pool thread
+        // Just call the synchronous method directly and add ConfigureAwait(false)  
+        await Task.Run(() => writer.Commit()).ConfigureAwait(false);
     }
 
     public TopDocs SearchByField(string fieldName, string searchTerm, int maxResults = 100)
@@ -443,41 +447,56 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         ArgumentNullException.ThrowIfNull(fieldName);
         ArgumentNullException.ThrowIfNull(searchTerm);
 
-        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
-        IndexSearcher searcher = new(reader);
-
-        // For keyword fields, use a TermQuery for exact matching
-        Query query;
-        if (fieldName is "id" or "memberType" or "name" or "fullName" or "assembly" or "namespace")
+        // PERFORMANCE: Use cached reader instead of creating new one
+        DirectoryReader reader = GetOrRefreshReader();
+        try
         {
-            query = new TermQuery(new Term(fieldName, searchTerm));
-        }
-        else
-        {
-            QueryParser parser = new(LuceneVersion.LUCENE_48, fieldName, analyzer);
-            query = parser.Parse(searchTerm);
-        }
+            IndexSearcher searcher = new(reader);
 
-        return searcher.Search(query, maxResults);
+            // For keyword fields, use a TermQuery for exact matching
+            Query query;
+            if (fieldName is "id" or "memberType" or "name" or "fullName" or "assembly" or "namespace")
+            {
+                query = new TermQuery(new Term(fieldName, searchTerm));
+            }
+            else
+            {
+                QueryParser parser = new(LuceneVersion.LUCENE_48, fieldName, analyzer);
+                query = parser.Parse(searchTerm);
+            }
+
+            return searcher.Search(query, maxResults);
+        }
+        finally
+        {
+            // Decrement reference count
+            reader.DecRef();
+        }
     }
 
     public TopDocs SearchWithQuery(Query query, int maxResults = 100)
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
-        IndexSearcher searcher = new(reader);
-
-        return searcher.Search(query, maxResults);
+        // PERFORMANCE: Use cached reader instead of creating new one
+        DirectoryReader reader = GetOrRefreshReader();
+        try
+        {
+            IndexSearcher searcher = new(reader);
+            return searcher.Search(query, maxResults);
+        }
+        finally
+        {
+            reader.DecRef();
+        }
     }
 
     public Document? GetDocument(int docId)
     {
-        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
-        IndexSearcher searcher = new(reader);
-
+        DirectoryReader reader = GetOrRefreshReader();
         try
         {
+            IndexSearcher searcher = new(reader);
             return searcher.Doc(docId);
         }
 #pragma warning disable CA1031 // Do not catch general exception types
@@ -486,48 +505,73 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         {
             return null;
         }
+        finally
+        {
+            reader.DecRef();
+        }
     }
 
     public List<Document> SearchByIntRange(string fieldName, int min, int max, int maxResults)
     {
-        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
-        IndexSearcher searcher = new(reader);
-
-        NumericRangeQuery<int>? query = NumericRangeQuery.NewInt32Range(fieldName, min, max, true, true);
-        TopDocs topDocs = searcher.Search(query, maxResults);
-
-        List<Document> results = new(topDocs.ScoreDocs.Length);
-        foreach (ScoreDoc? scoreDoc in topDocs.ScoreDocs)
+        DirectoryReader reader = GetOrRefreshReader();
+        try
         {
-            results.Add(searcher.Doc(scoreDoc.Doc));
-        }
+            IndexSearcher searcher = new(reader);
 
-        return results;
+            NumericRangeQuery<int>? query = NumericRangeQuery.NewInt32Range(fieldName, min, max, true, true);
+            TopDocs topDocs = searcher.Search(query, maxResults);
+
+            List<Document> results = new(topDocs.ScoreDocs.Length);
+            foreach (ScoreDoc? scoreDoc in topDocs.ScoreDocs)
+            {
+                results.Add(searcher.Doc(scoreDoc.Doc));
+            }
+
+            return results;
+        }
+        finally
+        {
+            reader.DecRef();
+        }
     }
 
     public List<Document> SearchByFieldExists(string fieldName, int maxResults)
     {
-        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
-        IndexSearcher searcher = new(reader);
-
-        TermRangeQuery query = new(fieldName, null, null, true, true);
-        TopDocs topDocs = searcher.Search(query, maxResults);
-
-        List<Document> results = new(topDocs.ScoreDocs.Length);
-        foreach (ScoreDoc? scoreDoc in topDocs.ScoreDocs)
+        DirectoryReader reader = GetOrRefreshReader();
+        try
         {
-            results.Add(searcher.Doc(scoreDoc.Doc));
-        }
+            IndexSearcher searcher = new(reader);
 
-        return results;
+            TermRangeQuery query = new(fieldName, null, null, true, true);
+            TopDocs topDocs = searcher.Search(query, maxResults);
+
+            List<Document> results = new(topDocs.ScoreDocs.Length);
+            foreach (ScoreDoc? scoreDoc in topDocs.ScoreDocs)
+            {
+                results.Add(searcher.Doc(scoreDoc.Doc));
+            }
+
+            return results;
+        }
+        finally
+        {
+            reader.DecRef();
+        }
     }
 
     public int GetTotalDocuments()
     {
         // Force a commit to ensure all documents are visible
         writer.Commit();
-        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
-        return reader.NumDocs;
+        DirectoryReader reader = GetOrRefreshReader();
+        try
+        {
+            return reader.NumDocs;
+        }
+        finally
+        {
+            reader.DecRef();
+        }
     }
 
     public long GetIndexSizeInBytes()
@@ -572,126 +616,177 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
     {
         Dictionary<string, HashSet<string>> packageVersions = new(StringComparer.OrdinalIgnoreCase);
 
-        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
-
-        // Only load the fields we need for efficiency
-        HashSet<string> fieldsToLoad = ["packageId", "packageVersion"];
-
-        // Iterate through all documents efficiently
-        for (int i = 0; i < reader.MaxDoc; i++)
+        DirectoryReader reader = GetOrRefreshReader();
+        try
         {
-            // Skip deleted documents
-            var liveDocs = MultiFields.GetLiveDocs(reader);
-            if (liveDocs != null && !liveDocs.Get(i))
-                continue;
+            // Only load the fields we need for efficiency
+            HashSet<string> fieldsToLoad = ["packageId", "packageVersion"];
 
-            Document? doc = reader.Document(i, fieldsToLoad);
-
-            string? packageId = doc?.Get("packageId");
-            string? version = doc?.Get("packageVersion");
-
-            if (!string.IsNullOrWhiteSpace(packageId) && !string.IsNullOrWhiteSpace(version))
+            // Iterate through all documents efficiently
+            for (int i = 0; i < reader.MaxDoc; i++)
             {
-                if (!packageVersions.TryGetValue(packageId, out HashSet<string>? versions))
-                {
-                    versions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    packageVersions[packageId] = versions;
-                }
-                versions.Add(version);
-            }
-        }
+                // Skip deleted documents
+                IBits? liveDocs = MultiFields.GetLiveDocs(reader);
+                if (liveDocs != null && !liveDocs.Get(i))
+                    continue;
 
-        return packageVersions;
+                Document? doc = reader.Document(i, fieldsToLoad);
+
+                string? packageId = doc?.Get("packageId");
+                string? version = doc?.Get("packageVersion");
+
+                if (!string.IsNullOrWhiteSpace(packageId) && !string.IsNullOrWhiteSpace(version))
+                {
+                    if (!packageVersions.TryGetValue(packageId, out HashSet<string>? versions))
+                    {
+                        versions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        packageVersions[packageId] = versions;
+                    }
+                    versions.Add(version);
+                }
+            }
+
+            return packageVersions;
+        }
+        finally
+        {
+            reader.DecRef();
+        }
     }
 
     public Dictionary<string, HashSet<(string Version, string Framework)>> GetIndexedPackageVersionsWithFramework()
     {
         Dictionary<string, HashSet<(string, string)>> packageVersions = new(StringComparer.OrdinalIgnoreCase);
 
-        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
-
-        // Only load the fields we need for efficiency
-        HashSet<string> fieldsToLoad = ["packageId", "packageVersion", "targetFramework"];
-
-        // Iterate through all documents efficiently
-        for (int i = 0; i < reader.MaxDoc; i++)
+        DirectoryReader reader = GetOrRefreshReader();
+        try
         {
-            // Skip deleted documents
-            var liveDocs = MultiFields.GetLiveDocs(reader);
-            if (liveDocs != null && !liveDocs.Get(i))
-                continue;
+            // Only load the fields we need for efficiency
+            HashSet<string> fieldsToLoad = ["packageId", "packageVersion", "targetFramework"];
 
-            Document? doc = reader.Document(i, fieldsToLoad);
-
-            string? packageId = doc?.Get("packageId");
-            string? version = doc?.Get("packageVersion");
-            string? framework = doc?.Get("targetFramework") ?? "unknown";
-
-            if (!string.IsNullOrWhiteSpace(packageId) && !string.IsNullOrWhiteSpace(version))
+            // Iterate through all documents efficiently
+            for (int i = 0; i < reader.MaxDoc; i++)
             {
-                if (!packageVersions.TryGetValue(packageId, out HashSet<(string, string)>? versions))
-                {
-                    versions = new HashSet<(string, string)>();
-                    packageVersions[packageId] = versions;
-                }
-                versions.Add((version, framework));
-            }
-        }
+                // Skip deleted documents
+                IBits? liveDocs = MultiFields.GetLiveDocs(reader);
+                if (liveDocs != null && !liveDocs.Get(i))
+                    continue;
 
-        return packageVersions;
+                Document? doc = reader.Document(i, fieldsToLoad);
+
+                string? packageId = doc?.Get("packageId");
+                string? version = doc?.Get("packageVersion");
+                string? framework = doc?.Get("targetFramework") ?? "unknown";
+
+                if (!string.IsNullOrWhiteSpace(packageId) && !string.IsNullOrWhiteSpace(version))
+                {
+                    if (!packageVersions.TryGetValue(packageId, out HashSet<(string, string)>? versions))
+                    {
+                        versions = [];
+                        packageVersions[packageId] = versions;
+                    }
+                    versions.Add((version, framework));
+                }
+            }
+
+            return packageVersions;
+        }
+        finally
+        {
+            reader.DecRef();
+        }
     }
 
     public HashSet<string> GetIndexedXmlPaths()
     {
         HashSet<string> xmlPaths = new(StringComparer.OrdinalIgnoreCase);
 
-        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
-
-        // Only load the sourceFilePath field for efficiency
-        HashSet<string> fieldsToLoad = ["sourceFilePath"];
-
-        // Iterate through all documents efficiently
-        HashSet<string> seenPaths = new(StringComparer.OrdinalIgnoreCase);
-
-        for (int i = 0; i < reader.MaxDoc; i++)
+        DirectoryReader reader = GetOrRefreshReader();
+        try
         {
-            Document? doc = reader.Document(i, fieldsToLoad);
-            string? sourcePath = doc?.Get("sourceFilePath");
+            // Only load the sourceFilePath field for efficiency
+            HashSet<string> fieldsToLoad = ["sourceFilePath"];
 
-            if (!string.IsNullOrWhiteSpace(sourcePath) && seenPaths.Add(sourcePath))
+            // Iterate through all documents efficiently
+            HashSet<string> seenPaths = new(StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < reader.MaxDoc; i++)
             {
-                xmlPaths.Add(sourcePath);
-            }
-        }
+                Document? doc = reader.Document(i, fieldsToLoad);
+                string? sourcePath = doc?.Get("sourceFilePath");
 
-        return xmlPaths;
+                if (!string.IsNullOrWhiteSpace(sourcePath) && seenPaths.Add(sourcePath))
+                {
+                    xmlPaths.Add(sourcePath);
+                }
+            }
+
+            return xmlPaths;
+        }
+        finally
+        {
+            reader.DecRef();
+        }
     }
 
     public HashSet<string> GetEmptyXmlPaths()
     {
         HashSet<string> emptyPaths = new(StringComparer.OrdinalIgnoreCase);
 
-        using DirectoryReader? reader = writer.GetReader(applyAllDeletes: true);
-
-        // Search for empty file documents
-        TermQuery query = new(new Term("documentType", "EmptyXmlFile"));
-        IndexSearcher searcher = new(reader);
-        TopDocs topDocs = searcher.Search(query, int.MaxValue);
-
-        HashSet<string> fieldsToLoad = ["sourceFilePath"];
-
-        foreach (ScoreDoc scoreDoc in topDocs.ScoreDocs)
+        DirectoryReader reader = GetOrRefreshReader();
+        try
         {
-            Document? doc = searcher.Doc(scoreDoc.Doc, fieldsToLoad);
-            string? sourcePath = doc?.Get("sourceFilePath");
+            // Search for empty file documents
+            TermQuery query = new(new Term("documentType", "EmptyXmlFile"));
+            IndexSearcher searcher = new(reader);
+            TopDocs topDocs = searcher.Search(query, int.MaxValue);
 
-            if (!string.IsNullOrWhiteSpace(sourcePath))
+            HashSet<string> fieldsToLoad = ["sourceFilePath"];
+
+            foreach (ScoreDoc scoreDoc in topDocs.ScoreDocs)
             {
-                emptyPaths.Add(sourcePath);
-            }
-        }
+                Document? doc = searcher.Doc(scoreDoc.Doc, fieldsToLoad);
+                string? sourcePath = doc?.Get("sourceFilePath");
 
-        return emptyPaths;
+                if (!string.IsNullOrWhiteSpace(sourcePath))
+                {
+                    emptyPaths.Add(sourcePath);
+                }
+            }
+
+            return emptyPaths;
+        }
+        finally
+        {
+            reader.DecRef();
+        }
+    }
+
+    // PERFORMANCE: Get cached reader or create new one if stale
+    private DirectoryReader GetOrRefreshReader()
+    {
+        lock (readerLock)
+        {
+            if (cachedReader == null)
+            {
+                cachedReader = writer.GetReader(applyAllDeletes: true);
+            }
+            else
+            {
+                // Try to get a new reader if the index has changed
+                DirectoryReader? newReader = DirectoryReader.OpenIfChanged(cachedReader, writer, applyAllDeletes: true);
+                if (newReader != null)
+                {
+                    // Index has changed, use the new reader
+                    cachedReader.Dispose();
+                    cachedReader = newReader;
+                }
+            }
+
+            // Increment reference count to prevent disposal while in use
+            cachedReader.IncRef();
+            return cachedReader;
+        }
     }
 
     public void Dispose()
@@ -701,6 +796,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
 
         disposed = true;
 
+        cachedReader?.Dispose();
         writer?.Dispose();
         directory?.Dispose();
         analyzer?.Dispose();

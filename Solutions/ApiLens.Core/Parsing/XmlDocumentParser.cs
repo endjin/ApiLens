@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using ApiLens.Core.Helpers;
@@ -10,7 +11,7 @@ using ApiLens.Core.Services;
 
 namespace ApiLens.Core.Parsing;
 
-public sealed class XmlDocumentParser : IXmlDocumentParser
+public sealed partial class XmlDocumentParser : IXmlDocumentParser
 {
     private readonly StringInternCache stringCache;
     private readonly ObjectPool<StringBuilder> stringBuilderPool;
@@ -21,6 +22,11 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
     private readonly string memberElementName = "member";
     private readonly string nameAttributeName = "name";
     private readonly string assemblyElementName = "assembly";
+
+    // FIXED: Pre-compiled regex to avoid compilation in hot path
+    // This regex replaces multiple whitespace characters with a single space
+    [GeneratedRegex(@"\s+", RegexOptions.Compiled)]
+    private static partial Regex WhitespaceNormalizer();
 
     public XmlDocumentParser(IFileHashHelper fileHashHelper, IFileSystemService fileSystem)
     {
@@ -43,7 +49,7 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
         ArgumentNullException.ThrowIfNull(filePath);
 
         // Extract NuGet package information from the file path if available
-        var nugetInfo = NuGetHelper.ExtractNuGetInfo(filePath);
+        (string PackageId, string Version, string Framework)? nugetInfo = NuGetHelper.ExtractNuGetInfo(filePath);
 
         // For non-NuGet files, we'll compute a hash for change detection
         string? fileHash = null;
@@ -352,8 +358,9 @@ public sealed class XmlDocumentParser : IXmlDocumentParser
         if (string.IsNullOrEmpty(text))
             return string.Empty;
 
-        // Simple normalization - replace multiple whitespaces with single space
-        return System.Text.RegularExpressions.Regex.Replace(text.Trim(), @"\s+", " ");
+        // PERFORMANCE: Using pre-compiled regex via source generator
+        // This avoids regex compilation on every call (major hot path optimization)
+        return WhitespaceNormalizer().Replace(text.Trim(), " ");
     }
 
     private static string NormalizePath(string path)

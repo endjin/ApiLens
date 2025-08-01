@@ -2,6 +2,7 @@ using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Tests.Helpers;
 using Lucene.Net.Documents;
+using Lucene.Net.Index;
 
 namespace ApiLens.Core.Tests.Lucene;
 
@@ -22,7 +23,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_WithSourceFilePath_AlwaysStoresPath()
     {
         // Arrange
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = "T:Test.Type|package|1.0.0|net6.0",
             MemberType = MemberType.Type,
@@ -44,7 +45,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_WithNullSourceFilePath_StoresEmptyString()
     {
         // Arrange
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = "T:Test.Type",
             MemberType = MemberType.Type,
@@ -66,7 +67,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_WithWindowsStylePath_PreservesPath()
     {
         // Arrange
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = "T:Test.Type|package|1.0.0|net6.0",
             MemberType = MemberType.Type,
@@ -92,7 +93,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_WithFullNuGetMetadata_StoresAllFields()
     {
         // Arrange
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = "M:Newtonsoft.Json.JsonConvert.SerializeObject|newtonsoft.json|13.0.3|net6.0",
             MemberType = MemberType.Method,
@@ -122,7 +123,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_WithPreReleaseVersion_HandlesCorrectly()
     {
         // Arrange
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = "T:Microsoft.Extensions.Logging.ILogger|microsoft.extensions.logging|9.0.0-preview.1|net9.0",
             MemberType = MemberType.Type,
@@ -148,7 +149,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_WithoutPackageInfo_OmitsPackageFields()
     {
         // Arrange - Local file scenario
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = "T:Local.Type",
             MemberType = MemberType.Type,
@@ -178,7 +179,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_BuildsComprehensiveSearchContent()
     {
         // Arrange
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = "M:Example.Calculator.Add(System.Int32,System.Int32)|example|1.0.0|net6.0",
             MemberType = MemberType.Method,
@@ -189,16 +190,19 @@ public class DocumentBuilderAdvancedTests
             Summary = "Adds two integers together.",
             Remarks = "This method performs simple addition.",
             Returns = "The sum of the two integers.",
-            Parameters = ImmutableArray.Create(
+            Parameters =
+            [
                 TestDataBuilder.CreateParameter("a", "System.Int32", "First number", 0),
                 TestDataBuilder.CreateParameter("b", "System.Int32", "Second number", 1)
-            ),
-            Exceptions = ImmutableArray.Create(
+            ],
+            Exceptions =
+            [
                 new ExceptionInfo { Type = "System.OverflowException", Condition = "When the sum exceeds Int32.MaxValue" }
-            ),
-            CodeExamples = ImmutableArray.Create(
+            ],
+            CodeExamples =
+            [
                 new CodeExample { Code = "int result = calculator.Add(5, 3);", Description = "Basic usage example" }
-            )
+            ]
         };
 
         // Act
@@ -225,7 +229,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_WithComplexityMetrics_StoresMetrics()
     {
         // Arrange
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = "M:Complex.Method|package|1.0.0|net6.0",
             MemberType = MemberType.Method,
@@ -245,15 +249,15 @@ public class DocumentBuilderAdvancedTests
         Document doc = builder.BuildDocument(member);
 
         // Assert
-        var paramCount = doc.GetField("parameterCount");
+        IIndexableField? paramCount = doc.GetField("parameterCount");
         paramCount.ShouldNotBeNull();
         paramCount.GetInt32Value().ShouldBe(5);
 
-        var complexity = doc.GetField("cyclomaticComplexity");
+        IIndexableField? complexity = doc.GetField("cyclomaticComplexity");
         complexity.ShouldNotBeNull();
         complexity.GetInt32Value().ShouldBe(10);
 
-        var docLines = doc.GetField("documentationLineCount");
+        IIndexableField? docLines = doc.GetField("documentationLineCount");
         docLines.ShouldNotBeNull();
         docLines.GetInt32Value().ShouldBe(25);
     }
@@ -267,7 +271,7 @@ public class DocumentBuilderAdvancedTests
     {
         // Arrange
         string memberId = "T:Example.Service|package|1.0.0|net6.0";
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = memberId,
             MemberType = MemberType.Type,
@@ -275,21 +279,22 @@ public class DocumentBuilderAdvancedTests
             FullName = "Example.Service",
             Assembly = "Example",
             Namespace = "Example",
-            CrossReferences = ImmutableArray.Create(
+            CrossReferences =
+            [
                 TestDataBuilder.CreateCrossReference(ReferenceType.SeeAlso, "T:Example.IService", memberId),
                 TestDataBuilder.CreateCrossReference(ReferenceType.See, "M:Example.BaseService.Execute", memberId),
                 TestDataBuilder.CreateCrossReference(ReferenceType.See, "P:Example.Service.IsEnabled", memberId)
-            )
+            ]
         };
 
         // Act
         Document doc = builder.BuildDocument(member);
 
         // Assert
-        var crossrefs = doc.GetFields("crossref");
+        IIndexableField[]? crossrefs = doc.GetFields("crossref");
         crossrefs.Length.ShouldBe(3);
 
-        var crossrefValues = crossrefs.Select(f => f.GetStringValue()).ToList();
+        List<string> crossrefValues = crossrefs.Select(f => f.GetStringValue()).ToList();
         crossrefValues.ShouldContain("T:Example.IService");
         crossrefValues.ShouldContain("M:Example.BaseService.Execute");
         crossrefValues.ShouldContain("P:Example.Service.IsEnabled");
@@ -312,7 +317,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_AddsCorrectTypeSpecificSearchField(MemberType memberType, string expectedField)
     {
         // Arrange
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = $"{memberType.ToString()[0]}:Test.Member|package|1.0.0|net6.0",
             MemberType = memberType,
@@ -329,8 +334,8 @@ public class DocumentBuilderAdvancedTests
         doc.Get(expectedField).ShouldBe("Member");
 
         // Other type fields should not exist
-        var allTypeFields = new[] { "typeSearch", "methodSearch", "propertySearch", "fieldSearch", "eventSearch" };
-        foreach (var field in allTypeFields.Where(f => f != expectedField))
+        string[] allTypeFields = ["typeSearch", "methodSearch", "propertySearch", "fieldSearch", "eventSearch"];
+        foreach (string field in allTypeFields.Where(f => f != expectedField))
         {
             doc.Get(field).ShouldBeNull();
         }
@@ -344,7 +349,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_WithEmptyCollections_HandlesGracefully()
     {
         // Arrange
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = "T:Test.Type|package|1.0.0|net6.0",
             MemberType = MemberType.Type,
@@ -377,7 +382,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_WithSpecialCharactersInContent_HandlesCorrectly()
     {
         // Arrange
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = "M:Test.Method|package|1.0.0|net6.0",
             MemberType = MemberType.Method,
@@ -386,9 +391,10 @@ public class DocumentBuilderAdvancedTests
             Assembly = "Test",
             Namespace = "Test",
             Summary = "Generic method with <T> parameter & special chars: @#$%",
-            CodeExamples = ImmutableArray.Create(
+            CodeExamples =
+            [
                 new CodeExample { Code = "var result = obj.Method<string>(\"test\");", Description = "Usage with <>\"& chars" }
-            )
+            ]
         };
 
         // Act
@@ -407,7 +413,7 @@ public class DocumentBuilderAdvancedTests
     public void BuildDocument_WithContentHash_DoesNotStore()
     {
         // Arrange
-        var member = new MemberInfo
+        MemberInfo member = new()
         {
             Id = "T:Test.Type|package|1.0.0|net6.0",
             MemberType = MemberType.Type,
@@ -422,7 +428,7 @@ public class DocumentBuilderAdvancedTests
         Document doc = builder.BuildDocument(member);
 
         // Assert - ContentHash field should exist but be configured with Field.Store.NO
-        var contentHashField = doc.GetField("contentHash");
+        IIndexableField? contentHashField = doc.GetField("contentHash");
         contentHashField.ShouldNotBeNull();
 
         // In Lucene.NET, Field.Store.NO fields can still be retrieved from the Document object

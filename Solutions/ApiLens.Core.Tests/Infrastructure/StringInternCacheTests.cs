@@ -26,7 +26,7 @@ public class StringInternCacheTests
         // Arrange
         StringInternCache cache = new();
         string value1 = "test string";
-        string value2 = new string(value1.ToCharArray()); // Create different instance with same value
+        string value2 = new(value1.ToCharArray()); // Create different instance with same value
 
         // Act
         string cached1 = cache.GetOrAdd(value1);

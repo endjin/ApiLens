@@ -41,38 +41,60 @@ public class NuGetCommandComprehensiveTests : IDisposable
         SetupBasicMocks(cachePath);
 
         // Create packages where some XML files will be empty
-        var packages = new List<NuGetPackageInfo>
-        {
-            // Normal packages with content
-            new() { PackageId = "package1", Version = "1.0.0", TargetFramework = "net6.0",
-                   XmlDocumentationPath = "/cache/package1/1.0.0/lib/net6.0/Package1.xml" },
-            new() { PackageId = "package2", Version = "1.0.0", TargetFramework = "net6.0",
-                   XmlDocumentationPath = "/cache/package2/1.0.0/lib/net6.0/Package2.xml" },
-            // Empty XML files
-            new() { PackageId = "empty1", Version = "1.0.0", TargetFramework = "net6.0",
-                   XmlDocumentationPath = "/cache/empty1/1.0.0/lib/net6.0/Empty1.xml" },
-            new() { PackageId = "empty2", Version = "1.0.0", TargetFramework = "net6.0",
-                   XmlDocumentationPath = "/cache/empty2/1.0.0/lib/net6.0/Empty2.xml" }
-        };
+        List<NuGetPackageInfo> packages =
+        [
+            new()
+            {
+                PackageId = "package1",
+                Version = "1.0.0",
+                TargetFramework = "net6.0",
+                XmlDocumentationPath = "/cache/package1/1.0.0/lib/net6.0/Package1.xml"
+            },
 
-        mockScanner.ScanDirectory(cachePath).Returns(packages.ToImmutableArray());
+            new()
+            {
+                PackageId = "package2",
+                Version = "1.0.0",
+                TargetFramework = "net6.0",
+                XmlDocumentationPath = "/cache/package2/1.0.0/lib/net6.0/Package2.xml"
+            },
+            // Empty XML files
+
+            new()
+            {
+                PackageId = "empty1",
+                Version = "1.0.0",
+                TargetFramework = "net6.0",
+                XmlDocumentationPath = "/cache/empty1/1.0.0/lib/net6.0/Empty1.xml"
+            },
+
+            new()
+            {
+                PackageId = "empty2",
+                Version = "1.0.0",
+                TargetFramework = "net6.0",
+                XmlDocumentationPath = "/cache/empty2/1.0.0/lib/net6.0/Empty2.xml"
+            }
+        ];
+
+        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns(packages.ToImmutableArray());
+            .Returns([..packages]);
 
         // First run - empty index
         SetupEmptyIndex();
 
-        var indexingResult = CreateIndexingResult(successfulDocs: 100, elapsedMs: 50, bytesProcessed: 10000);
+        IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 100, elapsedMs: 50, bytesProcessed: 10000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
             .Returns(indexingResult);
 
-        var settings = new NuGetCommand.Settings { IndexPath = "./index", LatestOnly = true };
+        NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act - First run
         await command.ExecuteAsync(null!, settings);
 
         // Arrange - Second run with empty files tracked
-        var indexedPackages = new Dictionary<string, HashSet<(string, string)>>
+        Dictionary<string, HashSet<(string, string)>> indexedPackages = new()
         {
             ["package1"] = [("1.0.0", "net6.0")],
             ["package2"] = [("1.0.0", "net6.0")],
@@ -80,17 +102,17 @@ public class NuGetCommandComprehensiveTests : IDisposable
             ["empty2"] = [("1.0.0", "net6.0")]
         };
 
-        var indexedPaths = new HashSet<string>
-        {
+        HashSet<string> indexedPaths =
+        [
             "/cache/package1/1.0.0/lib/net6.0/Package1.xml",
             "/cache/package2/1.0.0/lib/net6.0/Package2.xml"
-        };
+        ];
 
-        var emptyPaths = new HashSet<string>
-        {
+        HashSet<string> emptyPaths =
+        [
             "/cache/empty1/1.0.0/lib/net6.0/Empty1.xml",
             "/cache/empty2/1.0.0/lib/net6.0/Empty2.xml"
-        };
+        ];
 
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(indexedPackages);
         mockIndexManager.GetIndexedXmlPaths().Returns(indexedPaths);
@@ -100,7 +122,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         await command.ExecuteAsync(null!, settings);
 
         // Assert
-        var output = console.Output;
+        string output = console.Output;
         output.ShouldContain("Skipping 2 known empty XML files");
         output.ShouldContain("All packages are already up-to-date");
     }
@@ -114,29 +136,52 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         // Multiple frameworks sharing the same XML file
         string sharedXmlPath = "/cache/microsoft.extensions.logging/8.0.0/lib/netstandard2.0/Microsoft.Extensions.Logging.xml";
-        var packages = new List<NuGetPackageInfo>
-        {
-            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net6.0",
-                   XmlDocumentationPath = sharedXmlPath },
-            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net7.0",
-                   XmlDocumentationPath = sharedXmlPath },
-            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net8.0",
-                   XmlDocumentationPath = sharedXmlPath },
-            new() { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net9.0",
-                   XmlDocumentationPath = sharedXmlPath }
-        };
+        List<NuGetPackageInfo> packages =
+        [
+            new()
+            {
+                PackageId = "microsoft.extensions.logging",
+                Version = "8.0.0",
+                TargetFramework = "net6.0",
+                XmlDocumentationPath = sharedXmlPath
+            },
 
-        mockScanner.ScanDirectory(cachePath).Returns(packages.ToImmutableArray());
+            new()
+            {
+                PackageId = "microsoft.extensions.logging",
+                Version = "8.0.0",
+                TargetFramework = "net7.0",
+                XmlDocumentationPath = sharedXmlPath
+            },
+
+            new()
+            {
+                PackageId = "microsoft.extensions.logging",
+                Version = "8.0.0",
+                TargetFramework = "net8.0",
+                XmlDocumentationPath = sharedXmlPath
+            },
+
+            new()
+            {
+                PackageId = "microsoft.extensions.logging",
+                Version = "8.0.0",
+                TargetFramework = "net9.0",
+                XmlDocumentationPath = sharedXmlPath
+            }
+        ];
+
+        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns(packages.ToImmutableArray());
+            .Returns([..packages]);
 
         SetupEmptyIndex();
 
-        var indexingResult = CreateIndexingResult(successfulDocs: 500, elapsedMs: 100, bytesProcessed: 50000);
+        IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 500, elapsedMs: 100, bytesProcessed: 50000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
             .Returns(indexingResult);
 
-        var settings = new NuGetCommand.Settings { IndexPath = "./index", LatestOnly = true };
+        NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
         await command.ExecuteAsync(null!, settings);
@@ -154,49 +199,74 @@ public class NuGetCommandComprehensiveTests : IDisposable
         string cachePath = "/cache";
         SetupBasicMocks(cachePath);
 
-        var packages = new List<NuGetPackageInfo>
-        {
-            // Package with shared XML across frameworks
-            new() { PackageId = "shared.package", Version = "1.0.0", TargetFramework = "net6.0",
-                   XmlDocumentationPath = "/cache/shared.package/1.0.0/lib/netstandard2.0/Shared.Package.xml" },
-            new() { PackageId = "shared.package", Version = "1.0.0", TargetFramework = "net7.0",
-                   XmlDocumentationPath = "/cache/shared.package/1.0.0/lib/netstandard2.0/Shared.Package.xml" },
-            
-            // Package with different XML per framework
-            new() { PackageId = "unique.package", Version = "1.0.0", TargetFramework = "net6.0",
-                   XmlDocumentationPath = "/cache/unique.package/1.0.0/lib/net6.0/Unique.Package.xml" },
-            new() { PackageId = "unique.package", Version = "1.0.0", TargetFramework = "net7.0",
-                   XmlDocumentationPath = "/cache/unique.package/1.0.0/lib/net7.0/Unique.Package.xml" },
-            
-            // Package already in index
-            new() { PackageId = "existing.package", Version = "1.0.0", TargetFramework = "net6.0",
-                   XmlDocumentationPath = "/cache/existing.package/1.0.0/lib/net6.0/Existing.Package.xml" }
-        };
+        List<NuGetPackageInfo> packages =
+        [
+            new()
+            {
+                PackageId = "shared.package",
+                Version = "1.0.0",
+                TargetFramework = "net6.0",
+                XmlDocumentationPath = "/cache/shared.package/1.0.0/lib/netstandard2.0/Shared.Package.xml"
+            },
 
-        mockScanner.ScanDirectory(cachePath).Returns(packages.ToImmutableArray());
+            new()
+            {
+                PackageId = "shared.package",
+                Version = "1.0.0",
+                TargetFramework = "net7.0",
+                XmlDocumentationPath = "/cache/shared.package/1.0.0/lib/netstandard2.0/Shared.Package.xml"
+            },
+
+            // Package with different XML per framework
+
+            new()
+            {
+                PackageId = "unique.package",
+                Version = "1.0.0",
+                TargetFramework = "net6.0",
+                XmlDocumentationPath = "/cache/unique.package/1.0.0/lib/net6.0/Unique.Package.xml"
+            },
+
+            new()
+            {
+                PackageId = "unique.package",
+                Version = "1.0.0",
+                TargetFramework = "net7.0",
+                XmlDocumentationPath = "/cache/unique.package/1.0.0/lib/net7.0/Unique.Package.xml"
+            },
+
+            // Package already in index
+
+            new()
+            {
+                PackageId = "existing.package",
+                Version = "1.0.0",
+                TargetFramework = "net6.0",
+                XmlDocumentationPath = "/cache/existing.package/1.0.0/lib/net6.0/Existing.Package.xml"
+            }
+        ];
+
+        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns(packages.ToImmutableArray());
+            .Returns([..packages]);
 
         // Existing package already indexed
-        var indexedPackages = new Dictionary<string, HashSet<(string, string)>>
+        Dictionary<string, HashSet<(string, string)>> indexedPackages = new()
         {
             ["existing.package"] = [("1.0.0", "net6.0")]
         };
 
-        var indexedPaths = new HashSet<string>
-        {
-            "/cache/existing.package/1.0.0/lib/net6.0/Existing.Package.xml"
-        };
+        HashSet<string> indexedPaths = ["/cache/existing.package/1.0.0/lib/net6.0/Existing.Package.xml"];
 
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(indexedPackages);
         mockIndexManager.GetIndexedXmlPaths().Returns(indexedPaths);
-        mockIndexManager.GetEmptyXmlPaths().Returns(new HashSet<string>());
+        mockIndexManager.GetEmptyXmlPaths().Returns([]);
 
-        var indexingResult = CreateIndexingResult(successfulDocs: 300, elapsedMs: 75, bytesProcessed: 30000);
+        IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 300, elapsedMs: 75, bytesProcessed: 30000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
             .Returns(indexingResult);
 
-        var settings = new NuGetCommand.Settings { IndexPath = "./index", LatestOnly = true };
+        NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
         await command.ExecuteAsync(null!, settings);
@@ -222,32 +292,37 @@ public class NuGetCommandComprehensiveTests : IDisposable
         string cachePath = "/cache";
         SetupBasicMocks(cachePath);
 
-        var packages = new List<NuGetPackageInfo>
-        {
-            new() { PackageId = "mypackage", Version = "3.0.0", TargetFramework = "net6.0",
-                   XmlDocumentationPath = "/cache/mypackage/3.0.0/lib/net6.0/MyPackage.xml" }
-        };
+        List<NuGetPackageInfo> packages =
+        [
+            new()
+            {
+                PackageId = "mypackage",
+                Version = "3.0.0",
+                TargetFramework = "net6.0",
+                XmlDocumentationPath = "/cache/mypackage/3.0.0/lib/net6.0/MyPackage.xml"
+            }
+        ];
 
-        mockScanner.ScanDirectory(cachePath).Returns(packages.ToImmutableArray());
+        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns(packages.ToImmutableArray());
+            .Returns([..packages]);
 
         // Old versions in index
-        var indexedPackages = new Dictionary<string, HashSet<(string, string)>>
+        Dictionary<string, HashSet<(string, string)>> indexedPackages = new()
         {
             ["mypackage"] = [("1.0.0", "net6.0"), ("2.0.0", "net6.0")]
         };
 
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(indexedPackages);
-        mockIndexManager.GetIndexedXmlPaths().Returns(new HashSet<string>());
-        mockIndexManager.GetEmptyXmlPaths().Returns(new HashSet<string>());
+        mockIndexManager.GetIndexedXmlPaths().Returns([]);
+        mockIndexManager.GetEmptyXmlPaths().Returns([]);
         mockIndexManager.GetTotalDocuments().Returns(200);
 
-        var indexingResult = CreateIndexingResult(successfulDocs: 50, elapsedMs: 25, bytesProcessed: 5000);
+        IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 50, elapsedMs: 25, bytesProcessed: 5000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
             .Returns(indexingResult);
 
-        var settings = new NuGetCommand.Settings { IndexPath = "./index", LatestOnly = true };
+        NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
         await command.ExecuteAsync(null!, settings);
@@ -264,31 +339,36 @@ public class NuGetCommandComprehensiveTests : IDisposable
         string cachePath = "/cache";
         SetupBasicMocks(cachePath);
 
-        var packages = new List<NuGetPackageInfo>
-        {
-            new() { PackageId = "prerelease.package", Version = "2.0.0-preview.1", TargetFramework = "net8.0",
-                   XmlDocumentationPath = "/cache/prerelease.package/2.0.0-preview.1/lib/net8.0/Package.xml" }
-        };
+        List<NuGetPackageInfo> packages =
+        [
+            new()
+            {
+                PackageId = "prerelease.package",
+                Version = "2.0.0-preview.1",
+                TargetFramework = "net8.0",
+                XmlDocumentationPath = "/cache/prerelease.package/2.0.0-preview.1/lib/net8.0/Package.xml"
+            }
+        ];
 
-        mockScanner.ScanDirectory(cachePath).Returns(packages.ToImmutableArray());
+        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns(packages.ToImmutableArray());
+            .Returns([..packages]);
 
         // Stable version in index
-        var indexedPackages = new Dictionary<string, HashSet<(string, string)>>
+        Dictionary<string, HashSet<(string, string)>> indexedPackages = new()
         {
             ["prerelease.package"] = [("1.0.0", "net8.0")]
         };
 
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(indexedPackages);
-        mockIndexManager.GetIndexedXmlPaths().Returns(new HashSet<string>());
-        mockIndexManager.GetEmptyXmlPaths().Returns(new HashSet<string>());
+        mockIndexManager.GetIndexedXmlPaths().Returns([]);
+        mockIndexManager.GetEmptyXmlPaths().Returns([]);
 
-        var indexingResult = CreateIndexingResult(successfulDocs: 50, elapsedMs: 25, bytesProcessed: 5000);
+        IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 50, elapsedMs: 25, bytesProcessed: 5000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
             .Returns(indexingResult);
 
-        var settings = new NuGetCommand.Settings { IndexPath = "./index", LatestOnly = true };
+        NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
         await command.ExecuteAsync(null!, settings);
@@ -310,25 +390,32 @@ public class NuGetCommandComprehensiveTests : IDisposable
         string cachePath = @"C:\Users\test\.nuget\packages";
         SetupBasicMocks(cachePath);
 
-        var packages = new List<NuGetPackageInfo>
-        {
-            // Windows-style paths
-            new() { PackageId = "package1", Version = "1.0.0", TargetFramework = "net6.0",
-                   XmlDocumentationPath = @"C:\Users\test\.nuget\packages\package1\1.0.0\lib\net6.0\Package1.xml" },
+        List<NuGetPackageInfo> packages =
+        [
+            new()
+            {
+                PackageId = "package1",
+                Version = "1.0.0",
+                TargetFramework = "net6.0",
+                XmlDocumentationPath = @"C:\Users\test\.nuget\packages\package1\1.0.0\lib\net6.0\Package1.xml"
+            },
             // Forward slashes
-            new() { PackageId = "package2", Version = "1.0.0", TargetFramework = "net6.0",
-                   XmlDocumentationPath = "C:/Users/test/.nuget/packages/package2/1.0.0/lib/net6.0/Package2.xml" }
-        };
 
-        mockScanner.ScanDirectory(cachePath).Returns(packages.ToImmutableArray());
+            new()
+            {
+                PackageId = "package2",
+                Version = "1.0.0",
+                TargetFramework = "net6.0",
+                XmlDocumentationPath = "C:/Users/test/.nuget/packages/package2/1.0.0/lib/net6.0/Package2.xml"
+            }
+        ];
+
+        mockScanner.ScanDirectory(cachePath).Returns([..packages]);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns(packages.ToImmutableArray());
+            .Returns([..packages]);
 
         // Index has normalized paths
-        var indexedPaths = new HashSet<string>
-        {
-            "C:/Users/test/.nuget/packages/package1/1.0.0/lib/net6.0/Package1.xml"
-        };
+        HashSet<string> indexedPaths = ["C:/Users/test/.nuget/packages/package1/1.0.0/lib/net6.0/Package1.xml"];
 
         mockIndexManager.GetIndexedPackageVersionsWithFramework()
             .Returns(new Dictionary<string, HashSet<(string, string)>>
@@ -336,13 +423,13 @@ public class NuGetCommandComprehensiveTests : IDisposable
                 ["package1"] = [("1.0.0", "net6.0")]
             });
         mockIndexManager.GetIndexedXmlPaths().Returns(indexedPaths);
-        mockIndexManager.GetEmptyXmlPaths().Returns(new HashSet<string>());
+        mockIndexManager.GetEmptyXmlPaths().Returns([]);
 
-        var indexingResult = CreateIndexingResult(successfulDocs: 50, elapsedMs: 25, bytesProcessed: 5000);
+        IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 50, elapsedMs: 25, bytesProcessed: 5000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
             .Returns(indexingResult);
 
-        var settings = new NuGetCommand.Settings { IndexPath = "./index", LatestOnly = true };
+        NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
         await command.ExecuteAsync(null!, settings);
@@ -368,7 +455,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         mockScanner.ScanDirectory(cachePath).Returns(ImmutableArray<NuGetPackageInfo>.Empty);
 
-        var settings = new NuGetCommand.Settings { IndexPath = "./index", LatestOnly = true };
+        NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
         int result = await command.ExecuteAsync(null!, settings);
@@ -386,7 +473,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         mockFileSystem.GetUserNuGetCachePath().Returns(cachePath);
         mockFileSystem.DirectoryExists(cachePath).Returns(false);
 
-        var settings = new NuGetCommand.Settings { IndexPath = "./index" };
+        NuGetCommand.Settings settings = new() { IndexPath = "./index" };
 
         // Act
         int result = await command.ExecuteAsync(null!, settings);
@@ -410,8 +497,8 @@ public class NuGetCommandComprehensiveTests : IDisposable
     {
         mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(new Dictionary<string, HashSet<(string, string)>>());
-        mockIndexManager.GetIndexedXmlPaths().Returns(new HashSet<string>());
-        mockIndexManager.GetEmptyXmlPaths().Returns(new HashSet<string>());
+        mockIndexManager.GetIndexedXmlPaths().Returns([]);
+        mockIndexManager.GetEmptyXmlPaths().Returns([]);
         mockIndexManager.GetTotalDocuments().Returns(0);
     }
 

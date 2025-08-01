@@ -60,21 +60,21 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
                    XmlDocumentationPath = "/cache/newtonsoft.json/13.0.3/lib/netstandard2.0/Newtonsoft.Json.xml" }
         ];
 
-        mockScanner.ScanDirectory(cachePath).Returns(allPackages.ToImmutableArray());
+        mockScanner.ScanDirectory(cachePath).Returns([..allPackages]);
 
         // GetLatestVersions returns all of them (grouped by package+framework)
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns(allPackages.ToImmutableArray());
+            .Returns([..allPackages]);
 
         // Empty index
         mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(new Dictionary<string, HashSet<(string, string)>>());
-        mockIndexManager.GetIndexedXmlPaths().Returns(new HashSet<string>());
-        mockIndexManager.GetEmptyXmlPaths().Returns(new HashSet<string>());
+        mockIndexManager.GetIndexedXmlPaths().Returns([]);
+        mockIndexManager.GetEmptyXmlPaths().Returns([]);
         mockIndexManager.GetTotalDocuments().Returns(0);
 
         // Setup indexing result
-        var indexingResult = CreateIndexingResult(successfulDocs: 100, elapsedMs: 50, bytesProcessed: 10000);
+        IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 100, elapsedMs: 50, bytesProcessed: 10000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
             .Returns(indexingResult);
 
@@ -87,7 +87,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
             FileCount = 3  // 3 unique XML files
         });
 
-        var settings = new NuGetCommand.Settings
+        NuGetCommand.Settings settings = new()
         {
             IndexPath = "./index",
             LatestOnly = true
@@ -124,18 +124,18 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
                    XmlDocumentationPath = "/cache/mypackage/1.0.0/lib/net6.0/MyPackage.xml" }
         ];
 
-        mockScanner.ScanDirectory(cachePath).Returns(allPackages.ToImmutableArray());
+        mockScanner.ScanDirectory(cachePath).Returns([..allPackages]);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns(allPackages.ToImmutableArray());
+            .Returns([..allPackages]);
 
         // Empty index
         mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(new Dictionary<string, HashSet<(string, string)>>());
-        mockIndexManager.GetIndexedXmlPaths().Returns(new HashSet<string>());
-        mockIndexManager.GetEmptyXmlPaths().Returns(new HashSet<string>());
+        mockIndexManager.GetIndexedXmlPaths().Returns([]);
+        mockIndexManager.GetEmptyXmlPaths().Returns([]);
         mockIndexManager.GetTotalDocuments().Returns(0);
 
-        var indexingResult = CreateIndexingResult(successfulDocs: 150, elapsedMs: 75, bytesProcessed: 15000);
+        IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 150, elapsedMs: 75, bytesProcessed: 15000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
             .Returns(indexingResult);
 
@@ -148,7 +148,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
             FileCount = 3
         });
 
-        var settings = new NuGetCommand.Settings
+        NuGetCommand.Settings settings = new()
         {
             IndexPath = "./index",
             LatestOnly = true
@@ -204,9 +204,9 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
             });
         }
 
-        mockScanner.ScanDirectory(cachePath).Returns(allPackages.ToImmutableArray());
+        mockScanner.ScanDirectory(cachePath).Returns([..allPackages]);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns(allPackages.ToImmutableArray());
+            .Returns([..allPackages]);
 
         // Index already contains package1
         Dictionary<string, HashSet<string>> indexedPackages = new()
@@ -221,11 +221,11 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
             ["package1"] = [("1.0.0", "net6.0"), ("1.0.0", "net7.0"), ("1.0.0", "net8.0")]
         };
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(indexedPackagesWithFramework);
-        mockIndexManager.GetIndexedXmlPaths().Returns(new HashSet<string> { "/cache/package1/1.0.0/lib/netstandard2.0/Package1.xml" });
-        mockIndexManager.GetEmptyXmlPaths().Returns(new HashSet<string>());
+        mockIndexManager.GetIndexedXmlPaths().Returns(["/cache/package1/1.0.0/lib/netstandard2.0/Package1.xml"]);
+        mockIndexManager.GetEmptyXmlPaths().Returns([]);
         mockIndexManager.GetTotalDocuments().Returns(100); // Some documents already in index
 
-        var indexingResult = CreateIndexingResult(successfulDocs: 30, elapsedMs: 25, bytesProcessed: 3000);
+        IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 30, elapsedMs: 25, bytesProcessed: 3000);
         mockIndexManager.IndexXmlFilesAsync(Arg.Any<List<string>>(), Arg.Any<Action<int>?>())
             .Returns(indexingResult);
 
@@ -238,7 +238,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
             FileCount = 4
         });
 
-        var settings = new NuGetCommand.Settings
+        NuGetCommand.Settings settings = new()
         {
             IndexPath = "./index",
             LatestOnly = true

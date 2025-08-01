@@ -221,7 +221,7 @@ public class ObjectPoolTests
         }
 
         // Return all objects
-        foreach (var obj in objects)
+        foreach (StringBuilder obj in objects)
         {
             pool.Return(obj);
         }
@@ -235,7 +235,7 @@ public class ObjectPoolTests
 
         // Assert
         // All objects should be reused
-        foreach (var reused in reusedObjects)
+        foreach (StringBuilder reused in reusedObjects)
         {
             objects.ShouldContain(reused);
         }

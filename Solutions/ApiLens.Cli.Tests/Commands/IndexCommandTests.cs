@@ -56,7 +56,7 @@ public class IndexCommandTests
         });
 
         // Setup default IndexingResult
-        var defaultIndexingResult = new IndexingResult
+        IndexingResult defaultIndexingResult = new()
         {
             TotalDocuments = 0,
             SuccessfulDocuments = 0,

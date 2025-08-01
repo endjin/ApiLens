@@ -2,7 +2,7 @@ using ApiLens.Core.Helpers;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
 using ApiLens.Core.Services;
-using ApiLens.Core.Tests.Extensions;
+using ApiLens.Core.Tests.Helpers;
 
 namespace ApiLens.Core.Tests.Parsing;
 
@@ -77,23 +77,23 @@ public class XmlDocumentParserComprehensiveTests
         SetupMockFileSystem(sharedXmlPath, xmlContent);
 
         // Simulate parsing for different framework contexts
-        var packageInfos = new[]
-        {
+        NuGetPackageInfo[] packageInfos =
+        [
             new NuGetPackageInfo { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net6.0", XmlDocumentationPath = sharedXmlPath },
             new NuGetPackageInfo { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net7.0", XmlDocumentationPath = sharedXmlPath },
             new NuGetPackageInfo { PackageId = "microsoft.extensions.logging", Version = "8.0.0", TargetFramework = "net8.0", XmlDocumentationPath = sharedXmlPath }
-        };
+        ];
 
         List<MemberInfo> allMembers = [];
 
         // Act - Parse same file for different frameworks
-        foreach (var pkgInfo in packageInfos)
+        foreach (NuGetPackageInfo pkgInfo in packageInfos)
         {
             // Simulate framework-specific parsing by temporarily modifying the path
             string frameworkSpecificPath = sharedXmlPath.Replace("netstandard2.0", pkgInfo.TargetFramework);
             mockFileSystem.OpenReadAsync(frameworkSpecificPath).Returns(CreateStreamFromString(xmlContent));
 
-            var members = await parser.ParseXmlFileStreamAsync(frameworkSpecificPath).ToListAsync();
+            List<MemberInfo> members = await parser.ParseXmlFileStreamAsync(frameworkSpecificPath).ToListAsync();
             allMembers.AddRange(members);
         }
 
@@ -383,8 +383,8 @@ public class XmlDocumentParserComprehensiveTests
 
     private static Stream CreateStreamFromString(string content)
     {
-        var stream = new MemoryStream();
-        var writer = new StreamWriter(stream);
+        MemoryStream stream = new();
+        StreamWriter writer = new(stream);
         writer.Write(content);
         writer.Flush();
         stream.Position = 0;

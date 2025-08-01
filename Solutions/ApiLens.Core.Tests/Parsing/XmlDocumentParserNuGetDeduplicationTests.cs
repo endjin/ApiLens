@@ -48,20 +48,20 @@ public class XmlDocumentParserNuGetDeduplicationTests
         mockFileSystem.OpenReadAsync(Arg.Any<string>()).Returns(_ => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(xmlContent)));
 
         // Act - Parse the same XML from different package locations
-        List<MemberInfo> members1 = new();
-        await foreach (var member in parser.ParseXmlFileStreamAsync(path1))
+        List<MemberInfo> members1 = [];
+        await foreach (MemberInfo member in parser.ParseXmlFileStreamAsync(path1))
         {
             members1.Add(member);
         }
 
-        List<MemberInfo> members2 = new();
-        await foreach (var member in parser.ParseXmlFileStreamAsync(path2))
+        List<MemberInfo> members2 = [];
+        await foreach (MemberInfo member in parser.ParseXmlFileStreamAsync(path2))
         {
             members2.Add(member);
         }
 
-        List<MemberInfo> members3 = new();
-        await foreach (var member in parser.ParseXmlFileStreamAsync(path3))
+        List<MemberInfo> members3 = [];
+        await foreach (MemberInfo member in parser.ParseXmlFileStreamAsync(path3))
         {
             members3.Add(member);
         }
@@ -119,8 +119,8 @@ public class XmlDocumentParserNuGetDeduplicationTests
         mockFileHashHelper.ComputeFileHashAsync(localPath).Returns(fileHash);
 
         // Act
-        List<MemberInfo> members = new();
-        await foreach (var member in parser.ParseXmlFileStreamAsync(localPath))
+        List<MemberInfo> members = [];
+        await foreach (MemberInfo member in parser.ParseXmlFileStreamAsync(localPath))
         {
             members.Add(member);
         }
@@ -150,21 +150,21 @@ public class XmlDocumentParserNuGetDeduplicationTests
 
         // Simulate the same type in different framework targets
         string[] paths =
-        {
+        [
             @"C:\Users\test\.nuget\packages\newtonsoft.json\13.0.3\lib\net6.0\Newtonsoft.Json.xml",
             @"C:\Users\test\.nuget\packages\newtonsoft.json\13.0.3\lib\netstandard2.0\Newtonsoft.Json.xml",
             @"C:\Users\test\.nuget\packages\newtonsoft.json\13.0.3\lib\net45\Newtonsoft.Json.xml",
             @"C:\Users\test\.nuget\packages\newtonsoft.json\12.0.3\lib\netstandard2.0\Newtonsoft.Json.xml"
-        };
+        ];
 
         mockFileSystem.OpenReadAsync(Arg.Any<string>()).Returns(_ => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(xmlContent)));
 
         // Act
-        List<string> allIds = new();
+        List<string> allIds = [];
         foreach (string path in paths)
         {
-            List<MemberInfo> members = new();
-            await foreach (var member in parser.ParseXmlFileStreamAsync(path))
+            List<MemberInfo> members = [];
+            await foreach (MemberInfo member in parser.ParseXmlFileStreamAsync(path))
             {
                 members.Add(member);
             }

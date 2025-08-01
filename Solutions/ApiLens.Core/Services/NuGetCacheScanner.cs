@@ -92,15 +92,17 @@ public partial class NuGetCacheScanner : INuGetCacheScanner
             return version;
         }
 
-        // Fallback: pad with zeros if needed
+        // FIXED: Avoid Array.Resize allocations by pre-allocating array
         string[] parts = versionString.Split('.');
-        while (parts.Length < 4)
+        
+        // Create a properly sized array and copy parts
+        string[] paddedParts = new string[4];
+        for (int i = 0; i < 4; i++)
         {
-            Array.Resize(ref parts, parts.Length + 1);
-            parts[^1] = "0";
+            paddedParts[i] = i < parts.Length ? parts[i] : "0";
         }
 
-        string paddedVersion = string.Join(".", parts.Take(4));
+        string paddedVersion = string.Join(".", paddedParts);
         return Version.TryParse(paddedVersion, out version) ? version : new Version(0, 0, 0, 0);
     }
 }

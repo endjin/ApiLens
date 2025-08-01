@@ -3,6 +3,7 @@ using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
 using ApiLens.Core.Querying;
+using ApiLens.Core.Tests.Helpers;
 
 namespace ApiLens.Core.Tests.Integration;
 

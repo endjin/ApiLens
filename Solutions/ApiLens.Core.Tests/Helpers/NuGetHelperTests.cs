@@ -20,7 +20,7 @@ public class NuGetHelperTests
         string expectedVersion, string expectedFramework)
     {
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -36,7 +36,7 @@ public class NuGetHelperTests
         string path = @"C:\Users\test\.nuget\packages\microsoft.extensions.hosting\9.0.0-preview.1.24080.9\lib\net9.0\Microsoft.Extensions.Hosting.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -52,7 +52,7 @@ public class NuGetHelperTests
         string path = @"C:\Users\test\.nuget\packages\my.package\2.0.0-beta.1+20230515.3\lib\netcoreapp3.1\My.Package.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -78,7 +78,7 @@ public class NuGetHelperTests
         string path = $@"C:\Users\test\.nuget\packages\test.package\1.0.0\lib\{framework}\Test.Package.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -96,7 +96,7 @@ public class NuGetHelperTests
         string path = @"C:\Projects\MyProject\bin\Debug\MyProject.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldBeNull();
@@ -106,7 +106,7 @@ public class NuGetHelperTests
     public void ExtractNuGetInfo_WithEmptyPath_ReturnsNull()
     {
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(string.Empty);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(string.Empty);
 
         // Assert
         result.ShouldBeNull();
@@ -116,7 +116,7 @@ public class NuGetHelperTests
     public void ExtractNuGetInfo_WithNullPath_ReturnsNull()
     {
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(null!);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(null!);
 
         // Assert
         result.ShouldBeNull();
@@ -129,7 +129,7 @@ public class NuGetHelperTests
         string path = @"C:\Users\test\.nuget\packages\mypackage\lib\net6.0\MyPackage.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldBeNull();
@@ -146,7 +146,7 @@ public class NuGetHelperTests
         string path = @"C:\Program Files\My App\.nuget\packages\my.package\1.0.0\lib\net6.0\My.Package.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -161,7 +161,7 @@ public class NuGetHelperTests
         string path = @"C:\Users\test\.nuget\packages\company.product.feature.component\2.5.0\lib\net7.0\Company.Product.Feature.Component.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -176,7 +176,7 @@ public class NuGetHelperTests
         string path = @"C:\Users\test\.nuget\packages\my-package-name\1.0.0\lib\net6.0\My-Package-Name.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -190,7 +190,7 @@ public class NuGetHelperTests
         string path = @"C:\Users\test\.nuget\packages\my_package_name\1.0.0\lib\net6.0\My_Package_Name.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -201,11 +201,11 @@ public class NuGetHelperTests
     public void ExtractNuGetInfo_WithVeryLongPath_ExtractsCorrectly()
     {
         // Arrange - Create a path near Windows MAX_PATH limit
-        string longPackageName = new string('a', 50);
+        string longPackageName = new('a', 50);
         string path = $@"C:\Users\verylongusername\AppData\Local\NuGet\packages\{longPackageName}\1.0.0\lib\net6.0\{longPackageName}.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -223,7 +223,7 @@ public class NuGetHelperTests
         string path = "/home/user/.nuget/packages/newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -239,7 +239,7 @@ public class NuGetHelperTests
         string path = "/Users/developer/.nuget/packages/serilog/3.1.1/lib/netstandard2.0/Serilog.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -255,7 +255,7 @@ public class NuGetHelperTests
         string path = @"C:/Users/test\.nuget\packages/my.package\1.0.0/lib\net6.0/My.Package.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -275,7 +275,7 @@ public class NuGetHelperTests
         string path = @"D:\CustomNuGet\packages\my.package\1.0.0\lib\net6.0\My.Package.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();
@@ -289,7 +289,7 @@ public class NuGetHelperTests
         string path = @"C:\ProgramData\NuGet\packages\my.package\1.0.0\lib\net6.0\My.Package.xml";
 
         // Act
-        var result = NuGetHelper.ExtractNuGetInfo(path);
+        (string PackageId, string Version, string Framework)? result = NuGetHelper.ExtractNuGetInfo(path);
 
         // Assert
         result.ShouldNotBeNull();

@@ -32,8 +32,8 @@ public class QueryCommandVersionTests
         // For these integration tests, we'll use real implementations
         indexManagerFactory.Create(Arg.Any<string>()).Returns(callInfo =>
         {
-            var mockFileSystem = Substitute.For<IFileSystemService>();
-            var mockFileHashHelper = Substitute.For<IFileHashHelper>();
+            IFileSystemService? mockFileSystem = Substitute.For<IFileSystemService>();
+            IFileHashHelper? mockFileHashHelper = Substitute.For<IFileHashHelper>();
             XmlDocumentParser parser = new(mockFileHashHelper, mockFileSystem);
             DocumentBuilder documentBuilder = new();
             return new LuceneIndexManager(callInfo.Arg<string>(), parser, documentBuilder);
@@ -169,8 +169,8 @@ public class QueryCommandVersionTests
 
     private void CreateIndexWithVersionInfo()
     {
-        var mockFileSystem = Substitute.For<IFileSystemService>();
-        var mockFileHashHelper = Substitute.For<IFileHashHelper>();
+        IFileSystemService? mockFileSystem = Substitute.For<IFileSystemService>();
+        IFileHashHelper? mockFileHashHelper = Substitute.For<IFileHashHelper>();
         XmlDocumentParser parser = new(mockFileHashHelper, mockFileSystem);
         DocumentBuilder documentBuilder = new();
         using LuceneIndexManager indexManager = new(indexPath, parser, documentBuilder);
@@ -200,8 +200,8 @@ public class QueryCommandVersionTests
 
     private void CreateIndexWithoutVersionInfo()
     {
-        var mockFileSystem = Substitute.For<IFileSystemService>();
-        var mockFileHashHelper = Substitute.For<IFileHashHelper>();
+        IFileSystemService? mockFileSystem = Substitute.For<IFileSystemService>();
+        IFileHashHelper? mockFileHashHelper = Substitute.For<IFileHashHelper>();
         XmlDocumentParser parser = new(mockFileHashHelper, mockFileSystem);
         DocumentBuilder documentBuilder = new();
         using LuceneIndexManager indexManager = new(indexPath, parser, documentBuilder);
