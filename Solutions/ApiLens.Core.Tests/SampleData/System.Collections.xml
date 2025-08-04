@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>System.Collections</name>
+    </assembly>
+    <members>
+        <member name="T:System.Collections.Generic.List`1">
+            <summary>Represents a strongly typed list of objects that can be accessed by index. Provides methods to search, sort, and manipulate lists.</summary>
+            <typeparam name="T">The type of elements in the list.</typeparam>
+            <seealso cref="T:System.Collections.Generic.IList`1"/>
+            <seealso cref="T:System.Collections.IList"/>
+        </member>
+        <member name="M:System.Collections.Generic.List`1.Add(`0)">
+            <summary>Adds an object to the end of the <see cref="T:System.Collections.Generic.List`1"/>.</summary>
+            <param name="item">The object to be added to the end of the <see cref="T:System.Collections.Generic.List`1"/>. The value can be null for reference types.</param>
+            <exception cref="T:System.NotSupportedException">The <see cref="T:System.Collections.Generic.List`1"/> is read-only.</exception>
+        </member>
+        <member name="P:System.Collections.Generic.List`1.Count">
+            <summary>Gets the number of elements contained in the <see cref="T:System.Collections.Generic.List`1"/>.</summary>
+            <value>The number of elements contained in the <see cref="T:System.Collections.Generic.List`1"/>.</value>
+        </member>
+        <member name="M:System.Collections.Generic.List`1.Clear">
+            <summary>Removes all elements from the <see cref="T:System.Collections.Generic.List`1"/>.</summary>
+        </member>
+        <member name="M:System.Collections.Generic.List`1.Contains(`0)">
+            <summary>Determines whether an element is in the <see cref="T:System.Collections.Generic.List`1"/>.</summary>
+            <param name="item">The object to locate in the <see cref="T:System.Collections.Generic.List`1"/>. The value can be null for reference types.</param>
+            <returns>true if item is found in the <see cref="T:System.Collections.Generic.List`1"/>; otherwise, false.</returns>
+        </member>
+        <member name="T:System.Collections.Generic.Dictionary`2">
+            <summary>Represents a collection of keys and values.</summary>
+            <typeparam name="TKey">The type of the keys in the dictionary.</typeparam>
+            <typeparam name="TValue">The type of the values in the dictionary.</typeparam>
+            <seealso cref="T:System.Collections.Generic.IDictionary`2"/>
+        </member>
+        <member name="M:System.Collections.Generic.Dictionary`2.Add(`0,`1)">
+            <summary>Adds the specified key and value to the dictionary.</summary>
+            <param name="key">The key of the element to add.</param>
+            <param name="value">The value of the element to add. The value can be null for reference types.</param>
+            <exception cref="T:System.ArgumentNullException">key is null.</exception>
+            <exception cref="T:System.ArgumentException">An element with the same key already exists in the <see cref="T:System.Collections.Generic.Dictionary`2"/>.</exception>
+        </member>
+        <member name="F:System.Collections.Generic.List`1.DefaultCapacity">
+            <summary>The default capacity of a list.</summary>
+        </member>
+        <member name="E:System.Collections.Specialized.NotifyCollectionChangedEventHandler">
+            <summary>Represents the method that will handle the <see cref="E:System.Collections.Specialized.INotifyCollectionChanged.CollectionChanged"/> event.</summary>
+        </member>
+        <member name="T:System.Collections.Generic.Dictionary`2+Enumerator">
+            <summary>Enumerates the elements of a <see cref="T:System.Collections.Generic.Dictionary`2"/>.</summary>
+        </member>
+    </members>
+</doc>
