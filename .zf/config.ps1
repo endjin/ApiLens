@@ -17,9 +17,6 @@ $zerofailedExtensions = @(
 
 
 #
-# Build process configuration
-#
-#
 # Build process control options
 #
 $SkipInit = $false
@@ -31,7 +28,9 @@ $SkipTestReport = $false
 $SkipAnalysis = $false
 $SkipPackage = $false
 
-
+#
+# Build process configuration
+#
 $SolutionToBuild = (Resolve-Path (Join-Path $here ".\Solutions\ApiLens.sln")).Path
 $ProjectsToPublish = @()
 $NuSpecFilesToPackage = @()
