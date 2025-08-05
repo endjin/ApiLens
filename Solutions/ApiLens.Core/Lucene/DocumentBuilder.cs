@@ -23,7 +23,7 @@ public class DocumentBuilder : IDocumentBuilder
             new TextField("nameText", memberInfo.Name, Field.Store.NO),
             new TextField("fullNameText", memberInfo.FullName, Field.Store.NO),
             new TextField("namespaceText", memberInfo.Namespace, Field.Store.NO),
-            
+
             // Facet field for filtering by member type
             new StringField("memberTypeFacet", memberInfo.MemberType.ToString(), Field.Store.YES)
         ];
@@ -173,8 +173,10 @@ public class DocumentBuilder : IDocumentBuilder
         if (memberInfo.Complexity != null)
         {
             doc.Add(new Int32Field("parameterCount", memberInfo.Complexity.ParameterCount, Field.Store.YES));
-            doc.Add(new Int32Field("cyclomaticComplexity", memberInfo.Complexity.CyclomaticComplexity, Field.Store.YES));
-            doc.Add(new Int32Field("documentationLineCount", memberInfo.Complexity.DocumentationLineCount, Field.Store.YES));
+            doc.Add(new Int32Field("cyclomaticComplexity", memberInfo.Complexity.CyclomaticComplexity,
+                Field.Store.YES));
+            doc.Add(new Int32Field("documentationLineCount", memberInfo.Complexity.DocumentationLineCount,
+                Field.Store.YES));
         }
 
         // Add version tracking fields
@@ -193,7 +195,8 @@ public class DocumentBuilder : IDocumentBuilder
             doc.Add(new StringField("targetFramework", memberInfo.TargetFramework, Field.Store.YES));
         }
 
-        doc.Add(new StringField("isFromNuGetCache", memberInfo.IsFromNuGetCache.ToString().ToLowerInvariant(), Field.Store.YES));
+        doc.Add(new StringField("isFromNuGetCache", memberInfo.IsFromNuGetCache.ToString().ToLowerInvariant(),
+            Field.Store.YES));
 
         // Always add sourceFilePath for proper change detection tracking
         doc.Add(new StringField("sourceFilePath", memberInfo.SourceFilePath ?? string.Empty, Field.Store.YES));

@@ -15,7 +15,9 @@ public partial class AsyncNuGetCacheScanner : INuGetCacheScanner
 
     // Regex to parse NuGet cache paths
     // Pattern: .../packageid/version/lib|ref/framework/*.xml
-    [GeneratedRegex(@"[\\/](?<packageId>[^\\/]+)[\\/](?<version>[^\\/]+)[\\/](?:lib|ref)[\\/](?<framework>[^\\/]+)[\\/][^\\/]+\.xml$", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(
+        @"[\\/](?<packageId>[^\\/]+)[\\/](?<version>[^\\/]+)[\\/](?:lib|ref)[\\/](?<framework>[^\\/]+)[\\/][^\\/]+\.xml$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex NuGetPathRegex();
 
     public AsyncNuGetCacheScanner(IFileSystemService fileSystem, IAsyncFileEnumerator asyncFileEnumerator)
@@ -39,7 +41,8 @@ public partial class AsyncNuGetCacheScanner : INuGetCacheScanner
     }
 
     // Async methods (optimized)
-    public async Task<ImmutableArray<NuGetPackageInfo>> ScanNuGetCacheAsync(CancellationToken cancellationToken = default)
+    public async Task<ImmutableArray<NuGetPackageInfo>> ScanNuGetCacheAsync(
+        CancellationToken cancellationToken = default)
     {
         string cachePath = fileSystem.GetUserNuGetCachePath();
         return await ScanDirectoryAsync(cachePath, cancellationToken);
@@ -60,29 +63,30 @@ public partial class AsyncNuGetCacheScanner : INuGetCacheScanner
 
         // Process files in batches for better performance
         await foreach (IReadOnlyList<FileInfo> batch in asyncFileEnumerator.EnumerateFilesBatchedAsync(
-            cachePath, "*.xml", batchSize: 100, recursive: true, maxConcurrency: null, cancellationToken))
+                           cachePath, "*.xml", batchSize: 100, recursive: true, maxConcurrency: null,
+                           cancellationToken))
         {
             // Process batch in parallel
-            await Parallel.ForEachAsync(batch, new ParallelOptions
-            {
-                CancellationToken = cancellationToken,
-                MaxDegreeOfParallelism = Environment.ProcessorCount
-            }, async (xmlFile, ct) =>
-            {
-                NuGetPackageInfo? packageInfo = ParsePackageInfo(xmlFile.FullName);
-                if (packageInfo != null)
+            await Parallel.ForEachAsync(batch,
+                new ParallelOptions
                 {
-                    packages.Add(packageInfo);
-                }
-
-                int currentCount = Interlocked.Increment(ref filesProcessed);
-                if (currentCount % 100 == 0)
+                    CancellationToken = cancellationToken, MaxDegreeOfParallelism = Environment.ProcessorCount
+                }, async (xmlFile, ct) =>
                 {
-                    progress?.Report(currentCount);
-                }
+                    NuGetPackageInfo? packageInfo = ParsePackageInfo(xmlFile.FullName);
+                    if (packageInfo != null)
+                    {
+                        packages.Add(packageInfo);
+                    }
 
-                await Task.CompletedTask; // Ensure async
-            });
+                    int currentCount = Interlocked.Increment(ref filesProcessed);
+                    if (currentCount % 100 == 0)
+                    {
+                        progress?.Report(currentCount);
+                    }
+
+                    await Task.CompletedTask; // Ensure async
+                });
         }
 
         return [.. packages.OrderBy(p => p.PackageId).ThenBy(p => p.Version)];
@@ -161,6 +165,7 @@ public partial class AsyncNuGetCacheScanner : INuGetCacheScanner
                         parts[partCount++] = 0;
                     }
                 }
+
                 start = i + 1;
             }
         }

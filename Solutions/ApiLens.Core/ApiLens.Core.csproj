@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,5 +22,6 @@
     <Using Include="System.Collections.Immutable" />
     <Using Include="System.Collections.Frozen" />
   </ItemGroup>
+
 
 </Project>

@@ -52,20 +52,19 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
                 cancellationToken.ThrowIfCancellationRequested();
                 yield return file;
             }
+
             yield break;
         }
 
         // Recursive case: use parallel scanning with channels
         Channel<FileInfo> fileChannel = Channel.CreateUnbounded<FileInfo>(new UnboundedChannelOptions
         {
-            SingleWriter = false,
-            SingleReader = true
+            SingleWriter = false, SingleReader = true
         });
 
         Channel<string> directoryChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions
         {
-            SingleWriter = false,
-            SingleReader = false
+            SingleWriter = false, SingleReader = false
         });
 
         // Start with the root directory
@@ -114,7 +113,8 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
     {
         List<FileInfo> batch = new(batchSize);
 
-        await foreach (FileInfo file in EnumerateFilesAsync(path, searchPattern, recursive, maxConcurrency, cancellationToken))
+        await foreach (FileInfo file in EnumerateFilesAsync(path, searchPattern, recursive, maxConcurrency,
+                           cancellationToken))
         {
             batch.Add(file);
 

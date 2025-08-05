@@ -36,10 +36,7 @@ public class CrossReferenceExtractor
             {
                 builder.Add(new CrossReference
                 {
-                    SourceId = memberId,
-                    TargetId = cref,
-                    Type = ReferenceType.SeeAlso,
-                    Context = "seealso"
+                    SourceId = memberId, TargetId = cref, Type = ReferenceType.SeeAlso, Context = "seealso"
                 });
             }
         }
@@ -52,10 +49,7 @@ public class CrossReferenceExtractor
             {
                 builder.Add(new CrossReference
                 {
-                    SourceId = memberId,
-                    TargetId = cref,
-                    Type = ReferenceType.Exception,
-                    Context = "exception"
+                    SourceId = memberId, TargetId = cref, Type = ReferenceType.Exception, Context = "exception"
                 });
             }
         }

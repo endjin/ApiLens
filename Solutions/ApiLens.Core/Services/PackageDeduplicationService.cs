@@ -76,13 +76,14 @@ public class PackageDeduplicationService : IPackageDeduplicationService
             packages.Add(packageData);
 
             // Check if this is a new or updated package
-            bool isNew = !existingPackages.TryGetValue(package.PackageId, out HashSet<(string Version, string Framework)>? existingVersions);
+            bool isNew = !existingPackages.TryGetValue(package.PackageId,
+                out HashSet<(string Version, string Framework)>? existingVersions);
             bool needsIndexing = isNew || (existingVersions != null && !existingVersions.Any(v =>
                 v.Version == package.Version &&
                 (v.Framework == package.TargetFramework ||
                  (v.Framework == "unknown" && !existingVersions.Any(iv =>
-                    iv.Version == package.Version &&
-                    iv.Framework != "unknown")))));
+                     iv.Version == package.Version &&
+                     iv.Framework != "unknown")))));
 
             if (needsIndexing)
             {

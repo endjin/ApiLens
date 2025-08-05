@@ -50,6 +50,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
                 {
                     AnsiConsole.WriteLine("[]");
                 }
+
                 return 0;
             }
 
@@ -92,11 +93,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
                         @namespace = member.Namespace,
                         assembly = member.Assembly
                     },
-                    exception = new
-                    {
-                        type = ex.Type,
-                        condition = ex.Condition
-                    },
+                    exception = new { type = ex.Type, condition = ex.Condition },
                     searchedType = exceptionType
                 })
         );
@@ -123,7 +120,8 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
                 {
                     if (ExceptionTypeMatches(exception.Type, exceptionType))
                     {
-                        AnsiConsole.WriteLine($"| {member.FullName} | {exception.Type} | {exception.Condition ?? "No condition specified"} |");
+                        AnsiConsole.WriteLine(
+                            $"| {member.FullName} | {exception.Type} | {exception.Condition ?? "No condition specified"} |");
                     }
                 }
             }
@@ -256,10 +254,10 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         {
             // For wildcard patterns, verify the match
             string regexPattern = "^" +
-                Regex.Escape(searchPattern)
-                    .Replace("\\*", ".*")
-                    .Replace("\\?", ".") +
-                "$";
+                                  Regex.Escape(searchPattern)
+                                      .Replace("\\*", ".*")
+                                      .Replace("\\?", ".") +
+                                  "$";
 
             // Check full type or simple name
             if (Regex.IsMatch(exceptionType, regexPattern, RegexOptions.IgnoreCase))

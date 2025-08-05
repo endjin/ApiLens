@@ -14,24 +14,10 @@ public class QueryEngine : IQueryEngine
     // Common .NET namespaces for exception type resolution
     private static readonly string[] CommonExceptionNamespaces =
     {
-        "System",
-        "System.IO",
-        "System.Net",
-        "System.Net.Http",
-        "System.Data",
-        "System.Xml",
-        "System.Collections",
-        "System.Collections.Generic",
-        "System.Threading",
-        "System.Threading.Tasks",
-        "System.Security",
-        "System.Runtime",
-        "System.Runtime.InteropServices",
-        "System.ComponentModel",
-        "System.Configuration",
-        "System.Diagnostics",
-        "System.Linq",
-        "System.Text"
+        "System", "System.IO", "System.Net", "System.Net.Http", "System.Data", "System.Xml", "System.Collections",
+        "System.Collections.Generic", "System.Threading", "System.Threading.Tasks", "System.Security",
+        "System.Runtime", "System.Runtime.InteropServices", "System.ComponentModel", "System.Configuration",
+        "System.Diagnostics", "System.Linq", "System.Text"
     };
 
     public QueryEngine(ILuceneIndexManager indexManager)
@@ -324,7 +310,8 @@ public class QueryEngine : IQueryEngine
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
         // Search for methods with cyclomatic complexity in range
-        List<Document> documents = indexManager.SearchByIntRange("cyclomaticComplexity", minComplexity, maxComplexity, maxResults);
+        List<Document> documents =
+            indexManager.SearchByIntRange("cyclomaticComplexity", minComplexity, maxComplexity, maxResults);
         return ConvertDocumentsToMembers(documents);
     }
 
@@ -447,10 +434,7 @@ public class QueryEngine : IQueryEngine
 
                 crossRefs.Add(new CrossReference
                 {
-                    SourceId = id,
-                    TargetId = crossRefId,
-                    Type = refType,
-                    Context = string.Empty
+                    SourceId = id, TargetId = crossRefId, Type = refType, Context = string.Empty
                 });
             }
         }
@@ -503,8 +487,7 @@ public class QueryEngine : IQueryEngine
             {
                 attributes.Add(new AttributeInfo
                 {
-                    Type = attrType,
-                    Properties = ImmutableDictionary<string, string>.Empty // Not stored in index
+                    Type = attrType, Properties = ImmutableDictionary<string, string>.Empty // Not stored in index
                 });
             }
         }

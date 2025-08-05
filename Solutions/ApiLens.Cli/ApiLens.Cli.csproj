@@ -10,6 +10,22 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <AssemblyName>apilens</AssemblyName>
     <RootNamespace>ApiLens.Cli</RootNamespace>
+    <!-- Global Tool Configuration -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>apilens</ToolCommandName>
+    <!-- NuGet Package Properties -->
+    <PackageId>ApiLens</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Howard van Rooijen</Authors>
+    <Copyright>Copyright © $([System.DateTime]::Now.Year) Endjin Limited</Copyright>
+    <Company>endjin</Company>
+    <Description>A .NET global tool for indexing and querying .NET XML API documentation using Lucene.NET. Designed to make .NET API documentation searchable and accessible. For us</Description>
+    <PackageTags>dotnet;tool;api;documentation;lucene;search;mcp;xml;nuget;cli</PackageTags>
+    <PackageProjectUrl>https://github.com/endjin/ApiLens</PackageProjectUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/endjin/ApiLens</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,6 +43,10 @@
     <Using Include="Spectre.Console" />
     <Using Include="Spectre.Console.Cli" />
     <Using Include="Spectre.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

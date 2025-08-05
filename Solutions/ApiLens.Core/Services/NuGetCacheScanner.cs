@@ -12,7 +12,9 @@ public partial class NuGetCacheScanner : INuGetCacheScanner
 
     // Regex to parse NuGet cache paths
     // Pattern: .../packageid/version/lib|ref/framework/*.xml
-    [GeneratedRegex(@"[\\/](?<packageId>[^\\/]+)[\\/](?<version>[^\\/]+)[\\/](?:lib|ref)[\\/](?<framework>[^\\/]+)[\\/][^\\/]+\.xml$", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(
+        @"[\\/](?<packageId>[^\\/]+)[\\/](?<version>[^\\/]+)[\\/](?:lib|ref)[\\/](?<framework>[^\\/]+)[\\/][^\\/]+\.xml$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex NuGetPathRegex();
 
     public NuGetCacheScanner(IFileSystemService fileSystem)

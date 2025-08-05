@@ -84,16 +84,17 @@ public class StatsCommand : Command<StatsCommand.Settings>
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
-        string json = JsonSerializer.Serialize(new
-        {
-            stats.IndexPath,
-            stats.TotalSizeInBytes,
-            TotalSizeFormatted = FormatSize(stats.TotalSizeInBytes),
-            stats.DocumentCount,
-            stats.FieldCount,
-            stats.FileCount,
-            LastModified = stats.LastModified?.ToString("O")
-        }, jsonOptions);
+        string json = JsonSerializer.Serialize(
+            new
+            {
+                stats.IndexPath,
+                stats.TotalSizeInBytes,
+                TotalSizeFormatted = FormatSize(stats.TotalSizeInBytes),
+                stats.DocumentCount,
+                stats.FieldCount,
+                stats.FileCount,
+                LastModified = stats.LastModified?.ToString("O")
+            }, jsonOptions);
 
         AnsiConsole.WriteLine(json);
     }
@@ -110,7 +111,8 @@ public class StatsCommand : Command<StatsCommand.Settings>
         AnsiConsole.WriteLine($"| Documents | {stats.DocumentCount:N0} |");
         AnsiConsole.WriteLine($"| Fields | {stats.FieldCount:N0} |");
         AnsiConsole.WriteLine($"| Files | {stats.FileCount:N0} |");
-        AnsiConsole.WriteLine($"| Last Modified | {stats.LastModified?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Unknown"} |");
+        AnsiConsole.WriteLine(
+            $"| Last Modified | {stats.LastModified?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Unknown"} |");
     }
 
     private static string FormatSize(long bytes)

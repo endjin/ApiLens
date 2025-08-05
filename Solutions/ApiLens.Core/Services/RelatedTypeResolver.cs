@@ -53,7 +53,8 @@ public partial class RelatedTypeResolver
 
     private static void ExtractDeclaringType(string memberId, HashSet<string> relatedTypes)
     {
-        if (memberId.StartsWith("M:") || memberId.StartsWith("P:") || memberId.StartsWith("F:") || memberId.StartsWith("E:"))
+        if (memberId.StartsWith("M:") || memberId.StartsWith("P:") || memberId.StartsWith("F:") ||
+            memberId.StartsWith("E:"))
         {
             // Extract declaring type
             string memberName = memberId[2..]; // Remove prefix

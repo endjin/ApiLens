@@ -157,6 +157,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
                     {
                         packageDisplay += $" v{result.PackageVersion}";
                     }
+
                     AnsiConsole.WriteLine($"- **Package**: {packageDisplay}");
                 }
 
@@ -184,7 +185,8 @@ public class QueryCommand : Command<QueryCommand.Settings>
 
     public sealed class Settings : CommandSettings
     {
-        [Description("Search query. For content searches, supports Lucene syntax: wildcards (*,?), fuzzy (~), boolean (AND,OR,NOT)")]
+        [Description(
+            "Search query. For content searches, supports Lucene syntax: wildcards (*,?), fuzzy (~), boolean (AND,OR,NOT)")]
         [CommandArgument(0, "<query>")]
         public string Query { get; init; } = string.Empty;
 

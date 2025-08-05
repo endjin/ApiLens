@@ -9,7 +9,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnableMSTestRunner>true</EnableMSTestRunner>
     <GenerateProgramFile>false</GenerateProgramFile>
-        <IsTestProject>true</IsTestProject>
+    <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 

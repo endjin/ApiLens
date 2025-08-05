@@ -98,11 +98,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             OpenMode = OpenMode.CREATE_OR_APPEND,
             RAMBufferSizeMB = RamBufferSizeMB,
             MaxBufferedDocs = BatchSize,
-            MergePolicy = new TieredMergePolicy
-            {
-                MaxMergeAtOnce = 10,
-                SegmentsPerTier = 10
-            },
+            MergePolicy = new TieredMergePolicy { MaxMergeAtOnce = 10, SegmentsPerTier = 10 },
             UseCompoundFile = false
         };
 
@@ -120,16 +116,12 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         // Initialize channels
         parseChannel = Channel.CreateBounded<ParseTask>(new BoundedChannelOptions(ChannelCapacity)
         {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleWriter = false,
-            SingleReader = false
+            FullMode = BoundedChannelFullMode.Wait, SingleWriter = false, SingleReader = false
         });
 
         documentChannel = Channel.CreateBounded<Document>(new BoundedChannelOptions(ChannelCapacity)
         {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleWriter = false,
-            SingleReader = true
+            FullMode = BoundedChannelFullMode.Wait, SingleWriter = false, SingleReader = true
         });
 
         performanceTracker = new PerformanceTracker();
@@ -167,6 +159,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                             Term idTerm = new("id", batchDoc.Get("id"));
                             writer.UpdateDocument(idTerm, batchDoc);
                         }
+
                         writer.Commit();
                         batch.Clear();
                         performanceTracker.RecordBatchCommit(BatchSize);
@@ -189,6 +182,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                     Term idTerm = new("id", batchDoc.Get("id"));
                     writer.UpdateDocument(idTerm, batchDoc);
                 }
+
                 writer.Commit();
                 performanceTracker.RecordBatchCommit(batch.Count);
             }
@@ -247,8 +241,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         // Parse files in parallel
         ParallelOptions parseOptions = new()
         {
-            CancellationToken = cancellationToken,
-            MaxDegreeOfParallelism = Environment.ProcessorCount
+            CancellationToken = cancellationToken, MaxDegreeOfParallelism = Environment.ProcessorCount
         };
 
         // Track progress
@@ -276,6 +269,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                 {
                     // File access denied, continue anyway
                 }
+
                 Interlocked.Add(ref bytesProcessed, fileSize);
 
                 int membersInFile = 0;
@@ -362,9 +356,11 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                             writer.UpdateDocument(idTerm, batchDoc);
                         }
                     }
+
                     writer.Commit();
                     performanceTracker.RecordBatchCommit(batch.Count, batchStopwatch.Elapsed);
                 }
+
                 return; // Exit the pipeline
             }
 
@@ -382,6 +378,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                         writer.UpdateDocument(idTerm, batchDoc);
                     }
                 }
+
                 writer.Commit();
                 performanceTracker.RecordBatchCommit(batch.Count, batchStopwatch.Elapsed);
                 batch.Clear();
@@ -402,6 +399,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                     writer.UpdateDocument(idTerm, batchDoc);
                 }
             }
+
             writer.Commit();
             performanceTracker.RecordBatchCommit(batch.Count, batchStopwatch.Elapsed);
         }
@@ -670,6 +668,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                         versions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                         packageVersions[packageId] = versions;
                     }
+
                     versions.Add(version);
                 }
             }
@@ -713,6 +712,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                         versions = [];
                         packageVersions[packageId] = versions;
                     }
+
                     versions.Add((version, framework));
                 }
             }
