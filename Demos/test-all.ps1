@@ -104,14 +104,20 @@ foreach ($demo in $demosToRun) {
         
         $duration = (Get-Date) - $startTime
         
-        # Check for success indicators
-        $hasError = $output -match "error:|exception:" | Where-Object { $_ -notmatch "error handling|Handle errors" }
+        # Check for success indicators (improved error detection)
+        $hasError = $output -match "error:|exception:|failed:|cannot:|unable:" | Where-Object { 
+            $_ -notmatch "error handling|Handle errors|Found \d+ method.*throw|throw.*exception|exception.*method|method.*exception|method.*that throw|methods.*that throw|Found \d+ method.*with|Found \d+ interface|Found \d+ enum|Found \d+ attribute|Found \d+ class|Found \d+ type|Found \d+ property|Found \d+ namespace|Found \d+ event|Found \d+ field|Found \d+ constructor|Found \d+ delegate|method with code examples|methods with code examples|\d+ Error\(s\)|Failed Documents|won't throw exceptions|catch.*Exception|specific exceptions|throwing exceptions|ArgumentException|DivideByZeroException|without throwing" 
+        }
         $hasVersionInfo = $output -match "\d+\.\d+\.\d+ \["
         $hasNuGetCommand = $output -match "apilens nuget"
         
-        if ($Verbose) {
+        # Always show a preview of the output to verify commands are working
+        if ($output -and $output.Count -gt 0) {
             Write-Host "`n   Output preview:" -ForegroundColor DarkGray
-            $output | Select-Object -First 10 | ForEach-Object { Write-Host "   > $_" -ForegroundColor DarkGray }
+            $output | Select-Object -First 15 | ForEach-Object { Write-Host "   > $_" -ForegroundColor DarkGray }
+            if ($output.Count -gt 15) {
+                Write-Host "   > ... (output truncated)" -ForegroundColor DarkGray
+            }
         }
         
         if (-not $hasError) {
@@ -166,23 +172,35 @@ if ($Category -eq "all" -or $Category -eq "nuget") {
     # Test specific features
     Write-Host "`nTesting NuGet command..." -ForegroundColor Yellow
     $apilensPath = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+    if ($IsWindows -or $env:OS -eq "Windows_NT") { 
+        $apilensPath += ".exe" 
+    }
     if (-not (Test-Path $apilensPath)) {
-        $apilensPath = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+        Write-Host "⚠️  ApiLens executable not found at: $apilensPath" -ForegroundColor Yellow
     }
     
     if (Test-Path $apilensPath) {
-        $nugetTest = & $apilensPath nuget --list --filter "newtonsoft.*" 2>&1 | Select-Object -First 5
-        if ($nugetTest -match "newtonsoft.json") {
-            Write-Host "✅ NuGet command works" -ForegroundColor Green
-        } else {
-            Write-Host "❌ NuGet command failed" -ForegroundColor Red
+        try {
+            $nugetTest = & "$apilensPath" nuget --list --filter "newtonsoft.*" 2>&1 | Select-Object -First 10
+            if ($nugetTest -match "newtonsoft.json") {
+                Write-Host "✅ NuGet command works" -ForegroundColor Green
+            } else {
+                Write-Host "❌ NuGet command failed" -ForegroundColor Red
+            }
+        } catch {
+            Write-Host "❌ NuGet command failed with error: $_" -ForegroundColor Red
         }
         
         Write-Host "`nTesting version info in queries..." -ForegroundColor Yellow
         $tempIndex = Join-Path ([System.IO.Path]::GetTempPath()) "test-version-$(Get-Random)"
-        & $apilensPath nuget --filter "newtonsoft.*" --latest-only --index $tempIndex 2>&1 | Out-Null
-        $queryTest = & $apilensPath query JsonSerializer --index $tempIndex 2>&1
-        Remove-Item $tempIndex -Recurse -Force -ErrorAction SilentlyContinue
+        try {
+            & "$apilensPath" nuget --filter "newtonsoft.*" --latest-only --index "$tempIndex" 2>&1 | Out-Null
+            $queryTest = & "$apilensPath" query JsonSerializer --index "$tempIndex" 2>&1
+            Remove-Item $tempIndex -Recurse -Force -ErrorAction SilentlyContinue
+        } catch {
+            Write-Host "❌ Version info test failed with error: $_" -ForegroundColor Red
+            if (Test-Path $tempIndex) { Remove-Item $tempIndex -Recurse -Force -ErrorAction SilentlyContinue }
+        }
         
         if ($queryTest -match "\d+\.\d+\.\d+ \[") {
             Write-Host "✅ Version info displayed in queries" -ForegroundColor Green

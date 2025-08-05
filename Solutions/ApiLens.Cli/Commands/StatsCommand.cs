@@ -80,7 +80,8 @@ public class StatsCommand : Command<StatsCommand.Settings>
         JsonSerializerOptions jsonOptions = new()
         {
             WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
         string json = JsonSerializer.Serialize(new

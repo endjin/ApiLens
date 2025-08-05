@@ -5,6 +5,8 @@ using System.Text.RegularExpressions;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace ApiLens.Cli.Commands;
 
@@ -53,6 +55,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 
             // Scan for packages
             List<NuGetPackageInfo> packages = [];
+            ImmutableArray<NuGetPackageInfo> allPackages = ImmutableArray<NuGetPackageInfo>.Empty;
 
             await AnsiConsole.Status()
                 .StartAsync("Scanning NuGet cache...", async ctx =>
@@ -60,18 +63,20 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     ctx.Spinner(Spinner.Known.Star);
                     ctx.SpinnerStyle(Style.Parse("green"));
 
-                    ImmutableArray<NuGetPackageInfo> allPackages = await scanner.ScanDirectoryAsync(cachePath, cancellationToken: default);
-                    
-                    if (!string.IsNullOrEmpty(settings.PackageFilter))
-                    {
-                        Regex regex = new(settings.PackageFilter.Replace("*", ".*"), RegexOptions.IgnoreCase);
-                        packages = allPackages.Where(p => regex.IsMatch(p.PackageId)).ToList();
-                    }
-                    else
-                    {
-                        packages = allPackages.ToList();
-                    }
+                    allPackages = await scanner.ScanDirectoryAsync(cachePath, cancellationToken: default);
                 });
+
+            // Apply filter if specified
+            if (!string.IsNullOrEmpty(settings.PackageFilter))
+            {
+                string regexPattern = settings.PackageFilter.Replace("*", ".*");
+                Regex regex = new(regexPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+                packages = allPackages.Where(p => regex.IsMatch(p.PackageId)).ToList();
+            }
+            else
+            {
+                packages = allPackages.ToList();
+            }
 
             if (packages.Count == 0)
             {
@@ -291,8 +296,13 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
         table.AddColumn("[bold]Framework[/]");
         table.AddColumn("[bold]XML Size[/]", c => c.RightAligned());
 
-        foreach (NuGetPackageInfo package in packages.OrderBy(p => p.PackageId).ThenBy(p => p.Version))
+        // Group packages by ID for better readability and debugging
+        var packageGroups = packages.GroupBy(p => p.PackageId).OrderBy(g => g.Key);
+        
+        foreach (var group in packageGroups)
         {
+            foreach (NuGetPackageInfo package in group.OrderBy(p => p.Version).ThenBy(p => p.TargetFramework))
+            {
             FileInfo fileInfo = new(package.XmlDocumentationPath);
             long fileSize = 0;
             try
@@ -305,11 +315,12 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 fileSize = 0;
             }
 
-            table.AddRow(
-                package.PackageId,
-                package.Version,
-                package.TargetFramework,
-                FormatSize(fileSize));
+                table.AddRow(
+                    package.PackageId,
+                    package.Version,
+                    package.TargetFramework,
+                    FormatSize(fileSize));
+            }
         }
 
         AnsiConsole.Write(table);
@@ -419,7 +430,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
         public bool Clean { get; init; }
 
         [Description("Filter packages by name (supports wildcards)")]
-        [CommandOption("-p|--package")]
+        [CommandOption("-p|--package|--filter")]
         public string? PackageFilter { get; init; }
 
         [Description("Filter packages by version (regex)")]
