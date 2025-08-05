@@ -85,7 +85,18 @@ public class DocumentBuilder : IDocumentBuilder
         // Add exceptions
         foreach (ExceptionInfo exception in memberInfo.Exceptions)
         {
+            // Store the full exception type as keyword field for exact matching
             doc.Add(new StringField("exceptionType", exception.Type, Field.Store.YES));
+            
+            // Also add as text field for partial matching
+            doc.Add(new TextField("exceptionTypeText", exception.Type, Field.Store.NO));
+            
+            // Extract just the class name without namespace for easier searching
+            string simpleName = exception.Type.Contains('.') 
+                ? exception.Type.Substring(exception.Type.LastIndexOf('.') + 1)
+                : exception.Type;
+            doc.Add(new TextField("exceptionSimpleName", simpleName, Field.Store.NO));
+            
             if (!string.IsNullOrWhiteSpace(exception.Condition))
             {
                 doc.Add(new TextField("exceptionCondition", exception.Condition, Field.Store.YES));

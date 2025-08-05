@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
@@ -78,7 +79,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
     {
         var output = results.SelectMany(member =>
             member.Exceptions
-                .Where(ex => ex.Type.Contains(exceptionType, StringComparison.OrdinalIgnoreCase))
+                .Where(ex => ExceptionTypeMatches(ex.Type, exceptionType))
                 .Select(ex => new
                 {
                     memberInfo = new
@@ -119,7 +120,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
             {
                 foreach (ExceptionInfo exception in member.Exceptions)
                 {
-                    if (exception.Type.Contains(exceptionType, StringComparison.OrdinalIgnoreCase))
+                    if (ExceptionTypeMatches(exception.Type, exceptionType))
                     {
                         AnsiConsole.WriteLine($"| {member.FullName} | {exception.Type} | {exception.Condition ?? "No condition specified"} |");
                     }
@@ -170,7 +171,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         {
             foreach (ExceptionInfo exception in member.Exceptions)
             {
-                if (exception.Type.Contains(exceptionType, StringComparison.OrdinalIgnoreCase))
+                if (ExceptionTypeMatches(exception.Type, exceptionType))
                 {
                     table.AddRow(
                         Markup.Escape(member.FullName),
@@ -235,5 +236,65 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         [Description("Output format")]
         [CommandOption("-f|--format")]
         public OutputFormat Format { get; init; } = OutputFormat.Table;
+    }
+
+    /// <summary>
+    /// Determines if an exception type matches a search pattern, supporting wildcards.
+    /// </summary>
+    /// <param name="exceptionType">The actual exception type</param>
+    /// <param name="searchPattern">The search pattern, potentially with wildcards</param>
+    /// <returns>True if the exception type matches the search pattern</returns>
+    private static bool ExceptionTypeMatches(string exceptionType, string searchPattern)
+    {
+        // Since the search logic now handles all matching strategies,
+        // this method only needs to verify that the exception was found
+        // by the search. The main check is ensuring the display matches
+        // what the user searched for.
+        
+        if (searchPattern.Contains('*') || searchPattern.Contains('?'))
+        {
+            // For wildcard patterns, verify the match
+            string regexPattern = "^" + 
+                Regex.Escape(searchPattern)
+                    .Replace("\\*", ".*")
+                    .Replace("\\?", ".") + 
+                "$";
+            
+            // Check full type or simple name
+            if (Regex.IsMatch(exceptionType, regexPattern, RegexOptions.IgnoreCase))
+                return true;
+                
+            if (!searchPattern.Contains('.'))
+            {
+                string simpleName = exceptionType.Contains('.') 
+                    ? exceptionType.Substring(exceptionType.LastIndexOf('.') + 1)
+                    : exceptionType;
+                return Regex.IsMatch(simpleName, regexPattern, RegexOptions.IgnoreCase);
+            }
+            
+            return false;
+        }
+        
+        // For non-wildcard searches, check various matching strategies
+        // 1. Contains check (handles partial matches)
+        if (exceptionType.Contains(searchPattern, StringComparison.OrdinalIgnoreCase))
+            return true;
+        
+        // 2. If search has namespace, check if exception name matches
+        if (searchPattern.Contains('.') && exceptionType.Contains('.'))
+        {
+            string searchName = searchPattern.Substring(searchPattern.LastIndexOf('.') + 1);
+            string exceptionName = exceptionType.Substring(exceptionType.LastIndexOf('.') + 1);
+            return string.Equals(searchName, exceptionName, StringComparison.OrdinalIgnoreCase);
+        }
+        
+        // 3. Simple name match (search for "IOException" matches "System.IO.IOException")
+        if (!searchPattern.Contains('.') && exceptionType.Contains('.'))
+        {
+            string exceptionName = exceptionType.Substring(exceptionType.LastIndexOf('.') + 1);
+            return string.Equals(searchPattern, exceptionName, StringComparison.OrdinalIgnoreCase);
+        }
+        
+        return false;
     }
 }

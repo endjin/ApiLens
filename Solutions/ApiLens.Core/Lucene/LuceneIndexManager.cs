@@ -491,6 +491,34 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         }
     }
 
+    public TopDocs SearchByFieldMultiple(string fieldName, IEnumerable<string> searchTerms, int maxResults = 100)
+    {
+        ArgumentNullException.ThrowIfNull(fieldName);
+        ArgumentNullException.ThrowIfNull(searchTerms);
+
+        DirectoryReader reader = GetOrRefreshReader();
+        try
+        {
+            IndexSearcher searcher = new(reader);
+
+            // Create a BooleanQuery to combine multiple terms with OR
+            BooleanQuery query = new();
+            foreach (string term in searchTerms)
+            {
+                if (!string.IsNullOrWhiteSpace(term))
+                {
+                    query.Add(new TermQuery(new Term(fieldName, term)), Occur.SHOULD);
+                }
+            }
+
+            return searcher.Search(query, maxResults);
+        }
+        finally
+        {
+            reader.DecRef();
+        }
+    }
+
     public Document? GetDocument(int docId)
     {
         DirectoryReader reader = GetOrRefreshReader();
