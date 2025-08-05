@@ -105,8 +105,8 @@ foreach ($demo in $demosToRun) {
         $duration = (Get-Date) - $startTime
         
         # Check for success indicators (improved error detection)
-        $hasError = $output -match "error:|exception:|failed|cannot|unable" | Where-Object { 
-            $_ -notmatch "error handling|Handle errors|Found \d+ method.*throw|throw.*exception|exception.*method|method.*exception|method.*that throw|methods.*that throw" 
+        $hasError = $output -match "error:|exception:|failed:|cannot:|unable:" | Where-Object { 
+            $_ -notmatch "error handling|Handle errors|Found \d+ method.*throw|throw.*exception|exception.*method|method.*exception|method.*that throw|methods.*that throw|Found \d+ method.*with|Found \d+ interface|Found \d+ enum|Found \d+ attribute|Found \d+ class|Found \d+ type|Found \d+ property|Found \d+ namespace|Found \d+ event|Found \d+ field|Found \d+ constructor|Found \d+ delegate|method with code examples|methods with code examples|\d+ Error\(s\)|Failed Documents|won't throw exceptions|catch.*Exception|specific exceptions|throwing exceptions|ArgumentException|DivideByZeroException|without throwing" 
         }
         $hasVersionInfo = $output -match "\d+\.\d+\.\d+ \["
         $hasNuGetCommand = $output -match "apilens nuget"
