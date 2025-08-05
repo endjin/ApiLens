@@ -353,7 +353,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             Description = string.Empty
         };
     }
-    
+
     private static async Task<string> ReadCodeContentAsync(XmlReader reader, StringBuilder sb)
     {
         sb.Clear();

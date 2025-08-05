@@ -14,9 +14,9 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
     {
         private int activeDirectories;
         private int activeScanners;
-        
+
         public TaskCompletionSource ScanningComplete { get; } = new();
-        
+
         public void IncrementDirectories(int count) => Interlocked.Add(ref activeDirectories, count);
         public bool DecrementDirectory() => Interlocked.Decrement(ref activeDirectories) == 0;
         public void IncrementScanner() => Interlocked.Increment(ref activeScanners);
@@ -43,7 +43,7 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
 
         // Use bounded concurrency for parallel directory scanning
         int concurrency = maxConcurrency ?? Math.Min(Environment.ProcessorCount, 8);
-        
+
         if (!recursive)
         {
             // Non-recursive case: simple enumeration
@@ -141,7 +141,7 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
         CancellationToken cancellationToken)
     {
         scanState.IncrementScanner();
-        
+
         try
         {
             while (await directoryReader.WaitToReadAsync(cancellationToken))
@@ -164,7 +164,7 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
                         {
                             // Increment active directories before writing
                             scanState.IncrementDirectories(subdirs.Count);
-                            
+
                             foreach (DirectoryInfo subDir in subdirs)
                             {
                                 await directoryWriter.WriteAsync(subDir.FullName, cancellationToken);

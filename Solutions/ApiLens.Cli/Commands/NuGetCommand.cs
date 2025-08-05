@@ -5,8 +5,6 @@ using System.Text.RegularExpressions;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
-using Spectre.Console;
-using Spectre.Console.Cli;
 
 namespace ApiLens.Cli.Commands;
 
@@ -40,7 +38,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
         Stopwatch commandStopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             // Get NuGet cache path
@@ -178,7 +176,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 DeduplicationStats stats = deduplicationResult.Stats;
                 int totalInIndex = indexedPackagesWithFramework.Sum(kvp => kvp.Value.Count);
                 int uniquePackageVersions = indexedPackagesWithFramework.Sum(kvp => kvp.Value.Select(v => v.Version).Distinct().Count());
-                
+
                 AnsiConsole.MarkupLine($"[dim]Index contains {uniquePackageVersions:N0} package versions across {indexedPackagesWithFramework.Count:N0} packages.[/]");
 
                 if (stats.EmptyXmlFilesSkipped > 0)
@@ -298,22 +296,22 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 
         // Group packages by ID for better readability and debugging
         var packageGroups = packages.GroupBy(p => p.PackageId).OrderBy(g => g.Key);
-        
+
         foreach (var group in packageGroups)
         {
             foreach (NuGetPackageInfo package in group.OrderBy(p => p.Version).ThenBy(p => p.TargetFramework))
             {
-            FileInfo fileInfo = new(package.XmlDocumentationPath);
-            long fileSize = 0;
-            try
-            {
-                fileSize = fileInfo.Length;
-            }
-            catch (FileNotFoundException)
-            {
-                // File doesn't exist - use 0 size (common in tests)
-                fileSize = 0;
-            }
+                FileInfo fileInfo = new(package.XmlDocumentationPath);
+                long fileSize = 0;
+                try
+                {
+                    fileSize = fileInfo.Length;
+                }
+                catch (FileNotFoundException)
+                {
+                    // File doesn't exist - use 0 size (common in tests)
+                    fileSize = 0;
+                }
 
                 table.AddRow(
                     package.PackageId,

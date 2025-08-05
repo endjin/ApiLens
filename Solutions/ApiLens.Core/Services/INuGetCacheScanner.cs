@@ -42,7 +42,7 @@ public interface INuGetCacheScanner
     /// <param name="progress">Optional progress reporting.</param>
     /// <returns>Collection of found NuGet packages with documentation.</returns>
     Task<ImmutableArray<NuGetPackageInfo>> ScanDirectoryAsync(
-        string cachePath, 
+        string cachePath,
         CancellationToken cancellationToken = default,
         IProgress<int>? progress = null);
 }

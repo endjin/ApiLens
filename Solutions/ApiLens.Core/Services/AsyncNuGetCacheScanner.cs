@@ -46,7 +46,7 @@ public partial class AsyncNuGetCacheScanner : INuGetCacheScanner
     }
 
     public async Task<ImmutableArray<NuGetPackageInfo>> ScanDirectoryAsync(
-        string cachePath, 
+        string cachePath,
         CancellationToken cancellationToken = default,
         IProgress<int>? progress = null)
     {
@@ -140,11 +140,11 @@ public partial class AsyncNuGetCacheScanner : INuGetCacheScanner
         // Use stack allocation for better performance
         Span<int> parts = stackalloc int[4];
         int partCount = 0;
-        
+
         // Parse version parts
         ReadOnlySpan<char> versionSpan = versionString.AsSpan();
         int start = 0;
-        
+
         for (int i = 0; i <= versionSpan.Length && partCount < 4; i++)
         {
             if (i == versionSpan.Length || versionSpan[i] == '.')

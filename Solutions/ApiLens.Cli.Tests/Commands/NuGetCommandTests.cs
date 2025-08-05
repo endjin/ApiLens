@@ -231,7 +231,7 @@ public sealed class NuGetCommandTests : IDisposable
                 XmlDocumentationPath = "/home/user/.nuget/packages/microsoft.extensions/6.0.0/lib/net6.0/Microsoft.Extensions.xml"
             }
         ];
-        
+
         // Setup mocks with helper methods
         mockScanner.SetupScannerWithPackages(cachePath, packages);
         // Filter should only return newtonsoft.json
@@ -292,7 +292,7 @@ public sealed class NuGetCommandTests : IDisposable
 
         TestMockSetup.SetupScannerMock(mockScanner, cachePath, [.. allPackages]);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>()).Returns([.. latestPackages]);
-        
+
         // Setup deduplication to return latest packages
         TestMockSetup.SetupDeduplicationMock(
             mockDeduplicationService,

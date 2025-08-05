@@ -144,7 +144,7 @@ public class FileSystemService : IFileSystemService
     {
         // FIXED: Use FileStream with async support for better I/O performance
         // The async benefit comes from the stream operations, not opening it
-        FileStream fileStream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read, 
+        FileStream fileStream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read,
             bufferSize: 4096, useAsync: true);
         return Task.FromResult<Stream>(fileStream);
     }

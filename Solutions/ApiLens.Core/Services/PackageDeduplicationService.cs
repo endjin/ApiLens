@@ -39,7 +39,7 @@ public class PackageDeduplicationService : IPackageDeduplicationService
         Dictionary<string, List<PackageData>> packagesByXmlPath = new(StringComparer.OrdinalIgnoreCase);
         HashSet<string> packagesToIndex = new(StringComparer.OrdinalIgnoreCase);
         HashSet<string> packageIdsToDelete = new(StringComparer.OrdinalIgnoreCase);
-        
+
         // Stats tracking
         int emptyFilesSkipped = 0;
         int alreadyIndexedSkipped = 0;
