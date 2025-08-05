@@ -22,6 +22,7 @@ public interface ILuceneIndexManager : IDisposable
     // Search operations
     TopDocs SearchByField(string fieldName, string searchTerm, int maxResults = 100);
     TopDocs SearchWithQuery(Query query, int maxResults = 100);
+    TopDocs SearchByFieldMultiple(string fieldName, IEnumerable<string> searchTerms, int maxResults = 100);
     Document? GetDocument(int docId);
     List<Document> SearchByIntRange(string fieldName, int min, int max, int maxResults);
     List<Document> SearchByFieldExists(string fieldName, int maxResults);

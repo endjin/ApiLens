@@ -120,9 +120,12 @@ Search by namespace:
 apilens query "System.Collections" --type namespace
 ```
 
-Get by exact ID:
+Get by exact ID (requires full internal ID):
 ```bash
-apilens query "T:System.String" --type id
+# First, find the full ID using regular search
+apilens query String --format json | ConvertFrom-Json | Select-Object -First 1 -ExpandProperty id
+# Then use the full ID (format: MemberName|Assembly|Hash)
+apilens query "T:System.String|mscorlib|abc123..." --type id
 ```
 
 Search by assembly:
@@ -151,18 +154,32 @@ apilens examples --format json --max 5
 ```
 
 #### Exceptions Command
-Find methods that throw specific exceptions:
+Find methods that throw specific exceptions with advanced fuzzy search support:
 
 ```bash
-# Find methods throwing ArgumentNullException
+# Find methods throwing ArgumentNullException (partial name without namespace)
 apilens exceptions "ArgumentNullException"
 
+# Search with full type name for exact match
+apilens exceptions "System.ArgumentNullException"
+
+# Wildcard searches (Note: Leading wildcards not supported)
+apilens exceptions "System.Argument*"      # All System.Argument exceptions
+apilens exceptions "Invalid*Exception"     # All exceptions starting with Invalid
+
 # Get detailed exception information
-apilens exceptions "System.IO.IOException" --details --format markdown
+apilens exceptions "IOException" --details --format markdown
 
 # Search for custom exceptions
 apilens exceptions "ValidationException" --max 50
 ```
+
+**Exception Search Features:**
+- **Partial name matching**: Search without namespace (e.g., "ArgumentNullException" finds "System.ArgumentNullException")
+- **Automatic namespace resolution**: Common .NET namespaces are tried automatically (System, System.IO, System.Collections, etc.)
+- **Wildcard support**: Use `*` and `?` for pattern matching (no leading wildcards)
+- **Smart fallback**: Multiple search strategies ensure you find what you're looking for
+- **Deduplication**: Results are automatically deduplicated across search strategies
 
 #### Complexity Command
 Analyze method complexity and parameter counts:
