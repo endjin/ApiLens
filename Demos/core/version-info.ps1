@@ -22,6 +22,9 @@ Write-Host "================================" -ForegroundColor Cyan
 
 # Build if needed
 $apilens = "./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+if ($IsWindows -or $env:OS -eq "Windows_NT") { 
+    $apilens += ".exe" 
+}
 if (-not (Test-Path $apilens)) {
     Write-Step "Building ApiLens..."
     dotnet build ./Solutions/ApiLens.Cli/ApiLens.Cli.csproj --verbosity quiet
@@ -49,29 +52,34 @@ if (Test-Path $indexPath) { Remove-Item $indexPath -Recurse -Force }
 
 Write-Step "Indexing Newtonsoft.Json from NuGet cache..."
 Write-Cmd "apilens index `"$nugetCache/newtonsoft.json`" --clean --pattern `"**/*.xml`""
-& $apilens index "$nugetCache/newtonsoft.json" --index $indexPath --clean --pattern "**/*.xml"
+& "$apilens" index "$nugetCache/newtonsoft.json" --index "$indexPath" --clean --pattern "**/*.xml"
 
 Write-Step "Querying with version info (Table Format):"
 Write-Cmd "apilens query JsonSerializer"
-& $apilens query JsonSerializer --index $indexPath
+& "$apilens" query JsonSerializer --index "$indexPath"
 
 Write-Step "Querying with version info (JSON Format):"
 Write-Cmd "apilens query JsonConvert --format json"
-$jsonOutput = & $apilens query JsonConvert --index $indexPath --format json
-if ($jsonOutput -and $jsonOutput -ne "No results found.") {
-    $json = $jsonOutput | ConvertFrom-Json
-    $json | Select-Object name, packageVersion, targetFramework | Format-Table
-} else {
-    Write-Host "  No results found for JsonConvert" -ForegroundColor Yellow
+try {
+    $jsonOutput = & "$apilens" query JsonConvert --index "$indexPath" --format json
+    if ($jsonOutput -and $jsonOutput -ne "[]" -and $jsonOutput -notmatch "No results found") {
+        $json = $jsonOutput | ConvertFrom-Json -ErrorAction Stop
+        $json | Select-Object name, packageVersion, targetFramework | Format-Table
+    } else {
+        Write-Host "  No results found for JsonConvert" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "  Error parsing JSON output: $_" -ForegroundColor Red
+    Write-Host "  Raw output: $jsonOutput" -ForegroundColor DarkGray
 }
 
 Write-Step "Querying with version info (Markdown Format):"
 Write-Cmd "apilens query JObject --format markdown"
-& $apilens query JObject --index $indexPath --format markdown --max 1
+& "$apilens" query JObject --index "$indexPath" --format markdown --max 1
 
 Write-Step "Index Statistics:"
 Write-Cmd "apilens stats"
-& $apilens stats --index $indexPath
+& "$apilens" stats --index "$indexPath"
 
 # Cleanup
 Remove-Item $indexPath -Recurse -Force

@@ -59,7 +59,7 @@ if (-not $SkipBuild) {
 
 # Set up paths
 $apilens = Join-Path $PSScriptRoot "../../Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
-if ($IsWindows) {
+if ($IsWindows -or $env:OS -eq "Windows_NT") {
     $apilens = "$apilens.exe"
 }
 
@@ -134,7 +134,7 @@ Write-Step "Indexing Newtonsoft.Json from NuGet cache"
 $newtonsoftPath = Join-Path $nugetCache "newtonsoft.json"
 if (Test-Path $newtonsoftPath) {
     Write-Command "$apilens index `"$newtonsoftPath`" --index `"$IndexPath`" --pattern `"**/*.xml`""
-    & $apilens index $newtonsoftPath --index $IndexPath --pattern "**/*.xml"
+    & "$apilens" index "$newtonsoftPath" --index "$IndexPath" --pattern "**/*.xml"
 } else {
     Write-Warning "Newtonsoft.Json not found in cache"
 }
@@ -143,7 +143,7 @@ Write-Step "Indexing System.Text.Json from NuGet cache"
 $systemTextJsonPath = Join-Path $nugetCache "system.text.json"
 if (Test-Path $systemTextJsonPath) {
     Write-Command "$apilens index `"$systemTextJsonPath`" --index `"$IndexPath`" --pattern `"**/*.xml`""
-    & $apilens index $systemTextJsonPath --index $IndexPath --pattern "**/*.xml"
+    & "$apilens" index "$systemTextJsonPath" --index "$IndexPath" --pattern "**/*.xml"
 } else {
     Write-Warning "System.Text.Json not found in cache"
 }
@@ -153,21 +153,26 @@ Write-Header "Step 3: Querying APIs with Version Information"
 
 Write-Step "Search for JsonSerializer (shows version info in table)"
 Write-Command "$apilens query JsonSerializer --index `"$IndexPath`""
-& $apilens query JsonSerializer --index $IndexPath
+& "$apilens" query JsonSerializer --index "$IndexPath"
 
 Write-Step "Search for JsonConvert with JSON output (includes all version fields)"
 Write-Command "$apilens query JsonConvert --index `"$IndexPath`" --format json | ConvertFrom-Json"
-$jsonOutput = & $apilens query JsonConvert --index $IndexPath --format json
-if ($jsonOutput -and $jsonOutput -ne "No results found.") {
-    $results = $jsonOutput | ConvertFrom-Json
-    $results | ForEach-Object {
-        Write-Host "`nAPI: $($_.fullName)"
-        Write-Host "  Package: $($_.packageId) v$($_.packageVersion)"
-        Write-Host "  Framework: $($_.targetFramework)"
-        Write-Host "  From NuGet: $($_.isFromNuGetCache)"
+try {
+    $jsonOutput = & "$apilens" query JsonConvert --index "$IndexPath" --format json
+    if ($jsonOutput -and $jsonOutput -ne "No results found." -and $jsonOutput -ne "[]") {
+        $results = $jsonOutput | ConvertFrom-Json -ErrorAction Stop
+        $results | ForEach-Object {
+            Write-Host "`nAPI: $($_.fullName)"
+            Write-Host "  Package: $($_.packageId) v$($_.packageVersion)"
+            Write-Host "  Framework: $($_.targetFramework)"
+            Write-Host "  From NuGet: $($_.isFromNuGetCache)"
+        }
+    } else {
+        Write-Host "  No results found for JsonConvert" -ForegroundColor Yellow
     }
-} else {
-    Write-Host "  No results found for JsonConvert" -ForegroundColor Yellow
+} catch {
+    Write-Host "  Error parsing JSON output: $_" -ForegroundColor Red
+    Write-Host "  Raw output: $jsonOutput" -ForegroundColor DarkGray
 }
 
 # Step 4: Content search across versions
@@ -175,31 +180,31 @@ Write-Header "Step 4: Content Search Across Package Versions"
 
 Write-Step "Search for APIs that handle 'DateTime' across all versions"
 Write-Command "$apilens query DateTime --type content --index `"$IndexPath`" --max 5"
-& $apilens query DateTime --type content --index $IndexPath --max 5
+& "$apilens" query DateTime --type content --index "$IndexPath" --max 5
 
 # Step 5: Markdown output with version sections
 Write-Header "Step 5: Detailed API Information with Versions"
 
 Write-Step "Get detailed info for a specific type"
 Write-Command "$apilens query `"Newtonsoft.Json.JsonSerializer`" --index `"$IndexPath`" --format markdown"
-& $apilens query "Newtonsoft.Json.JsonSerializer" --index $IndexPath --format markdown
+& "$apilens" query "Newtonsoft.Json.JsonSerializer" --index "$IndexPath" --format markdown
 
 # Step 6: Statistics showing packages
 Write-Header "Step 6: Index Statistics"
 
 Write-Command "$apilens stats --index `"$IndexPath`""
-& $apilens stats --index $IndexPath
+& "$apilens" stats --index "$IndexPath"
 
 # Step 7: Advanced scenarios
 Write-Header "Step 7: Advanced Scenarios"
 
 Write-Step "Find all APIs from a specific package version"
 Write-Command "$apilens query `"Newtonsoft.Json`" --type assembly --index `"$IndexPath`" --max 10"
-& $apilens query "Newtonsoft.Json" --type assembly --index $IndexPath --max 10
+& "$apilens" query "Newtonsoft.Json" --type assembly --index "$IndexPath" --max 10
 
 Write-Step "Search for extension methods in specific framework"
 Write-Command "$apilens query `"extension method`" --type content --index `"$IndexPath`" --format table"
-& $apilens query "extension method" --type content --index $IndexPath --format table
+& "$apilens" query "extension method" --type content --index "$IndexPath" --format table
 
 # Cleanup option
 Write-Header "Demo Complete!"
