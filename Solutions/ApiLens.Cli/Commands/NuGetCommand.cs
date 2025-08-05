@@ -419,7 +419,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
         public bool Clean { get; init; }
 
         [Description("Filter packages by name (supports wildcards)")]
-        [CommandOption("-p|--package")]
+        [CommandOption("-p|--package|--filter")]
         public string? PackageFilter { get; init; }
 
         [Description("Filter packages by version (regex)")]
