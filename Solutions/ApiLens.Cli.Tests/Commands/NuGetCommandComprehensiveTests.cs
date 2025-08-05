@@ -81,7 +81,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns([..packages]);
+            .Returns([.. packages]);
 
         // First run - empty index
         SetupEmptyIndex();
@@ -179,10 +179,10 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns([..packages]);
+            .Returns([.. packages]);
 
         SetupEmptyIndex();
-        
+
         // Deduplication should keep only one package since they all share the same XML
         SetupDeduplicationService(packages.Take(1).ToList(), skippedPackages: packages.Count - 1);
 
@@ -257,7 +257,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns([..packages]);
+            .Returns([.. packages]);
 
         // Existing package already indexed
         Dictionary<string, HashSet<(string, string)>> indexedPackages = new()
@@ -318,7 +318,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns([..packages]);
+            .Returns([.. packages]);
 
         // Old versions in index
         Dictionary<string, HashSet<(string, string)>> indexedPackages = new()
@@ -368,7 +368,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns([..packages]);
+            .Returns([.. packages]);
 
         // Stable version in index
         Dictionary<string, HashSet<(string, string)>> indexedPackages = new()
@@ -431,7 +431,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
         SetupScannerWithPackages(packages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns([..packages]);
+            .Returns([.. packages]);
 
         // Index has normalized paths
         HashSet<string> indexedPaths = ["C:/Users/test/.nuget/packages/package1/1.0.0/lib/net6.0/Package1.xml"];
@@ -520,7 +520,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
     private void SetupScannerWithPackages(IReadOnlyList<NuGetPackageInfo> packages)
     {
-        ImmutableArray<NuGetPackageInfo> packagesArray = [..packages.ToArray()];
+        ImmutableArray<NuGetPackageInfo> packagesArray = [.. packages.ToArray()];
         mockScanner.ScanDirectory(Arg.Any<string>()).Returns(packagesArray);
         mockScanner.ScanDirectoryAsync(Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
             .Returns(Task.FromResult(packagesArray));

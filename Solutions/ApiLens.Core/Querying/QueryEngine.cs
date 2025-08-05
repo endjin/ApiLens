@@ -1,10 +1,8 @@
-using System.Collections.Immutable;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using Lucene.Net.Documents;
 using Lucene.Net.Index;
 using Lucene.Net.Search;
-using Lucene.Net.Util;
 
 namespace ApiLens.Core.Querying;
 
@@ -12,28 +10,14 @@ public class QueryEngine : IQueryEngine
 {
     private readonly ILuceneIndexManager indexManager;
     private bool disposed;
-    
+
     // Common .NET namespaces for exception type resolution
-    private static readonly string[] CommonExceptionNamespaces = 
+    private static readonly string[] CommonExceptionNamespaces =
     {
-        "System",
-        "System.IO", 
-        "System.Net",
-        "System.Net.Http",
-        "System.Data",
-        "System.Xml",
-        "System.Collections",
-        "System.Collections.Generic",
-        "System.Threading",
-        "System.Threading.Tasks",
-        "System.Security",
-        "System.Runtime",
-        "System.Runtime.InteropServices",
-        "System.ComponentModel",
-        "System.Configuration",
-        "System.Diagnostics",
-        "System.Linq",
-        "System.Text"
+        "System", "System.IO", "System.Net", "System.Net.Http", "System.Data", "System.Xml", "System.Collections",
+        "System.Collections.Generic", "System.Threading", "System.Threading.Tasks", "System.Security",
+        "System.Runtime", "System.Runtime.InteropServices", "System.ComponentModel", "System.Configuration",
+        "System.Diagnostics", "System.Linq", "System.Text"
     };
 
     public QueryEngine(ILuceneIndexManager indexManager)
@@ -168,10 +152,10 @@ public class QueryEngine : IQueryEngine
 
         // Build a comprehensive query based on the search term characteristics
         Query query = BuildExceptionSearchQuery(exceptionType);
-        
+
         // Execute search with extra results for deduplication
         TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults * 2);
-        
+
         // Convert and deduplicate results
         return ConvertTopDocsToMembers(topDocs)
             .GroupBy(m => m.Id)
@@ -179,14 +163,14 @@ public class QueryEngine : IQueryEngine
             .Take(maxResults)
             .ToList();
     }
-    
+
     private Query BuildExceptionSearchQuery(string searchTerm)
     {
         BooleanQuery queryBuilder = new();
-        
+
         bool hasWildcards = searchTerm.Contains('*') || searchTerm.Contains('?');
         bool hasNamespace = searchTerm.Contains('.');
-        
+
         if (hasWildcards)
         {
             // Wildcard search strategy
@@ -202,13 +186,13 @@ public class QueryEngine : IQueryEngine
             // Simple name search strategy (e.g., "IOException")
             AddSimpleNameQueries(queryBuilder, searchTerm);
         }
-        
+
         // Always add text field search as fallback
         queryBuilder.Add(new TermQuery(new Term("exceptionTypeText", searchTerm.ToLowerInvariant())), Occur.SHOULD);
-        
+
         return queryBuilder;
     }
-    
+
     private void AddWildcardQueries(BooleanQuery queryBuilder, string pattern, bool hasNamespace)
     {
         // Try wildcard on full exception type
@@ -217,7 +201,7 @@ public class QueryEngine : IQueryEngine
         {
             queryBuilder.Add(fullWildcard, Occur.SHOULD);
         }
-        
+
         // If no namespace, also try on simple name and with common namespaces
         if (!hasNamespace)
         {
@@ -226,7 +210,7 @@ public class QueryEngine : IQueryEngine
             {
                 queryBuilder.Add(simpleWildcard, Occur.SHOULD);
             }
-            
+
             // Try with common namespaces
             foreach (string ns in CommonExceptionNamespaces.Take(5)) // Limit to most common
             {
@@ -238,52 +222,52 @@ public class QueryEngine : IQueryEngine
             }
         }
     }
-    
+
     private void AddNamespacedQueries(BooleanQuery queryBuilder, string searchTerm)
     {
         // Exact match
         queryBuilder.Add(new TermQuery(new Term("exceptionType", searchTerm)), Occur.SHOULD);
-        
+
         // Prefix match (e.g., "System.IOException" matches "System.IO.IOException")
         Query? prefixQuery = CreateWildcardQuery("exceptionType", $"{searchTerm}*");
         if (prefixQuery != null)
         {
             queryBuilder.Add(prefixQuery, Occur.SHOULD);
         }
-        
+
         // Middle wildcard (e.g., "System.IOException" -> "System.*.IOException")
         int lastDot = searchTerm.LastIndexOf('.');
         if (lastDot > 0 && lastDot < searchTerm.Length - 1)
         {
             string namespacePart = searchTerm.Substring(0, lastDot);
             string typeName = searchTerm.Substring(lastDot + 1);
-            
+
             Query? middleWildcard = CreateWildcardQuery("exceptionType", $"{namespacePart}.*.{typeName}");
             if (middleWildcard != null)
             {
                 queryBuilder.Add(middleWildcard, Occur.SHOULD);
             }
-            
+
             // Also search just the type name
             queryBuilder.Add(new TermQuery(new Term("exceptionSimpleName", typeName.ToLowerInvariant())), Occur.SHOULD);
         }
     }
-    
+
     private void AddSimpleNameQueries(BooleanQuery queryBuilder, string searchTerm)
     {
         // Search simple name field
         queryBuilder.Add(new TermQuery(new Term("exceptionSimpleName", searchTerm.ToLowerInvariant())), Occur.SHOULD);
-        
+
         // Try exact match with common namespaces
         List<string> namespacedTypes = CommonExceptionNamespaces
             .Select(ns => $"{ns}.{searchTerm}")
             .ToList();
-            
+
         foreach (string nsType in namespacedTypes)
         {
             queryBuilder.Add(new TermQuery(new Term("exceptionType", nsType)), Occur.SHOULD);
         }
-        
+
         // Suffix wildcard for partial matches (e.g., "Exception" matches "ArgumentException")
         Query? suffixQuery = CreateWildcardQuery("exceptionType", $"*{searchTerm}");
         if (suffixQuery != null)
@@ -326,7 +310,8 @@ public class QueryEngine : IQueryEngine
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
         // Search for methods with cyclomatic complexity in range
-        List<Document> documents = indexManager.SearchByIntRange("cyclomaticComplexity", minComplexity, maxComplexity, maxResults);
+        List<Document> documents =
+            indexManager.SearchByIntRange("cyclomaticComplexity", minComplexity, maxComplexity, maxResults);
         return ConvertDocumentsToMembers(documents);
     }
 
@@ -449,10 +434,7 @@ public class QueryEngine : IQueryEngine
 
                 crossRefs.Add(new CrossReference
                 {
-                    SourceId = id,
-                    TargetId = crossRefId,
-                    Type = refType,
-                    Context = string.Empty
+                    SourceId = id, TargetId = crossRefId, Type = refType, Context = string.Empty
                 });
             }
         }
@@ -505,8 +487,7 @@ public class QueryEngine : IQueryEngine
             {
                 attributes.Add(new AttributeInfo
                 {
-                    Type = attrType,
-                    Properties = ImmutableDictionary<string, string>.Empty // Not stored in index
+                    Type = attrType, Properties = ImmutableDictionary<string, string>.Empty // Not stored in index
                 });
             }
         }

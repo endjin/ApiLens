@@ -8,9 +8,14 @@ namespace ApiLens.Core.Lucene;
 public interface ILuceneIndexManager : IDisposable
 {
     // High-performance batch operations
-    Task<IndexingResult> IndexBatchAsync(IEnumerable<MemberInfo> members, CancellationToken cancellationToken = default);
-    Task<IndexingResult> IndexXmlFilesAsync(IEnumerable<string> filePaths, CancellationToken cancellationToken = default);
-    Task<IndexingResult> IndexXmlFilesAsync(IEnumerable<string> filePaths, Action<int>? progressCallback, CancellationToken cancellationToken = default);
+    Task<IndexingResult> IndexBatchAsync(IEnumerable<MemberInfo> members,
+        CancellationToken cancellationToken = default);
+
+    Task<IndexingResult> IndexXmlFilesAsync(IEnumerable<string> filePaths,
+        CancellationToken cancellationToken = default);
+
+    Task<IndexingResult> IndexXmlFilesAsync(IEnumerable<string> filePaths, Action<int>? progressCallback,
+        CancellationToken cancellationToken = default);
 
     // Document management
     void DeleteDocument(Term term);

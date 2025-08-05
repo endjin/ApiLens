@@ -61,8 +61,10 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
             {
                 if (settings.Format != OutputFormat.Json)
                 {
-                    AnsiConsole.MarkupLine("[yellow]Please specify --min-complexity, --min-params, or --max-params.[/]");
+                    AnsiConsole.MarkupLine(
+                        "[yellow]Please specify --min-complexity, --min-params, or --max-params.[/]");
                 }
+
                 return 1;
             }
 
@@ -76,6 +78,7 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
                 {
                     AnsiConsole.WriteLine("[]");
                 }
+
                 return 0;
             }
 
@@ -122,30 +125,36 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
             criteria = criteria,
             results = results.Select(member => new
             {
-                memberInfo = new
-                {
-                    id = member.Id,
-                    name = member.Name,
-                    fullName = member.FullName,
-                    summary = member.Summary,
-                    @namespace = member.Namespace,
-                    assembly = member.Assembly
-                },
-                complexity = member.Complexity != null ? new
-                {
-                    parameterCount = member.Complexity.ParameterCount,
-                    cyclomaticComplexity = member.Complexity.CyclomaticComplexity,
-                    documentationLineCount = member.Complexity.DocumentationLineCount
-                } : null
+                memberInfo =
+                    new
+                    {
+                        id = member.Id,
+                        name = member.Name,
+                        fullName = member.FullName,
+                        summary = member.Summary,
+                        @namespace = member.Namespace,
+                        assembly = member.Assembly
+                    },
+                complexity =
+                    member.Complexity != null
+                        ? new
+                        {
+                            parameterCount = member.Complexity.ParameterCount,
+                            cyclomaticComplexity = member.Complexity.CyclomaticComplexity,
+                            documentationLineCount = member.Complexity.DocumentationLineCount
+                        }
+                        : null
             }),
-            statistics = showStats && metrics.Count > 0 ? new
-            {
-                averageParameters = metrics.Average(m => m.ParameterCount),
-                maxParameters = metrics.Max(m => m.ParameterCount),
-                averageComplexity = metrics.Average(m => m.CyclomaticComplexity),
-                maxComplexity = metrics.Max(m => m.CyclomaticComplexity),
-                averageDocLines = metrics.Average(m => m.DocumentationLineCount)
-            } : null
+            statistics = showStats && metrics.Count > 0
+                ? new
+                {
+                    averageParameters = metrics.Average(m => m.ParameterCount),
+                    maxParameters = metrics.Max(m => m.ParameterCount),
+                    averageComplexity = metrics.Average(m => m.CyclomaticComplexity),
+                    maxComplexity = metrics.Max(m => m.CyclomaticComplexity),
+                    averageDocLines = metrics.Average(m => m.DocumentationLineCount)
+                }
+                : null
         };
 
         string json = JsonSerializer.Serialize(output, JsonOptions);
@@ -167,7 +176,8 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
         foreach (MemberInfo member in results)
         {
             ComplexityMetrics? metrics = member.Complexity;
-            AnsiConsole.WriteLine($"| {member.FullName} | {metrics?.ParameterCount ?? 0} | {metrics?.CyclomaticComplexity ?? 0} | {metrics?.DocumentationLineCount ?? 0} |");
+            AnsiConsole.WriteLine(
+                $"| {member.FullName} | {metrics?.ParameterCount ?? 0} | {metrics?.CyclomaticComplexity ?? 0} | {metrics?.DocumentationLineCount ?? 0} |");
         }
 
         if (showStats && results.Any(r => r.Complexity != null))

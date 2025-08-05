@@ -23,7 +23,7 @@ public class DocumentBuilder : IDocumentBuilder
             new TextField("nameText", memberInfo.Name, Field.Store.NO),
             new TextField("fullNameText", memberInfo.FullName, Field.Store.NO),
             new TextField("namespaceText", memberInfo.Namespace, Field.Store.NO),
-            
+
             // Facet field for filtering by member type
             new StringField("memberTypeFacet", memberInfo.MemberType.ToString(), Field.Store.YES)
         ];
@@ -87,16 +87,16 @@ public class DocumentBuilder : IDocumentBuilder
         {
             // Store the full exception type as keyword field for exact matching
             doc.Add(new StringField("exceptionType", exception.Type, Field.Store.YES));
-            
+
             // Also add as text field for partial matching
             doc.Add(new TextField("exceptionTypeText", exception.Type, Field.Store.NO));
-            
+
             // Extract just the class name without namespace for easier searching
-            string simpleName = exception.Type.Contains('.') 
+            string simpleName = exception.Type.Contains('.')
                 ? exception.Type.Substring(exception.Type.LastIndexOf('.') + 1)
                 : exception.Type;
             doc.Add(new TextField("exceptionSimpleName", simpleName, Field.Store.NO));
-            
+
             if (!string.IsNullOrWhiteSpace(exception.Condition))
             {
                 doc.Add(new TextField("exceptionCondition", exception.Condition, Field.Store.YES));
@@ -173,8 +173,10 @@ public class DocumentBuilder : IDocumentBuilder
         if (memberInfo.Complexity != null)
         {
             doc.Add(new Int32Field("parameterCount", memberInfo.Complexity.ParameterCount, Field.Store.YES));
-            doc.Add(new Int32Field("cyclomaticComplexity", memberInfo.Complexity.CyclomaticComplexity, Field.Store.YES));
-            doc.Add(new Int32Field("documentationLineCount", memberInfo.Complexity.DocumentationLineCount, Field.Store.YES));
+            doc.Add(new Int32Field("cyclomaticComplexity", memberInfo.Complexity.CyclomaticComplexity,
+                Field.Store.YES));
+            doc.Add(new Int32Field("documentationLineCount", memberInfo.Complexity.DocumentationLineCount,
+                Field.Store.YES));
         }
 
         // Add version tracking fields
@@ -193,7 +195,8 @@ public class DocumentBuilder : IDocumentBuilder
             doc.Add(new StringField("targetFramework", memberInfo.TargetFramework, Field.Store.YES));
         }
 
-        doc.Add(new StringField("isFromNuGetCache", memberInfo.IsFromNuGetCache.ToString().ToLowerInvariant(), Field.Store.YES));
+        doc.Add(new StringField("isFromNuGetCache", memberInfo.IsFromNuGetCache.ToString().ToLowerInvariant(),
+            Field.Store.YES));
 
         // Always add sourceFilePath for proper change detection tracking
         doc.Add(new StringField("sourceFilePath", memberInfo.SourceFilePath ?? string.Empty, Field.Store.YES));

@@ -18,7 +18,7 @@ internal static class TestMockSetup
     {
         // Setup sync methods
         mockScanner.ScanDirectory(cachePath).Returns(packages);
-        
+
         // Setup async methods
         mockScanner.ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
             .Returns(Task.FromResult(packages));

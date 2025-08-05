@@ -66,7 +66,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
 
         // GetLatestVersions returns all of them (grouped by package+framework)
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns([..allPackages]);
+            .Returns([.. allPackages]);
 
         // Empty index
         mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
@@ -131,7 +131,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
 
         SetupScannerWithPackages(allPackages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns([..allPackages]);
+            .Returns([.. allPackages]);
 
         // Empty index
         mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
@@ -214,7 +214,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
 
         SetupScannerWithPackages(allPackages);
         mockScanner.GetLatestVersions(Arg.Any<ImmutableArray<NuGetPackageInfo>>())
-            .Returns([..allPackages]);
+            .Returns([.. allPackages]);
 
         // Index already contains package1
         Dictionary<string, HashSet<string>> indexedPackages = new()
@@ -309,7 +309,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
 
     private void SetupScannerWithPackages(IReadOnlyList<NuGetPackageInfo> packages)
     {
-        ImmutableArray<NuGetPackageInfo> packagesArray = [..packages.ToArray()];
+        ImmutableArray<NuGetPackageInfo> packagesArray = [.. packages.ToArray()];
         mockScanner.ScanDirectory(Arg.Any<string>()).Returns(packagesArray);
         mockScanner.ScanDirectoryAsync(Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
             .Returns(Task.FromResult(packagesArray));

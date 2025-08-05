@@ -88,12 +88,14 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
                         foreach (string file in xmlFiles)
                         {
                             // Check if it's a NuGet file
-                            (string PackageId, string Version, string Framework)? nugetInfo = NuGetHelper.ExtractNuGetInfo(file);
+                            (string PackageId, string Version, string Framework)? nugetInfo =
+                                NuGetHelper.ExtractNuGetInfo(file);
 
                             if (nugetInfo.HasValue)
                             {
                                 // For NuGet files, check by package ID and version
-                                if (!indexedPackages.TryGetValue(nugetInfo.Value.PackageId, out HashSet<string>? versions) ||
+                                if (!indexedPackages.TryGetValue(nugetInfo.Value.PackageId,
+                                        out HashSet<string>? versions) ||
                                     !versions.Contains(nugetInfo.Value.Version))
                                 {
                                     filesToIndex.Add(file);
@@ -113,7 +115,8 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
 
                                     // We need to get the assembly name from the file
                                     // For now, use filename as a proxy (will be replaced by actual assembly name during parsing)
-                                    string assemblyName = System.IO.Path.GetFileNameWithoutExtension(file).ToLowerInvariant();
+                                    string assemblyName = System.IO.Path.GetFileNameWithoutExtension(file)
+                                        .ToLowerInvariant();
 
                                     if (!indexedPackages.TryGetValue(assemblyName, out HashSet<string>? versions) ||
                                         !versions.Contains(fileHash))
@@ -131,7 +134,8 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
                                     // If we can't compute the hash (e.g., file doesn't exist in test scenarios),
                                     // treat it as a new file that needs indexing
                                     filesToIndex.Add(file);
-                                    string assemblyName = System.IO.Path.GetFileNameWithoutExtension(file).ToLowerInvariant();
+                                    string assemblyName = System.IO.Path.GetFileNameWithoutExtension(file)
+                                        .ToLowerInvariant();
                                     assembliesToUpdate.Add(assemblyName);
                                 }
                             }
@@ -140,11 +144,13 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
 
                 // Report what we're doing
                 int totalInIndex = indexedPackages.Sum(kvp => kvp.Value.Count);
-                AnsiConsole.MarkupLine($"[dim]Index contains {totalInIndex:N0} file versions across {indexedPackages.Count:N0} assemblies.[/]");
+                AnsiConsole.MarkupLine(
+                    $"[dim]Index contains {totalInIndex:N0} file versions across {indexedPackages.Count:N0} assemblies.[/]");
 
                 if (skippedFiles > 0)
                 {
-                    AnsiConsole.MarkupLine($"[green]Skipping {skippedFiles:N0} file(s) already up-to-date in index.[/]");
+                    AnsiConsole.MarkupLine(
+                        $"[green]Skipping {skippedFiles:N0} file(s) already up-to-date in index.[/]");
                 }
 
                 if (filesToIndex.Count == 0)
@@ -161,24 +167,26 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
                     int documentsBeforeCleanup = indexManager.GetTotalDocuments();
 
                     await AnsiConsole.Status()
-                        .StartAsync($"Removing old versions from {assembliesToUpdate.Count:N0} assemblies...", async ctx =>
-                        {
-                            ctx.Spinner(Spinner.Known.Star);
-                            ctx.SpinnerStyle(Style.Parse("yellow"));
-
-                            await Task.Run(() =>
+                        .StartAsync($"Removing old versions from {assembliesToUpdate.Count:N0} assemblies...",
+                            async ctx =>
                             {
-                                indexManager.DeleteDocumentsByPackageIds(assembliesToUpdate);
+                                ctx.Spinner(Spinner.Known.Star);
+                                ctx.SpinnerStyle(Style.Parse("yellow"));
+
+                                await Task.Run(() =>
+                                {
+                                    indexManager.DeleteDocumentsByPackageIds(assembliesToUpdate);
+                                });
+                                await indexManager.CommitAsync();
                             });
-                            await indexManager.CommitAsync();
-                        });
 
                     int documentsAfterCleanup = indexManager.GetTotalDocuments();
                     int documentsRemoved = documentsBeforeCleanup - documentsAfterCleanup;
 
                     if (documentsRemoved > 0)
                     {
-                        AnsiConsole.MarkupLine($"[green]Removed {documentsRemoved:N0} API members from old versions.[/]");
+                        AnsiConsole.MarkupLine(
+                            $"[green]Removed {documentsRemoved:N0} API members from old versions.[/]");
                     }
                 }
             }
@@ -226,6 +234,7 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
             {
                 AnsiConsole.WriteException(ex);
             }
+
             return 1;
         }
     }
@@ -255,7 +264,8 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
             table.AddRow("Avg Batch Commit", $"{result.Metrics.AverageBatchCommitTimeMs:N2} ms");
             table.AddRow("Peak Threads", result.Metrics.PeakThreadCount.ToString());
             table.AddRow("Peak Memory", FormatSize(result.Metrics.PeakWorkingSetBytes));
-            table.AddRow("GC Gen0/1/2", $"{result.Metrics.Gen0Collections}/{result.Metrics.Gen1Collections}/{result.Metrics.Gen2Collections}");
+            table.AddRow("GC Gen0/1/2",
+                $"{result.Metrics.Gen0Collections}/{result.Metrics.Gen1Collections}/{result.Metrics.Gen2Collections}");
         }
 
         // Index info
@@ -280,6 +290,7 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
             {
                 AnsiConsole.MarkupLine($"  [red]•[/] {error}");
             }
+
             if (result.Errors.Length > 10)
             {
                 AnsiConsole.MarkupLine($"  [dim]... and {result.Errors.Length - 10} more[/]");

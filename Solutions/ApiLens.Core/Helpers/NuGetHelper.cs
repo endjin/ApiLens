@@ -7,7 +7,9 @@ namespace ApiLens.Core.Helpers;
 /// </summary>
 public static partial class NuGetHelper
 {
-    [GeneratedRegex(@"[\\/]packages[\\/](?<packageId>[^\\/]+)[\\/](?<version>[^\\/]+)[\\/](?:lib|ref)[\\/](?<framework>[^\\/]+)[\\/][^\\/]+\.xml$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(
+        @"[\\/]packages[\\/](?<packageId>[^\\/]+)[\\/](?<version>[^\\/]+)[\\/](?:lib|ref)[\\/](?<framework>[^\\/]+)[\\/][^\\/]+\.xml$",
+        RegexOptions.IgnoreCase)]
     private static partial Regex NuGetPathRegex();
 
     /// <summary>

@@ -12,7 +12,9 @@ public partial class NuGetCacheScanner : INuGetCacheScanner
 
     // Regex to parse NuGet cache paths
     // Pattern: .../packageid/version/lib|ref/framework/*.xml
-    [GeneratedRegex(@"[\\/](?<packageId>[^\\/]+)[\\/](?<version>[^\\/]+)[\\/](?:lib|ref)[\\/](?<framework>[^\\/]+)[\\/][^\\/]+\.xml$", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(
+        @"[\\/](?<packageId>[^\\/]+)[\\/](?<version>[^\\/]+)[\\/](?:lib|ref)[\\/](?<framework>[^\\/]+)[\\/][^\\/]+\.xml$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex NuGetPathRegex();
 
     public NuGetCacheScanner(IFileSystemService fileSystem)
@@ -94,7 +96,7 @@ public partial class NuGetCacheScanner : INuGetCacheScanner
 
         // FIXED: Avoid Array.Resize allocations by pre-allocating array
         string[] parts = versionString.Split('.');
-        
+
         // Create a properly sized array and copy parts
         string[] paddedParts = new string[4];
         for (int i = 0; i < 4; i++)
@@ -113,7 +115,7 @@ public partial class NuGetCacheScanner : INuGetCacheScanner
     }
 
     public Task<ImmutableArray<NuGetPackageInfo>> ScanDirectoryAsync(
-        string cachePath, 
+        string cachePath,
         CancellationToken cancellationToken = default,
         IProgress<int>? progress = null)
     {

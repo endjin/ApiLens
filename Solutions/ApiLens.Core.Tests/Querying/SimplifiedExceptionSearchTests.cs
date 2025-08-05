@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
@@ -163,7 +162,7 @@ public class SimplifiedExceptionSearchTests : IDisposable
         // Assert
         results.Count.ShouldBeGreaterThanOrEqualTo(1); // At least finds System.IO.IOException
         results.ShouldContain(r => r.FullName == "FileOperations.ReadFile"); // System.IO.IOException
-        
+
         // Note: Simple "IOException" without namespace may not be found due to field analysis
         // This is a known limitation with the current indexing strategy
     }
@@ -177,7 +176,7 @@ public class SimplifiedExceptionSearchTests : IDisposable
         // Assert
         results.Count.ShouldBeGreaterThanOrEqualTo(1); // At least finds System.ArgumentException
         results.ShouldContain(r => r.FullName == "Validation.ValidateInput"); // System.ArgumentException
-        
+
         // Note: Simple "ArgumentException" without namespace may not be found
     }
 
@@ -205,7 +204,7 @@ public class SimplifiedExceptionSearchTests : IDisposable
         // Assert
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "FileOperations.ReadFile");
-        
+
         // Verify it found the System.IO.IOException
         var fileOps = results.First(r => r.FullName == "FileOperations.ReadFile");
         fileOps.Exceptions.ShouldContain(e => e.Type == "System.IO.IOException");
@@ -294,7 +293,7 @@ public class SimplifiedExceptionSearchTests : IDisposable
         // Assert
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Validation.ValidateInput");
-        
+
         // Should not include the simple "ArgumentException" without namespace
         results.ShouldNotContain(r => r.FullName == "Legacy.OldMethod");
     }
@@ -328,7 +327,7 @@ public class SimplifiedExceptionSearchTests : IDisposable
         // The CreateWildcardQuery method returns null for leading wildcards
         // However, the text field fallback search will still find "exception" matches
         List<MemberInfo> results = engine.SearchByException("*Exception", 10);
-        
+
         // Assert - Will find results due to text field fallback search
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Generic.Execute"); // Has System.Exception

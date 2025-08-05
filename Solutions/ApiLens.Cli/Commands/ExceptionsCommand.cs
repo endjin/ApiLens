@@ -50,6 +50,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
                 {
                     AnsiConsole.WriteLine("[]");
                 }
+
                 return 0;
             }
 
@@ -92,11 +93,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
                         @namespace = member.Namespace,
                         assembly = member.Assembly
                     },
-                    exception = new
-                    {
-                        type = ex.Type,
-                        condition = ex.Condition
-                    },
+                    exception = new { type = ex.Type, condition = ex.Condition },
                     searchedType = exceptionType
                 })
         );
@@ -123,7 +120,8 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
                 {
                     if (ExceptionTypeMatches(exception.Type, exceptionType))
                     {
-                        AnsiConsole.WriteLine($"| {member.FullName} | {exception.Type} | {exception.Condition ?? "No condition specified"} |");
+                        AnsiConsole.WriteLine(
+                            $"| {member.FullName} | {exception.Type} | {exception.Condition ?? "No condition specified"} |");
                     }
                 }
             }
@@ -251,36 +249,36 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         // this method only needs to verify that the exception was found
         // by the search. The main check is ensuring the display matches
         // what the user searched for.
-        
+
         if (searchPattern.Contains('*') || searchPattern.Contains('?'))
         {
             // For wildcard patterns, verify the match
-            string regexPattern = "^" + 
-                Regex.Escape(searchPattern)
-                    .Replace("\\*", ".*")
-                    .Replace("\\?", ".") + 
-                "$";
-            
+            string regexPattern = "^" +
+                                  Regex.Escape(searchPattern)
+                                      .Replace("\\*", ".*")
+                                      .Replace("\\?", ".") +
+                                  "$";
+
             // Check full type or simple name
             if (Regex.IsMatch(exceptionType, regexPattern, RegexOptions.IgnoreCase))
                 return true;
-                
+
             if (!searchPattern.Contains('.'))
             {
-                string simpleName = exceptionType.Contains('.') 
+                string simpleName = exceptionType.Contains('.')
                     ? exceptionType.Substring(exceptionType.LastIndexOf('.') + 1)
                     : exceptionType;
                 return Regex.IsMatch(simpleName, regexPattern, RegexOptions.IgnoreCase);
             }
-            
+
             return false;
         }
-        
+
         // For non-wildcard searches, check various matching strategies
         // 1. Contains check (handles partial matches)
         if (exceptionType.Contains(searchPattern, StringComparison.OrdinalIgnoreCase))
             return true;
-        
+
         // 2. If search has namespace, check if exception name matches
         if (searchPattern.Contains('.') && exceptionType.Contains('.'))
         {
@@ -288,14 +286,14 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
             string exceptionName = exceptionType.Substring(exceptionType.LastIndexOf('.') + 1);
             return string.Equals(searchName, exceptionName, StringComparison.OrdinalIgnoreCase);
         }
-        
+
         // 3. Simple name match (search for "IOException" matches "System.IO.IOException")
         if (!searchPattern.Contains('.') && exceptionType.Contains('.'))
         {
             string exceptionName = exceptionType.Substring(exceptionType.LastIndexOf('.') + 1);
             return string.Equals(searchPattern, exceptionName, StringComparison.OrdinalIgnoreCase);
         }
-        
+
         return false;
     }
 }

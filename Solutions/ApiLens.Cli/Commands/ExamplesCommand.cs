@@ -65,6 +65,7 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
                     // Return empty JSON array
                     AnsiConsole.WriteLine("[]");
                 }
+
                 return 0;
             }
 
@@ -95,20 +96,19 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
     {
         var output = results.Select(member => new
         {
-            memberInfo = new
-            {
-                id = member.Id,
-                name = member.Name,
-                fullName = member.FullName,
-                summary = member.Summary,
-                @namespace = member.Namespace,
-                assembly = member.Assembly
-            },
+            memberInfo =
+                new
+                {
+                    id = member.Id,
+                    name = member.Name,
+                    fullName = member.FullName,
+                    summary = member.Summary,
+                    @namespace = member.Namespace,
+                    assembly = member.Assembly
+                },
             codeExamples = member.CodeExamples.Select(ex => new
             {
-                description = ex.Description,
-                code = ex.Code,
-                language = ex.Language
+                description = ex.Description, code = ex.Code, language = ex.Language
             }),
             matchedPattern = searchPattern
         });

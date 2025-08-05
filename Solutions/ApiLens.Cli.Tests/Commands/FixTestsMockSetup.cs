@@ -16,11 +16,11 @@ internal static class FixTestsMockSetup
         string cachePath,
         NuGetPackageInfo[] packages)
     {
-        ImmutableArray<NuGetPackageInfo> packagesArray = [..packages];
-        
+        ImmutableArray<NuGetPackageInfo> packagesArray = [.. packages];
+
         // Setup sync method
         mockScanner.ScanDirectory(cachePath).Returns(packagesArray);
-        
+
         // Setup async method
         mockScanner.ScanDirectoryAsync(cachePath, Arg.Any<CancellationToken>(), Arg.Any<IProgress<int>?>())
             .Returns(Task.FromResult(packagesArray));

@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;

@@ -60,10 +60,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
 
         XmlReaderSettings settings = new()
         {
-            Async = true,
-            IgnoreWhitespace = true,
-            IgnoreComments = true,
-            IgnoreProcessingInstructions = true
+            Async = true, IgnoreWhitespace = true, IgnoreComments = true, IgnoreProcessingInstructions = true
         };
 
         using Stream fileStream = await fileSystem.OpenReadAsync(filePath);
@@ -83,7 +80,8 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                 }
                 else if (reader.Name == memberElementName && reader.Depth == 2)
                 {
-                    MemberInfo? member = await ParseMemberAsync(reader, assemblyName ?? "Unknown", filePath, nugetInfo, fileHash);
+                    MemberInfo? member = await ParseMemberAsync(reader, assemblyName ?? "Unknown", filePath, nugetInfo,
+                        fileHash);
                     if (member != null)
                     {
                         yield return member;
@@ -153,6 +151,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                 break;
             }
         }
+
         return null;
     }
 
@@ -230,7 +229,8 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             if (nugetInfo.HasValue)
             {
                 // For NuGet packages: include package, version, and framework
-                uniqueId = $"{nameAttribute}|{nugetInfo.Value.PackageId}|{nugetInfo.Value.Version}|{nugetInfo.Value.Framework}";
+                uniqueId =
+                    $"{nameAttribute}|{nugetInfo.Value.PackageId}|{nugetInfo.Value.Version}|{nugetInfo.Value.Framework}";
             }
             else if (fileHash != null)
             {
@@ -295,6 +295,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                             sb.Append(' ').Append(cref).Append(' ');
                         }
                     }
+
                     break;
                 case XmlNodeType.EndElement:
                     return NormalizeWhitespace(sb.ToString());
@@ -333,11 +334,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
 
         string condition = await ReadElementContentAsync(reader, sb);
 
-        return new ExceptionInfo
-        {
-            Type = stringCache.GetOrAdd(ExtractTypeNameFromCref(cref)),
-            Condition = condition
-        };
+        return new ExceptionInfo { Type = stringCache.GetOrAdd(ExtractTypeNameFromCref(cref)), Condition = condition };
     }
 
     private static async Task<CodeExample?> ParseExampleAsync(XmlReader reader, StringBuilder sb)
@@ -347,13 +344,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         if (string.IsNullOrEmpty(code))
             return null;
 
-        return new CodeExample
-        {
-            Code = code,
-            Description = string.Empty
-        };
+        return new CodeExample { Code = code, Description = string.Empty };
     }
-    
+
     private static async Task<string> ReadCodeContentAsync(XmlReader reader, StringBuilder sb)
     {
         sb.Clear();
@@ -373,6 +366,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                         if (!string.IsNullOrEmpty(cref))
                             sb.Append(cref);
                     }
+
                     break;
                 case XmlNodeType.EndElement:
                     // Don't normalize whitespace - preserve formatting for code
@@ -433,12 +427,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             throw new InvalidOperationException("Assembly name not found in XML document");
         }
 
-        return new ApiAssemblyInfo
-        {
-            Name = assemblyName,
-            Version = "0.0.0.0",
-            Culture = "neutral"
-        };
+        return new ApiAssemblyInfo { Name = assemblyName, Version = "0.0.0.0", Culture = "neutral" };
     }
 
     public MemberInfo? ParseMember(XElement memberElement)
@@ -492,15 +481,13 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                     {
                         description += textNode.ToString();
                     }
+
                     textNode = textNode.NextNode;
                 }
+
                 description = description.Trim();
 
-                examples.Add(new CodeExample
-                {
-                    Code = code,
-                    Description = description
-                });
+                examples.Add(new CodeExample { Code = code, Description = description });
             }
             else
             {
@@ -508,11 +495,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                 string code = exampleElement.Value.Trim();
                 if (!string.IsNullOrEmpty(code))
                 {
-                    examples.Add(new CodeExample
-                    {
-                        Code = code,
-                        Description = string.Empty
-                    });
+                    examples.Add(new CodeExample { Code = code, Description = string.Empty });
                 }
             }
         }
@@ -550,8 +533,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             {
                 exceptions.Add(new ExceptionInfo
                 {
-                    Type = ExtractTypeNameFromCref(cref),
-                    Condition = NormalizeWhitespace(exceptionElement.Value)
+                    Type = ExtractTypeNameFromCref(cref), Condition = NormalizeWhitespace(exceptionElement.Value)
                 });
             }
         }
@@ -858,6 +840,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                         break;
                     }
                 }
+
                 result.Add(line.Substring(pos));
             }
             else
