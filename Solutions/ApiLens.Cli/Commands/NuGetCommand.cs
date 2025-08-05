@@ -64,7 +64,8 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     
                     if (!string.IsNullOrEmpty(settings.PackageFilter))
                     {
-                        Regex regex = new(settings.PackageFilter.Replace("*", ".*"), RegexOptions.IgnoreCase);
+                        string regexPattern = settings.PackageFilter.Replace("*", ".*");
+                        Regex regex = new(regexPattern, RegexOptions.IgnoreCase);
                         packages = allPackages.Where(p => regex.IsMatch(p.PackageId)).ToList();
                     }
                     else
