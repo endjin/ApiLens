@@ -29,7 +29,7 @@ if (-not (Test-Path $apilens)) {
 
 # Get NuGet cache location
 Write-Host "`n📁 Discovering NuGet Cache Location..." -ForegroundColor Yellow
-$nugetCache = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { "$HOME/.nuget/packages" }
+$nugetCache = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $HOME ".nuget" "packages" }
 Write-Host "NuGet Cache: $nugetCache" -ForegroundColor Cyan
 
 # Create demo index

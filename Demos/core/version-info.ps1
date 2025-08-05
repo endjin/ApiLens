@@ -45,14 +45,15 @@ Remove-Item $tempProj
 # Demo paths
 $tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) "apilens-demo"
 $indexPath = Join-Path $tmpBase "indexes/demo-index"
-$nugetCache = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { "$HOME/.nuget/packages" }
+$nugetCache = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $HOME ".nuget" "packages" }
 
 # Clean previous demo
 if (Test-Path $indexPath) { Remove-Item $indexPath -Recurse -Force }
 
 Write-Step "Indexing Newtonsoft.Json from NuGet cache..."
-Write-Cmd "apilens index `"$nugetCache/newtonsoft.json`" --clean --pattern `"**/*.xml`""
-& "$apilens" index "$nugetCache/newtonsoft.json" --index "$indexPath" --clean --pattern "**/*.xml"
+$newtonsoftPath = Join-Path $nugetCache "newtonsoft.json"
+Write-Cmd "apilens index `"$newtonsoftPath`" --clean --pattern `"**/*.xml`""
+& "$apilens" index "$newtonsoftPath" --index "$indexPath" --clean --pattern "**/*.xml"
 
 Write-Step "Querying with version info (Table Format):"
 Write-Cmd "apilens query JsonSerializer"

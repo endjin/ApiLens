@@ -28,7 +28,8 @@ if (-not (Test-Path $apilens)) {
 }
 
 Write-Host "`n✨ OLD WAY (manual indexing):" -ForegroundColor Red
-Write-Host '$ apilens index "$HOME/.nuget/packages/newtonsoft.json" --pattern "**/*.xml"' -ForegroundColor DarkGray
+$examplePath = Join-Path "`$HOME" ".nuget" "packages" "newtonsoft.json"
+Write-Host "$ apilens index `"$examplePath`" --pattern `"**/*.xml`"" -ForegroundColor DarkGray
 Write-Host "  ❌ Need to know cache location" -ForegroundColor DarkGray
 Write-Host "  ❌ Need to specify recursive pattern" -ForegroundColor DarkGray
 Write-Host "  ❌ Index one package at a time" -ForegroundColor DarkGray
