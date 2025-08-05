@@ -181,7 +181,7 @@ if ($Category -eq "all" -or $Category -eq "nuget") {
     
     if (Test-Path $apilensPath) {
         try {
-            $nugetTest = & "$apilensPath" nuget --list --filter "newtonsoft.*" 2>&1 | Select-Object -First 5
+            $nugetTest = & "$apilensPath" nuget --list --package "newtonsoft.*" 2>&1 | Select-Object -First 5
             if ($nugetTest -match "newtonsoft.json") {
                 Write-Host "✅ NuGet command works" -ForegroundColor Green
             } else {
@@ -194,7 +194,7 @@ if ($Category -eq "all" -or $Category -eq "nuget") {
         Write-Host "`nTesting version info in queries..." -ForegroundColor Yellow
         $tempIndex = Join-Path ([System.IO.Path]::GetTempPath()) "test-version-$(Get-Random)"
         try {
-            & "$apilensPath" nuget --filter "newtonsoft.*" --latest-only --index "$tempIndex" 2>&1 | Out-Null
+            & "$apilensPath" nuget --package "newtonsoft.*" --latest-only --index "$tempIndex" 2>&1 | Out-Null
             $queryTest = & "$apilensPath" query JsonSerializer --index "$tempIndex" 2>&1
             Remove-Item $tempIndex -Recurse -Force -ErrorAction SilentlyContinue
         } catch {
