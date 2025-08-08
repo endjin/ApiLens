@@ -278,10 +278,7 @@ public class QueryEngine : IQueryEngine
 
     private Query? CreateWildcardQuery(string fieldName, string pattern)
     {
-        // Lucene doesn't allow leading wildcards by default
-        if (pattern.StartsWith('*') || pattern.StartsWith('?'))
-            return null;
-
+        // Leading wildcards are now supported but may impact performance
         try
         {
             return new WildcardQuery(new Term(fieldName, pattern));

@@ -321,16 +321,16 @@ public class SimplifiedExceptionSearchTests : IDisposable
     }
 
     [TestMethod]
-    public void SearchByException_Wildcard_AsteriskException_ReturnsEmptyDueToLeadingWildcard()
+    public void SearchByException_Wildcard_AsteriskException_ReturnsResultsWithLeadingWildcard()
     {
-        // Act - "*Exception" would require leading wildcard support
-        // The CreateWildcardQuery method returns null for leading wildcards
-        // However, the text field fallback search will still find "exception" matches
+        // Act - "*Exception" now supports leading wildcard
+        // This will find all exception types that end with "Exception"
         List<MemberInfo> results = engine.SearchByException("*Exception", 10);
 
-        // Assert - Will find results due to text field fallback search
+        // Assert - Should find multiple results ending with "Exception"
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Generic.Execute"); // Has System.Exception
+        // Should also find ArgumentNullException, IOException, etc.
     }
 
     [TestMethod]

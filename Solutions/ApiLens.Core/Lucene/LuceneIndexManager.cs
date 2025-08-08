@@ -451,15 +451,20 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         {
             IndexSearcher searcher = new(reader);
 
-            // For keyword fields, use a TermQuery for exact matching
+            // For keyword fields, use a TermQuery for exact matching (unless it contains wildcards)
             Query query;
-            if (fieldName is "id" or "memberType" or "name" or "fullName" or "assembly" or "namespace")
+            bool hasWildcards = searchTerm.Contains('*') || searchTerm.Contains('?');
+            
+            if (!hasWildcards && fieldName is "id" or "memberType" or "name" or "fullName" or "assembly" or "namespace" or "exceptionType")
             {
                 query = new TermQuery(new Term(fieldName, searchTerm));
             }
             else
             {
-                QueryParser parser = new(LuceneVersion.LUCENE_48, fieldName, analyzer);
+                QueryParser parser = new(LuceneVersion.LUCENE_48, fieldName, analyzer)
+                {
+                    AllowLeadingWildcard = true
+                };
                 query = parser.Parse(searchTerm);
             }
 

@@ -177,7 +177,7 @@ apilens exceptions "ValidationException" --max 50
 **Exception Search Features:**
 - **Partial name matching**: Search without namespace (e.g., "ArgumentNullException" finds "System.ArgumentNullException")
 - **Automatic namespace resolution**: Common .NET namespaces are tried automatically (System, System.IO, System.Collections, etc.)
-- **Wildcard support**: Use `*` and `?` for pattern matching (no leading wildcards)
+- **Wildcard support**: Use `*` and `?` for pattern matching (leading wildcards supported, may impact performance)
 - **Smart fallback**: Multiple search strategies ensure you find what you're looking for
 - **Deduplication**: Results are automatically deduplicated across search strategies
 
