@@ -206,7 +206,7 @@ public class SimplifiedExceptionSearchTests : IDisposable
         results.ShouldContain(r => r.FullName == "FileOperations.ReadFile");
 
         // Verify it found the System.IO.IOException
-        var fileOps = results.First(r => r.FullName == "FileOperations.ReadFile");
+        MemberInfo fileOps = results.First(r => r.FullName == "FileOperations.ReadFile");
         fileOps.Exceptions.ShouldContain(e => e.Type == "System.IO.IOException");
     }
 
@@ -439,7 +439,7 @@ public class SimplifiedExceptionSearchTests : IDisposable
         List<MemberInfo> results = engine.SearchByException("ArgumentNullException", 10);
 
         // Assert - ValidateInput has multiple exceptions but should appear only once in results
-        var validateInputCount = results.Count(r => r.FullName == "Validation.ValidateInput");
+        int validateInputCount = results.Count(r => r.FullName == "Validation.ValidateInput");
         validateInputCount.ShouldBe(1); // Should appear exactly once despite having multiple exceptions
     }
 

@@ -39,7 +39,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
-            var metadataService = new MetadataService();
+            MetadataService metadataService = new();
             metadataService.StartTiming();
 
             // Validate that at least one filter is provided
@@ -49,7 +49,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
             {
                 if (settings.Format == OutputFormat.Json)
                 {
-                    var errorResponse = new JsonResponse<object>
+                    JsonResponse<object> errorResponse = new()
                     {
                         Results = new { error = "At least one filter (--assembly, --package, or --namespace) must be specified." },
                         Metadata = metadataService.BuildMetadata(indexManager)
@@ -81,7 +81,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
             }
 
             // Group by assembly/package for better readability
-            var groupedResults = settings.GroupBy switch
+            IEnumerable<IGrouping<string, MemberInfo>> groupedResults = settings.GroupBy switch
             {
                 GroupByOption.Assembly => results.GroupBy(r => r.Assembly),
                 GroupByOption.Package => results.GroupBy(r => r.PackageId ?? "Unknown"),
@@ -157,7 +157,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
                     string regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(namespacePattern)
                         .Replace("\\*", ".*")
                         .Replace("\\?", ".") + "$";
-                    var regex = new System.Text.RegularExpressions.Regex(regexPattern,
+                    System.Text.RegularExpressions.Regex regex = new(regexPattern,
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                     results = results.Where(m => regex.IsMatch(m.Namespace)).ToList();
                 }
@@ -180,7 +180,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
                     string regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(assemblyPattern)
                         .Replace("\\*", ".*")
                         .Replace("\\?", ".") + "$";
-                    var regex = new System.Text.RegularExpressions.Regex(regexPattern,
+                    System.Text.RegularExpressions.Regex regex = new(regexPattern,
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                     results = results.Where(m => regex.IsMatch(m.Assembly)).ToList();
                 }
@@ -195,24 +195,24 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         return results;
     }
 
-    private static void OutputJson(List<MemberInfo> results, ILuceneIndexManager indexManager, 
+    private static void OutputJson(List<MemberInfo> results, ILuceneIndexManager indexManager,
         MetadataService metadataService, Settings settings)
     {
-        var filters = new List<string>();
+        List<string> filters = new();
         if (!string.IsNullOrWhiteSpace(settings.Assembly)) filters.Add($"assembly: {settings.Assembly}");
         if (!string.IsNullOrWhiteSpace(settings.Package)) filters.Add($"package: {settings.Package}");
         if (!string.IsNullOrWhiteSpace(settings.Namespace)) filters.Add($"namespace: {settings.Namespace}");
-        
-        var metadata = metadataService.BuildMetadata(results, indexManager, 
-            query: string.Join(", ", filters), 
+
+        ResponseMetadata metadata = metadataService.BuildMetadata(results, indexManager,
+            query: string.Join(", ", filters),
             queryType: "list-types",
             commandMetadata: new Dictionary<string, object>
             {
                 ["includeMembers"] = settings.IncludeMembers,
                 ["groupBy"] = settings.GroupBy.ToString()
             });
-        
-        var response = new JsonResponse<List<MemberInfo>>
+
+        JsonResponse<List<MemberInfo>> response = new()
         {
             Results = results,
             Metadata = metadata
@@ -224,7 +224,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
 
     private static void OutputTable(IEnumerable<IGrouping<string, MemberInfo>> groupedResults, Settings settings)
     {
-        foreach (var group in groupedResults)
+        foreach (IGrouping<string, MemberInfo> group in groupedResults)
         {
             AnsiConsole.WriteLine();
             AnsiConsole.Write(new Rule($"[bold yellow]{group.Key}[/]"));
@@ -241,7 +241,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
 
             foreach (MemberInfo member in group.OrderBy(m => m.Namespace).ThenBy(m => m.Name))
             {
-                var row = new List<string>
+                List<string> row = new()
                 {
                     member.MemberType.ToString(),
                     Markup.Escape(GenericTypeFormatter.FormatTypeName(member.Name)),
@@ -265,7 +265,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         AnsiConsole.WriteLine("# Type Listing Results");
         AnsiConsole.WriteLine();
 
-        foreach (var group in groupedResults)
+        foreach (IGrouping<string, MemberInfo> group in groupedResults)
         {
             AnsiConsole.WriteLine($"## {group.Key}");
             AnsiConsole.WriteLine();

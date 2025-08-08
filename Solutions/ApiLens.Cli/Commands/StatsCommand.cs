@@ -23,7 +23,7 @@ public class StatsCommand : Command<StatsCommand.Settings>
             // Create index manager with the specified path
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
 
-            var metadataService = new MetadataService();
+            MetadataService metadataService = new();
             metadataService.StartTiming();
 
             // Get index statistics
@@ -33,7 +33,7 @@ public class StatsCommand : Command<StatsCommand.Settings>
             {
                 if (settings.Format == OutputFormat.Json)
                 {
-                    var errorResponse = new JsonResponse<object>
+                    JsonResponse<object> errorResponse = new()
                     {
                         Results = new { error = "No index found at the specified location." },
                         Metadata = metadataService.BuildMetadata(indexManager)
@@ -92,7 +92,7 @@ public class StatsCommand : Command<StatsCommand.Settings>
         AnsiConsole.Write(table);
     }
 
-    private static void OutputJson(IndexStatistics stats, ILuceneIndexManager indexManager, 
+    private static void OutputJson(IndexStatistics stats, ILuceneIndexManager indexManager,
         MetadataService metadataService)
     {
         var statsData = new
@@ -106,10 +106,10 @@ public class StatsCommand : Command<StatsCommand.Settings>
             LastModified = stats.LastModified?.ToString("O")
         };
 
-        var metadata = metadataService.BuildMetadata(indexManager, 
+        ResponseMetadata metadata = metadataService.BuildMetadata(indexManager,
             queryType: "stats");
-        
-        var response = new JsonResponse<object>
+
+        JsonResponse<object> response = new()
         {
             Results = statsData,
             Metadata = metadata

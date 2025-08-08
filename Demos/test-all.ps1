@@ -38,6 +38,8 @@ $demoCategories = @{
     advanced = @(
         @{Name = "rich-metadata.ps1"; Description = "Rich metadata extraction demo"},
         @{Name = "specialized-queries.ps1"; Description = "Specialized query demonstrations"},
+        @{Name = "wildcard-and-types-demo.ps1"; Description = "Leading wildcards and type listing demo"},
+        @{Name = "enhanced-wildcard-demo.ps1"; Description = "Enhanced wildcard search with filters"},
         @{Name = "mcp-integration.ps1"; Description = "Model Context Protocol integration"},
         @{Name = "benchmark.ps1"; Description = "Performance benchmarking"; Skip = $true; Reason = "Benchmark takes too long for regular testing"}
     )

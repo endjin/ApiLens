@@ -37,10 +37,10 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
             // Create index manager and query engine with the specified path
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
-            
-            var metadataService = new MetadataService();
+
+            MetadataService metadataService = new();
             metadataService.StartTiming();
-            
+
             List<MemberInfo> results;
             string? searchPattern = null;
 
@@ -120,14 +120,14 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
             matchedPattern = searchPattern
         }).ToList();
 
-        var metadata = metadataService.BuildMetadata(results, indexManager, 
-            query: searchPattern, 
+        ResponseMetadata metadata = metadataService.BuildMetadata(results, indexManager,
+            query: searchPattern,
             queryType: "code-examples",
-            commandMetadata: searchPattern != null 
+            commandMetadata: searchPattern != null
                 ? new Dictionary<string, object> { ["pattern"] = searchPattern }
                 : null);
-        
-        var response = new JsonResponse<object>
+
+        JsonResponse<object> response = new()
         {
             Results = output,
             Metadata = metadata

@@ -39,18 +39,37 @@ public class QueryCommand : Command<QueryCommand.Settings>
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
-            var metadataService = new MetadataService();
+            MetadataService metadataService = new();
             metadataService.StartTiming();
 
-            List<MemberInfo> results = settings.QueryType switch
+            List<MemberInfo> results;
+
+            // Check if we have any filters specified
+            if (settings.MemberTypeFilter.HasValue ||
+                !string.IsNullOrEmpty(settings.NamespaceFilter) ||
+                !string.IsNullOrEmpty(settings.AssemblyFilter))
             {
-                QueryType.Name => queryEngine.SearchByName(settings.Query, settings.MaxResults),
-                QueryType.Content => queryEngine.SearchByContent(settings.Query, settings.MaxResults),
-                QueryType.Namespace => queryEngine.SearchByNamespace(settings.Query, settings.MaxResults),
-                QueryType.Id => queryEngine.GetById(settings.Query) is { } member ? [member] : [],
-                QueryType.Assembly => queryEngine.SearchByAssembly(settings.Query, settings.MaxResults),
-                _ => []
-            };
+                // Use the new SearchWithFilters method
+                results = queryEngine.SearchWithFilters(
+                    settings.Query,
+                    settings.MemberTypeFilter,
+                    settings.NamespaceFilter,
+                    settings.AssemblyFilter,
+                    settings.MaxResults);
+            }
+            else
+            {
+                // Use existing search methods
+                results = settings.QueryType switch
+                {
+                    QueryType.Name => queryEngine.SearchByName(settings.Query, settings.MaxResults),
+                    QueryType.Content => queryEngine.SearchByContent(settings.Query, settings.MaxResults),
+                    QueryType.Namespace => queryEngine.SearchByNamespace(settings.Query, settings.MaxResults),
+                    QueryType.Id => queryEngine.GetById(settings.Query) is { } member ? [member] : [],
+                    QueryType.Assembly => queryEngine.SearchByAssembly(settings.Query, settings.MaxResults),
+                    _ => []
+                };
+            }
 
             if (results.Count == 0 && settings.Format != OutputFormat.Json)
             {
@@ -80,13 +99,13 @@ public class QueryCommand : Command<QueryCommand.Settings>
         }
     }
 
-    private static void OutputJson(List<MemberInfo> results, ILuceneIndexManager indexManager, 
+    private static void OutputJson(List<MemberInfo> results, ILuceneIndexManager indexManager,
         MetadataService metadataService, Settings settings)
     {
-        var metadata = metadataService.BuildMetadata(results, indexManager, 
+        ResponseMetadata metadata = metadataService.BuildMetadata(results, indexManager,
             settings.Query, settings.QueryType.ToString());
-        
-        var response = new JsonResponse<List<MemberInfo>>
+
+        JsonResponse<List<MemberInfo>> response = new()
         {
             Results = results,
             Metadata = metadata
@@ -219,6 +238,18 @@ public class QueryCommand : Command<QueryCommand.Settings>
         [Description("Output format")]
         [CommandOption("-f|--format")]
         public OutputFormat Format { get; init; } = OutputFormat.Table;
+
+        [Description("Filter by member type (Type, Method, Property, Field, Event)")]
+        [CommandOption("--member-type")]
+        public MemberType? MemberTypeFilter { get; init; }
+
+        [Description("Filter by namespace pattern (supports wildcards)")]
+        [CommandOption("--namespace")]
+        public string? NamespaceFilter { get; init; }
+
+        [Description("Filter by assembly pattern (supports wildcards)")]
+        [CommandOption("--assembly")]
+        public string? AssemblyFilter { get; init; }
     }
 
     public enum QueryType

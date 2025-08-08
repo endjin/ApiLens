@@ -138,7 +138,7 @@ public class LeadingWildcardTests : IDisposable
         results.Count.ShouldBeGreaterThanOrEqualTo(4);
 
         // Verify we found different types of exceptions
-        var allExceptionTypes = results
+        List<string> allExceptionTypes = results
             .SelectMany(r => r.Exceptions)
             .Select(e => e.Type)
             .Distinct()
@@ -161,7 +161,7 @@ public class LeadingWildcardTests : IDisposable
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Test.Validation.ValidateInput");
 
-        var validationExceptions = results
+        List<string> validationExceptions = results
             .First(r => r.FullName == "Test.Validation.ValidateInput")
             .Exceptions
             .Select(e => e.Type)
@@ -194,7 +194,7 @@ public class LeadingWildcardTests : IDisposable
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Test.Custom.Process");
 
-        var customExceptions = results
+        List<string> customExceptions = results
             .First(r => r.FullName == "Test.Custom.Process")
             .Exceptions
             .Select(e => e.Type)
@@ -265,7 +265,7 @@ public class LeadingWildcardTests : IDisposable
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Test.Validation.ValidateInput");
 
-        var exceptions = results
+        List<string> exceptions = results
             .First(r => r.FullName == "Test.Validation.ValidateInput")
             .Exceptions
             .Select(e => e.Type)
@@ -279,7 +279,7 @@ public class LeadingWildcardTests : IDisposable
     public void SearchByException_LeadingWildcard_Performance_HandlesLargeResultSet()
     {
         // This test verifies that leading wildcard searches complete in reasonable time
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // Act - Search that could potentially match many results
         List<MemberInfo> results = engine.SearchByException("*", 100);

@@ -125,7 +125,7 @@ public class WildcardExceptionSearchTests : IDisposable
 
         // Assert - Should find System.ArgumentNullException, System.ArgumentException, System.ArgumentOutOfRangeException
         Console.WriteLine($"Wildcard search returned {results.Count} results:");
-        foreach (var result in results)
+        foreach (MemberInfo result in results)
         {
             Console.WriteLine($"- {result.FullName}: {string.Join(", ", result.Exceptions.Select(e => e.Type))}");
         }
@@ -143,7 +143,7 @@ public class WildcardExceptionSearchTests : IDisposable
 
         // Assert - Should find ArgumentNullException and ArgumentException
         Console.WriteLine($"Middle wildcard search returned {results.Count} results:");
-        foreach (var result in results)
+        foreach (MemberInfo result in results)
         {
             Console.WriteLine($"- {result.FullName}: {string.Join(", ", result.Exceptions.Select(e => e.Type))}");
         }
@@ -194,13 +194,13 @@ public class WildcardExceptionSearchTests : IDisposable
     public void InvestigateFieldAnalysis_ShowsFieldTypes()
     {
         // This test helps us understand how fields are analyzed
-        var totalDocs = indexManager.GetTotalDocuments();
+        int totalDocs = indexManager.GetTotalDocuments();
         Console.WriteLine($"Total documents in index: {totalDocs}");
 
         // Test various field searches to understand the behavior
-        var exactResults = indexManager.SearchByField("exceptionType", "System.ArgumentNullException", 10);
-        var textResults = indexManager.SearchByField("exceptionTypeText", "System.ArgumentNullException", 10);
-        var simpleResults = indexManager.SearchByField("exceptionSimpleName", "ArgumentNullException", 10);
+        TopDocs exactResults = indexManager.SearchByField("exceptionType", "System.ArgumentNullException", 10);
+        TopDocs textResults = indexManager.SearchByField("exceptionTypeText", "System.ArgumentNullException", 10);
+        TopDocs simpleResults = indexManager.SearchByField("exceptionSimpleName", "ArgumentNullException", 10);
 
         Console.WriteLine($"exceptionType field results: {exactResults.ScoreDocs?.Length ?? 0}");
         Console.WriteLine($"exceptionTypeText field results: {textResults.ScoreDocs?.Length ?? 0}");

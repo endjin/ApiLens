@@ -415,6 +415,77 @@ public class QueryEngine : IQueryEngine
         return ConvertTopDocsToMembers(topDocs);
     }
 
+    public List<MemberInfo> SearchWithFilters(string namePattern, MemberType? memberType,
+        string? namespacePattern, string? assemblyPattern, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(namePattern);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // Build a combined query with all filters
+        BooleanQuery query = new();
+
+        // Name pattern - always treat as wildcard if contains * or ?, otherwise add wildcards
+        string processedNamePattern = namePattern;
+        bool hasWildcards = namePattern.Contains('*') || namePattern.Contains('?');
+        if (!hasWildcards)
+        {
+            // Auto-add wildcards for convenience
+            processedNamePattern = $"*{namePattern}*";
+        }
+
+        // Use "name" field for wildcard searches (StringField, not analyzed)
+        Query? nameQuery = CreateWildcardQuery("name", processedNamePattern);
+        if (nameQuery != null)
+        {
+            query.Add(nameQuery, Occur.MUST);
+        }
+
+        // Member type filter
+        if (memberType.HasValue)
+        {
+            query.Add(new TermQuery(new Term("memberType", memberType.Value.ToString())), Occur.MUST);
+        }
+
+        // Namespace pattern filter
+        if (!string.IsNullOrEmpty(namespacePattern))
+        {
+            bool nsHasWildcards = namespacePattern.Contains('*') || namespacePattern.Contains('?');
+            if (nsHasWildcards)
+            {
+                Query? nsQuery = CreateWildcardQuery("namespace", namespacePattern);
+                if (nsQuery != null)
+                {
+                    query.Add(nsQuery, Occur.MUST);
+                }
+            }
+            else
+            {
+                query.Add(new TermQuery(new Term("namespace", namespacePattern)), Occur.MUST);
+            }
+        }
+
+        // Assembly pattern filter
+        if (!string.IsNullOrEmpty(assemblyPattern))
+        {
+            bool asmHasWildcards = assemblyPattern.Contains('*') || assemblyPattern.Contains('?');
+            if (asmHasWildcards)
+            {
+                Query? asmQuery = CreateWildcardQuery("assembly", assemblyPattern);
+                if (asmQuery != null)
+                {
+                    query.Add(asmQuery, Occur.MUST);
+                }
+            }
+            else
+            {
+                query.Add(new TermQuery(new Term("assembly", assemblyPattern)), Occur.MUST);
+            }
+        }
+
+        TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults);
+        return ConvertTopDocsToMembers(topDocs);
+    }
+
     private List<MemberInfo> ConvertTopDocsToMembers(TopDocs topDocs)
     {
         if (topDocs?.ScoreDocs == null)

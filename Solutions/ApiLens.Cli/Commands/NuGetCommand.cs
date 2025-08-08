@@ -308,9 +308,9 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
         table.AddColumn("[bold]XML Size[/]", c => c.RightAligned());
 
         // Group packages by ID for better readability and debugging
-        var packageGroups = packages.GroupBy(p => p.PackageId).OrderBy(g => g.Key);
+        IOrderedEnumerable<IGrouping<string, NuGetPackageInfo>> packageGroups = packages.GroupBy(p => p.PackageId).OrderBy(g => g.Key);
 
-        foreach (var group in packageGroups)
+        foreach (IGrouping<string, NuGetPackageInfo>? group in packageGroups)
         {
             foreach (NuGetPackageInfo package in group.OrderBy(p => p.Version).ThenBy(p => p.TargetFramework))
             {

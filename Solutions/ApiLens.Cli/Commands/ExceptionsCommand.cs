@@ -39,7 +39,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
-            var metadataService = new MetadataService();
+            MetadataService metadataService = new();
             metadataService.StartTiming();
 
             List<MemberInfo> results = queryEngine.GetByExceptionType(settings.ExceptionType, settings.MaxResults);
@@ -81,7 +81,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         }
     }
 
-    private static void OutputJson(List<MemberInfo> results, string exceptionType, 
+    private static void OutputJson(List<MemberInfo> results, string exceptionType,
         ILuceneIndexManager indexManager, MetadataService metadataService)
     {
         var output = results.SelectMany(member =>
@@ -103,11 +103,11 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
                 })
         ).ToList();
 
-        var metadata = metadataService.BuildMetadata(results, indexManager, 
+        ResponseMetadata metadata = metadataService.BuildMetadata(results, indexManager,
             exceptionType, "exception",
             new Dictionary<string, object> { ["exceptionType"] = exceptionType });
-        
-        var response = new JsonResponse<object>
+
+        JsonResponse<object> response = new()
         {
             Results = output,
             Metadata = metadata

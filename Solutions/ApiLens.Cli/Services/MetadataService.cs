@@ -11,7 +11,7 @@ namespace ApiLens.Cli.Services;
 public class MetadataService
 {
     private readonly Stopwatch _stopwatch;
-    
+
     public MetadataService()
     {
         _stopwatch = new Stopwatch();
@@ -44,10 +44,10 @@ public class MetadataService
         string? queryType = null,
         Dictionary<string, object>? commandMetadata = null)
     {
-        var resultsList = results.ToList();
-        var indexStats = indexManager.GetIndexStatistics();
+        List<MemberInfo> resultsList = results.ToList();
+        IndexStatistics? indexStats = indexManager.GetIndexStatistics();
 
-        var metadata = new ResponseMetadata
+        ResponseMetadata metadata = new()
         {
             TotalCount = resultsList.Count,
             SearchTime = GetElapsedTime(),
@@ -99,10 +99,10 @@ public class MetadataService
         string? queryType = null,
         Dictionary<string, object>? commandMetadata = null)
     {
-        var resultsList = results.ToList();
-        var indexStats = indexManager.GetIndexStatistics();
+        List<T> resultsList = results.ToList();
+        IndexStatistics? indexStats = indexManager.GetIndexStatistics();
 
-        var metadata = new ResponseMetadata
+        ResponseMetadata metadata = new()
         {
             TotalCount = resultsList.Count,
             SearchTime = GetElapsedTime(),
@@ -137,9 +137,9 @@ public class MetadataService
         string? queryType = null,
         Dictionary<string, object>? commandMetadata = null)
     {
-        var indexStats = indexManager.GetIndexStatistics();
+        IndexStatistics? indexStats = indexManager.GetIndexStatistics();
 
-        var metadata = new ResponseMetadata
+        ResponseMetadata metadata = new()
         {
             TotalCount = 0,
             SearchTime = GetElapsedTime(),

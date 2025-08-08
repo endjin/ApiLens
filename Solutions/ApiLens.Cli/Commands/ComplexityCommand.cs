@@ -38,7 +38,7 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
-            var metadataService = new MetadataService();
+            MetadataService metadataService = new();
             metadataService.StartTiming();
 
             List<MemberInfo> results;
@@ -71,7 +71,7 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
                 else
                 {
                     // Return error in JSON format
-                    var errorResponse = new JsonResponse<object>
+                    JsonResponse<object> errorResponse = new()
                     {
                         Results = new { error = "Please specify --min-complexity, --min-params, or --max-params." },
                         Metadata = metadataService.BuildMetadata(indexManager)
@@ -173,13 +173,13 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
                 : null
         };
 
-        var metadata = metadataService.BuildMetadata(results, indexManager, 
+        ResponseMetadata metadata = metadataService.BuildMetadata(results, indexManager,
             query: criteria, queryType: "complexity",
-            commandMetadata: showStats && metrics.Count > 0 
+            commandMetadata: showStats && metrics.Count > 0
                 ? new Dictionary<string, object> { ["includesStatistics"] = true }
                 : null);
-        
-        var response = new JsonResponse<object>
+
+        JsonResponse<object> response = new()
         {
             Results = output,
             Metadata = metadata

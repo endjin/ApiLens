@@ -26,4 +26,8 @@ public interface IQueryEngine : IDisposable
     List<MemberInfo> ListTypesFromPackage(string packagePattern, int maxResults);
     List<MemberInfo> SearchByNamespacePattern(string namespacePattern, int maxResults);
     List<MemberInfo> SearchByAssemblyAndType(string assemblyPattern, MemberType? memberType, int maxResults);
+
+    // Advanced filtering with wildcards
+    List<MemberInfo> SearchWithFilters(string namePattern, MemberType? memberType,
+        string? namespacePattern, string? assemblyPattern, int maxResults);
 }

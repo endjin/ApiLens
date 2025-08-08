@@ -99,8 +99,8 @@ public class ResponseMetadata
 
     private static string GetApiLensVersion()
     {
-        var assembly = typeof(ResponseMetadata).Assembly;
-        var version = assembly.GetName().Version;
+        System.Reflection.Assembly assembly = typeof(ResponseMetadata).Assembly;
+        Version? version = assembly.GetName().Version;
         return version?.ToString() ?? "1.0.0";
     }
 }
