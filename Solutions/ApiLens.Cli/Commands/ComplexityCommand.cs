@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
@@ -37,6 +38,9 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
+            var metadataService = new MetadataService();
+            metadataService.StartTiming();
+
             List<MemberInfo> results;
             string criteria = string.Empty;
 
@@ -64,19 +68,30 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
                     AnsiConsole.MarkupLine(
                         "[yellow]Please specify --min-complexity, --min-params, or --max-params.[/]");
                 }
+                else
+                {
+                    // Return error in JSON format
+                    var errorResponse = new JsonResponse<object>
+                    {
+                        Results = new { error = "Please specify --min-complexity, --min-params, or --max-params." },
+                        Metadata = metadataService.BuildMetadata(indexManager)
+                    };
+                    string errorJson = JsonSerializer.Serialize(errorResponse, JsonOptions);
+                    AnsiConsole.WriteLine(errorJson);
+                }
 
                 return 1;
             }
 
             if (results.Count == 0)
             {
-                if (settings.Format != OutputFormat.Json)
+                if (settings.Format == OutputFormat.Json)
                 {
-                    AnsiConsole.MarkupLine("[yellow]No methods found matching the criteria.[/]");
+                    OutputJson([], criteria, settings.ShowStats, indexManager, metadataService);
                 }
                 else
                 {
-                    AnsiConsole.WriteLine("[]");
+                    AnsiConsole.MarkupLine("[yellow]No methods found matching the criteria.[/]");
                 }
 
                 return 0;
@@ -93,7 +108,7 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
             switch (settings.Format)
             {
                 case OutputFormat.Json:
-                    OutputJson(sortedResults, criteria, settings.ShowStats);
+                    OutputJson(sortedResults, criteria, settings.ShowStats, indexManager, metadataService);
                     break;
                 case OutputFormat.Markdown:
                     OutputMarkdown(sortedResults, criteria, settings.ShowStats);
@@ -113,7 +128,8 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
         }
     }
 
-    private static void OutputJson(List<MemberInfo> results, string criteria, bool showStats)
+    private static void OutputJson(List<MemberInfo> results, string criteria, bool showStats,
+        ILuceneIndexManager indexManager, MetadataService metadataService)
     {
         List<ComplexityMetrics> metrics = results
             .Where(r => r.Complexity != null)
@@ -157,7 +173,19 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
                 : null
         };
 
-        string json = JsonSerializer.Serialize(output, JsonOptions);
+        var metadata = metadataService.BuildMetadata(results, indexManager, 
+            query: criteria, queryType: "complexity",
+            commandMetadata: showStats && metrics.Count > 0 
+                ? new Dictionary<string, object> { ["includesStatistics"] = true }
+                : null);
+        
+        var response = new JsonResponse<object>
+        {
+            Results = output,
+            Metadata = metadata
+        };
+
+        string json = JsonSerializer.Serialize(response, JsonOptions);
         AnsiConsole.WriteLine(json);
     }
 

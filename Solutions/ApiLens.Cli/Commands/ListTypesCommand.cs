@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Formatting;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
@@ -34,25 +35,48 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
     {
         try
         {
+            // Create index manager and query engine
+            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
+            using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
+
+            var metadataService = new MetadataService();
+            metadataService.StartTiming();
+
             // Validate that at least one filter is provided
             if (string.IsNullOrWhiteSpace(settings.Assembly) &&
                 string.IsNullOrWhiteSpace(settings.Package) &&
                 string.IsNullOrWhiteSpace(settings.Namespace))
             {
-                AnsiConsole.MarkupLine("[red]Error:[/] At least one filter (--assembly, --package, or --namespace) must be specified.");
+                if (settings.Format == OutputFormat.Json)
+                {
+                    var errorResponse = new JsonResponse<object>
+                    {
+                        Results = new { error = "At least one filter (--assembly, --package, or --namespace) must be specified." },
+                        Metadata = metadataService.BuildMetadata(indexManager)
+                    };
+                    string errorJson = JsonSerializer.Serialize(errorResponse, JsonOptions);
+                    AnsiConsole.WriteLine(errorJson);
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[red]Error:[/] At least one filter (--assembly, --package, or --namespace) must be specified.");
+                }
                 return 1;
             }
-
-            // Create index manager and query engine
-            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
-            using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
             // Build the combined query
             List<MemberInfo> results = GetFilteredResults(queryEngine, settings);
 
             if (results.Count == 0)
             {
-                AnsiConsole.MarkupLine("[yellow]No types found matching the specified filters.[/]");
+                if (settings.Format == OutputFormat.Json)
+                {
+                    OutputJson(results, indexManager, metadataService, settings);
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[yellow]No types found matching the specified filters.[/]");
+                }
                 return 0;
             }
 
@@ -68,18 +92,19 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
             switch (settings.Format)
             {
                 case OutputFormat.Json:
-                    OutputJson(results);
+                    OutputJson(results, indexManager, metadataService, settings);
                     break;
                 case OutputFormat.Table:
                     OutputTable(groupedResults, settings);
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine($"[green]Found {results.Count} {(settings.IncludeMembers ? "members" : "types")}[/]");
                     break;
                 case OutputFormat.Markdown:
                     OutputMarkdown(groupedResults, settings);
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine($"[green]Found {results.Count} {(settings.IncludeMembers ? "members" : "types")}[/]");
                     break;
             }
-
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[green]Found {results.Count} {(settings.IncludeMembers ? "members" : "types")}[/]");
 
             return 0;
         }
@@ -170,9 +195,30 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         return results;
     }
 
-    private static void OutputJson(List<MemberInfo> results)
+    private static void OutputJson(List<MemberInfo> results, ILuceneIndexManager indexManager, 
+        MetadataService metadataService, Settings settings)
     {
-        string json = JsonSerializer.Serialize(results, JsonOptions);
+        var filters = new List<string>();
+        if (!string.IsNullOrWhiteSpace(settings.Assembly)) filters.Add($"assembly: {settings.Assembly}");
+        if (!string.IsNullOrWhiteSpace(settings.Package)) filters.Add($"package: {settings.Package}");
+        if (!string.IsNullOrWhiteSpace(settings.Namespace)) filters.Add($"namespace: {settings.Namespace}");
+        
+        var metadata = metadataService.BuildMetadata(results, indexManager, 
+            query: string.Join(", ", filters), 
+            queryType: "list-types",
+            commandMetadata: new Dictionary<string, object>
+            {
+                ["includeMembers"] = settings.IncludeMembers,
+                ["groupBy"] = settings.GroupBy.ToString()
+            });
+        
+        var response = new JsonResponse<List<MemberInfo>>
+        {
+            Results = results,
+            Metadata = metadata
+        };
+
+        string json = JsonSerializer.Serialize(response, JsonOptions);
         AnsiConsole.WriteLine(json);
     }
 

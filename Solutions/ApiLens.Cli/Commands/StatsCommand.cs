@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 
@@ -22,19 +23,35 @@ public class StatsCommand : Command<StatsCommand.Settings>
             // Create index manager with the specified path
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
 
+            var metadataService = new MetadataService();
+            metadataService.StartTiming();
+
             // Get index statistics
             IndexStatistics? stats = indexManager.GetIndexStatistics();
 
             if (stats == null)
             {
-                AnsiConsole.MarkupLine("[yellow]No index found at the specified location.[/]");
+                if (settings.Format == OutputFormat.Json)
+                {
+                    var errorResponse = new JsonResponse<object>
+                    {
+                        Results = new { error = "No index found at the specified location." },
+                        Metadata = metadataService.BuildMetadata(indexManager)
+                    };
+                    string errorJson = JsonSerializer.Serialize(errorResponse, GetJsonOptions());
+                    AnsiConsole.WriteLine(errorJson);
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[yellow]No index found at the specified location.[/]");
+                }
                 return 0;
             }
 
             switch (settings.Format)
             {
                 case OutputFormat.Json:
-                    OutputJson(stats);
+                    OutputJson(stats, indexManager, metadataService);
                     break;
                 case OutputFormat.Markdown:
                     OutputMarkdown(stats);
@@ -75,28 +92,41 @@ public class StatsCommand : Command<StatsCommand.Settings>
         AnsiConsole.Write(table);
     }
 
-    private static void OutputJson(IndexStatistics stats)
+    private static void OutputJson(IndexStatistics stats, ILuceneIndexManager indexManager, 
+        MetadataService metadataService)
     {
-        JsonSerializerOptions jsonOptions = new()
+        var statsData = new
+        {
+            stats.IndexPath,
+            stats.TotalSizeInBytes,
+            TotalSizeFormatted = FormatSize(stats.TotalSizeInBytes),
+            stats.DocumentCount,
+            stats.FieldCount,
+            stats.FileCount,
+            LastModified = stats.LastModified?.ToString("O")
+        };
+
+        var metadata = metadataService.BuildMetadata(indexManager, 
+            queryType: "stats");
+        
+        var response = new JsonResponse<object>
+        {
+            Results = statsData,
+            Metadata = metadata
+        };
+
+        string json = JsonSerializer.Serialize(response, GetJsonOptions());
+        AnsiConsole.WriteLine(json);
+    }
+
+    private static JsonSerializerOptions GetJsonOptions()
+    {
+        return new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
-
-        string json = JsonSerializer.Serialize(
-            new
-            {
-                stats.IndexPath,
-                stats.TotalSizeInBytes,
-                TotalSizeFormatted = FormatSize(stats.TotalSizeInBytes),
-                stats.DocumentCount,
-                stats.FieldCount,
-                stats.FileCount,
-                LastModified = stats.LastModified?.ToString("O")
-            }, jsonOptions);
-
-        AnsiConsole.WriteLine(json);
     }
 
     private static void OutputMarkdown(IndexStatistics stats)

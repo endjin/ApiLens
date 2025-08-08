@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
@@ -36,6 +37,10 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
             // Create index manager and query engine with the specified path
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
+            
+            var metadataService = new MetadataService();
+            metadataService.StartTiming();
+            
             List<MemberInfo> results;
             string? searchPattern = null;
 
@@ -53,17 +58,16 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
 
             if (results.Count == 0)
             {
-                if (settings.Format != OutputFormat.Json)
+                if (settings.Format == OutputFormat.Json)
+                {
+                    OutputJson(results, searchPattern, indexManager, metadataService);
+                }
+                else
                 {
                     string message = searchPattern == null
                         ? "No methods with code examples found."
                         : $"No code examples found matching '{searchPattern}'.";
                     AnsiConsole.MarkupLine($"[yellow]{message}[/]");
-                }
-                else
-                {
-                    // Return empty JSON array
-                    AnsiConsole.WriteLine("[]");
                 }
 
                 return 0;
@@ -72,7 +76,7 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
             switch (settings.Format)
             {
                 case OutputFormat.Json:
-                    OutputJson(results, searchPattern);
+                    OutputJson(results, searchPattern, indexManager, metadataService);
                     break;
                 case OutputFormat.Markdown:
                     OutputMarkdown(results, searchPattern);
@@ -92,7 +96,8 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
         }
     }
 
-    private static void OutputJson(List<MemberInfo> results, string? searchPattern)
+    private static void OutputJson(List<MemberInfo> results, string? searchPattern,
+        ILuceneIndexManager indexManager, MetadataService metadataService)
     {
         var output = results.Select(member => new
         {
@@ -113,9 +118,22 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
                 language = ex.Language
             }),
             matchedPattern = searchPattern
-        });
+        }).ToList();
 
-        string json = JsonSerializer.Serialize(output, JsonOptions);
+        var metadata = metadataService.BuildMetadata(results, indexManager, 
+            query: searchPattern, 
+            queryType: "code-examples",
+            commandMetadata: searchPattern != null 
+                ? new Dictionary<string, object> { ["pattern"] = searchPattern }
+                : null);
+        
+        var response = new JsonResponse<object>
+        {
+            Results = output,
+            Metadata = metadata
+        };
+
+        string json = JsonSerializer.Serialize(response, JsonOptions);
         AnsiConsole.WriteLine(json);
     }
 

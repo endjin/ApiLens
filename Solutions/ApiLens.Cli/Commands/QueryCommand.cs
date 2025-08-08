@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Formatting;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
@@ -38,6 +39,9 @@ public class QueryCommand : Command<QueryCommand.Settings>
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
+            var metadataService = new MetadataService();
+            metadataService.StartTiming();
+
             List<MemberInfo> results = settings.QueryType switch
             {
                 QueryType.Name => queryEngine.SearchByName(settings.Query, settings.MaxResults),
@@ -48,7 +52,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
                 _ => []
             };
 
-            if (results.Count == 0)
+            if (results.Count == 0 && settings.Format != OutputFormat.Json)
             {
                 AnsiConsole.MarkupLine("[yellow]No results found.[/]");
                 return 0;
@@ -57,7 +61,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
             switch (settings.Format)
             {
                 case OutputFormat.Json:
-                    OutputJson(results);
+                    OutputJson(results, indexManager, metadataService, settings);
                     break;
                 case OutputFormat.Table:
                     OutputTable(results);
@@ -76,9 +80,19 @@ public class QueryCommand : Command<QueryCommand.Settings>
         }
     }
 
-    private static void OutputJson(List<MemberInfo> results)
+    private static void OutputJson(List<MemberInfo> results, ILuceneIndexManager indexManager, 
+        MetadataService metadataService, Settings settings)
     {
-        string json = JsonSerializer.Serialize(results, JsonOptions);
+        var metadata = metadataService.BuildMetadata(results, indexManager, 
+            settings.Query, settings.QueryType.ToString());
+        
+        var response = new JsonResponse<List<MemberInfo>>
+        {
+            Results = results,
+            Metadata = metadata
+        };
+
+        string json = JsonSerializer.Serialize(response, JsonOptions);
         AnsiConsole.WriteLine(json);
     }
 
