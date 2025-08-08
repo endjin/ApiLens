@@ -108,7 +108,9 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
                 },
             codeExamples = member.CodeExamples.Select(ex => new
             {
-                description = ex.Description, code = ex.Code, language = ex.Language
+                description = ex.Description,
+                code = ex.Code,
+                language = ex.Language
             }),
             matchedPattern = searchPattern
         });

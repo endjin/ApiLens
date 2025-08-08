@@ -116,12 +116,16 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         // Initialize channels
         parseChannel = Channel.CreateBounded<ParseTask>(new BoundedChannelOptions(ChannelCapacity)
         {
-            FullMode = BoundedChannelFullMode.Wait, SingleWriter = false, SingleReader = false
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleWriter = false,
+            SingleReader = false
         });
 
         documentChannel = Channel.CreateBounded<Document>(new BoundedChannelOptions(ChannelCapacity)
         {
-            FullMode = BoundedChannelFullMode.Wait, SingleWriter = false, SingleReader = true
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleWriter = false,
+            SingleReader = true
         });
 
         performanceTracker = new PerformanceTracker();
@@ -241,7 +245,8 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         // Parse files in parallel
         ParallelOptions parseOptions = new()
         {
-            CancellationToken = cancellationToken, MaxDegreeOfParallelism = Environment.ProcessorCount
+            CancellationToken = cancellationToken,
+            MaxDegreeOfParallelism = Environment.ProcessorCount
         };
 
         // Track progress
@@ -454,7 +459,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             // For keyword fields, use a TermQuery for exact matching (unless it contains wildcards)
             Query query;
             bool hasWildcards = searchTerm.Contains('*') || searchTerm.Contains('?');
-            
+
             if (!hasWildcards && fieldName is "id" or "memberType" or "name" or "fullName" or "assembly" or "namespace" or "exceptionType")
             {
                 query = new TermQuery(new Term(fieldName, searchTerm));

@@ -99,6 +99,15 @@ internal class Program
                 .WithExample("stats", "--index", "./custom-index")
                 .WithExample("stats", "--format", "json");
 
+            config.AddCommand<ListTypesCommand>("list-types")
+                .WithDescription("List types from assemblies, packages, or namespaces with filtering support")
+                .WithExample("list-types", "--assembly", "System.Collections")
+                .WithExample("list-types", "--package", "Newtonsoft.Json")
+                .WithExample("list-types", "--namespace", "System.Collections.Generic")
+                .WithExample("list-types", "--package", "Microsoft.Extensions.*", "--namespace", "Microsoft.Extensions.DependencyInjection")
+                .WithExample("list-types", "--assembly", "System.*", "--include-members")
+                .WithExample("list-types", "--package", "Serilog.AspNetCore", "--format", "json");
+
             config.AddCommand<NuGetCommand>("nuget")
                 .WithDescription("""
                                  Scan and index NuGet package cache.

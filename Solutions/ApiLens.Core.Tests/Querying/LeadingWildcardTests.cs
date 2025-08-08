@@ -136,14 +136,14 @@ public class LeadingWildcardTests : IDisposable
 
         // Assert - Should find many exception types
         results.Count.ShouldBeGreaterThanOrEqualTo(4);
-        
+
         // Verify we found different types of exceptions
         var allExceptionTypes = results
             .SelectMany(r => r.Exceptions)
             .Select(e => e.Type)
             .Distinct()
             .ToList();
-        
+
         allExceptionTypes.ShouldContain("System.ArgumentNullException");
         allExceptionTypes.ShouldContain("System.ArgumentException");
         allExceptionTypes.ShouldContain("System.TimeoutException");
@@ -160,13 +160,13 @@ public class LeadingWildcardTests : IDisposable
         // Assert
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Test.Validation.ValidateInput");
-        
+
         var validationExceptions = results
             .First(r => r.FullName == "Test.Validation.ValidateInput")
             .Exceptions
             .Select(e => e.Type)
             .ToList();
-        
+
         validationExceptions.ShouldContain("System.ArgumentNullException");
         validationExceptions.ShouldContain("System.ArgumentException");
     }
@@ -193,13 +193,13 @@ public class LeadingWildcardTests : IDisposable
         // Assert
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Test.Custom.Process");
-        
+
         var customExceptions = results
             .First(r => r.FullName == "Test.Custom.Process")
             .Exceptions
             .Select(e => e.Type)
             .ToList();
-        
+
         customExceptions.ShouldContain("MyApp.CustomException");
         customExceptions.ShouldContain("MyApp.ValidationException");
     }
@@ -240,17 +240,17 @@ public class LeadingWildcardTests : IDisposable
         // This test verifies that the QueryParser with AllowLeadingWildcard works
         // We'll use the DirectWildcardQuery as an alternative since SearchByField 
         // may have issues with how it constructs queries for certain field types
-        
+
         // First verify direct wildcard works (this passes in other tests)
         WildcardQuery wildcardQuery = new(new Term("exceptionType", "*Exception"));
         TopDocs directResults = indexManager.SearchWithQuery(wildcardQuery, 10);
         directResults.ScoreDocs.ShouldNotBeNull();
         directResults.ScoreDocs!.Length.ShouldBeGreaterThan(0);
-        
+
         // Now test SearchByField - it should work for fields that use QueryParser
         // Note: This may fail for keyword fields due to analyzer differences
         // The important thing is that leading wildcards are enabled in the QueryParser
-        
+
         // We've already verified that the QueryParser allows leading wildcards in another test
         // and that the direct wildcard queries work, which proves the core functionality
     }
@@ -264,13 +264,13 @@ public class LeadingWildcardTests : IDisposable
         // Assert
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Test.Validation.ValidateInput");
-        
+
         var exceptions = results
             .First(r => r.FullName == "Test.Validation.ValidateInput")
             .Exceptions
             .Select(e => e.Type)
             .ToList();
-        
+
         exceptions.ShouldContain("System.ArgumentNullException");
         exceptions.ShouldContain("System.ArgumentException");
     }
@@ -280,10 +280,10 @@ public class LeadingWildcardTests : IDisposable
     {
         // This test verifies that leading wildcard searches complete in reasonable time
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        
+
         // Act - Search that could potentially match many results
         List<MemberInfo> results = engine.SearchByException("*", 100);
-        
+
         stopwatch.Stop();
 
         // Assert - Should complete quickly even with leading wildcard

@@ -59,12 +59,14 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
         // Recursive case: use parallel scanning with channels
         Channel<FileInfo> fileChannel = Channel.CreateUnbounded<FileInfo>(new UnboundedChannelOptions
         {
-            SingleWriter = false, SingleReader = true
+            SingleWriter = false,
+            SingleReader = true
         });
 
         Channel<string> directoryChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions
         {
-            SingleWriter = false, SingleReader = false
+            SingleWriter = false,
+            SingleReader = false
         });
 
         // Start with the root directory

@@ -12,6 +12,7 @@ public interface IQueryEngine : IDisposable
     List<MemberInfo> GetByType(MemberType memberType, int maxResults);
     List<MemberInfo> GetTypeMembers(string typeName, int maxResults);
     List<MemberInfo> SearchByAssembly(string assemblyName, int maxResults);
+    List<MemberInfo> SearchByPackage(string packageId, int maxResults);
 
     // Specialized queries for rich metadata
     List<MemberInfo> SearchByCodeExample(string codePattern, int maxResults);
@@ -19,4 +20,10 @@ public interface IQueryEngine : IDisposable
     List<MemberInfo> GetByParameterCount(int min, int max, int maxResults);
     List<MemberInfo> GetMethodsWithExamples(int maxResults);
     List<MemberInfo> GetComplexMethods(int minComplexity, int maxResults);
+
+    // Assembly and type filtering
+    List<MemberInfo> ListTypesFromAssembly(string assemblyPattern, int maxResults);
+    List<MemberInfo> ListTypesFromPackage(string packagePattern, int maxResults);
+    List<MemberInfo> SearchByNamespacePattern(string namespacePattern, int maxResults);
+    List<MemberInfo> SearchByAssemblyAndType(string assemblyPattern, MemberType? memberType, int maxResults);
 }

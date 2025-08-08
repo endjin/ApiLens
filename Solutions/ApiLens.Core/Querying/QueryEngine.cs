@@ -340,6 +340,81 @@ public class QueryEngine : IQueryEngine
         return ConvertTopDocsToMembers(topDocs);
     }
 
+    public List<MemberInfo> ListTypesFromAssembly(string assemblyPattern, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assemblyPattern);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // First search for assembly matches (supports wildcards)
+        TopDocs assemblyDocs = indexManager.SearchByField("assembly", assemblyPattern, maxResults * 10);
+        List<MemberInfo> allMembers = ConvertTopDocsToMembers(assemblyDocs);
+
+        // Filter to only Type members
+        return allMembers
+            .Where(m => m.MemberType == MemberType.Type)
+            .Take(maxResults)
+            .ToList();
+    }
+
+    public List<MemberInfo> ListTypesFromPackage(string packagePattern, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packagePattern);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // Search for package matches (supports wildcards)
+        TopDocs packageDocs = indexManager.SearchByField("packageId", packagePattern, maxResults * 10);
+        List<MemberInfo> allMembers = ConvertTopDocsToMembers(packageDocs);
+
+        // Filter to only Type members
+        return allMembers
+            .Where(m => m.MemberType == MemberType.Type)
+            .Take(maxResults)
+            .ToList();
+    }
+
+    public List<MemberInfo> SearchByNamespacePattern(string namespacePattern, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(namespacePattern);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // Search namespace field with pattern (supports wildcards)
+        TopDocs topDocs = indexManager.SearchByField("namespace", namespacePattern, maxResults);
+        return ConvertTopDocsToMembers(topDocs);
+    }
+
+    public List<MemberInfo> SearchByAssemblyAndType(string assemblyPattern, MemberType? memberType, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assemblyPattern);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // Create a combined query for assembly and optionally member type
+        BooleanQuery query = new();
+
+        // Add assembly pattern query
+        bool hasWildcards = assemblyPattern.Contains('*') || assemblyPattern.Contains('?');
+        if (hasWildcards)
+        {
+            Query? wildcardQuery = CreateWildcardQuery("assembly", assemblyPattern);
+            if (wildcardQuery != null)
+            {
+                query.Add(wildcardQuery, Occur.MUST);
+            }
+        }
+        else
+        {
+            query.Add(new TermQuery(new Term("assembly", assemblyPattern)), Occur.MUST);
+        }
+
+        // Add member type filter if specified
+        if (memberType.HasValue)
+        {
+            query.Add(new TermQuery(new Term("memberType", memberType.Value.ToString())), Occur.MUST);
+        }
+
+        TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults);
+        return ConvertTopDocsToMembers(topDocs);
+    }
+
     private List<MemberInfo> ConvertTopDocsToMembers(TopDocs topDocs)
     {
         if (topDocs?.ScoreDocs == null)
@@ -431,7 +506,10 @@ public class QueryEngine : IQueryEngine
 
                 crossRefs.Add(new CrossReference
                 {
-                    SourceId = id, TargetId = crossRefId, Type = refType, Context = string.Empty
+                    SourceId = id,
+                    TargetId = crossRefId,
+                    Type = refType,
+                    Context = string.Empty
                 });
             }
         }
@@ -484,7 +562,8 @@ public class QueryEngine : IQueryEngine
             {
                 attributes.Add(new AttributeInfo
                 {
-                    Type = attrType, Properties = ImmutableDictionary<string, string>.Empty // Not stored in index
+                    Type = attrType,
+                    Properties = ImmutableDictionary<string, string>.Empty // Not stored in index
                 });
             }
         }

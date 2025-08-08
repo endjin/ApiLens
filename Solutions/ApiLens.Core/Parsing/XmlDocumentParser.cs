@@ -60,7 +60,10 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
 
         XmlReaderSettings settings = new()
         {
-            Async = true, IgnoreWhitespace = true, IgnoreComments = true, IgnoreProcessingInstructions = true
+            Async = true,
+            IgnoreWhitespace = true,
+            IgnoreComments = true,
+            IgnoreProcessingInstructions = true
         };
 
         using Stream fileStream = await fileSystem.OpenReadAsync(filePath);
@@ -533,7 +536,8 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             {
                 exceptions.Add(new ExceptionInfo
                 {
-                    Type = ExtractTypeNameFromCref(cref), Condition = NormalizeWhitespace(exceptionElement.Value)
+                    Type = ExtractTypeNameFromCref(cref),
+                    Condition = NormalizeWhitespace(exceptionElement.Value)
                 });
             }
         }
