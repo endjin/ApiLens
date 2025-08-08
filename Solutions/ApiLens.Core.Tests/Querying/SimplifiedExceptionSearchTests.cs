@@ -393,8 +393,11 @@ public class SimplifiedExceptionSearchTests : IDisposable
         // Act
         List<MemberInfo> results = engine.SearchByException("CustomIOException", 10);
 
-        // Assert - Custom namespaces not in common list won't be found by simple name
-        results.Count.ShouldBe(0);
+        // Assert - With leading wildcard support, suffix matching now finds custom namespace exceptions
+        // The suffix wildcard "*CustomIOException" matches "MyCompany.IO.CustomIOException"
+        results.Count.ShouldBe(1);
+        results[0].FullName.ShouldBe("Network.DownloadFile");
+        results[0].Exceptions.ShouldContain(e => e.Type == "MyCompany.IO.CustomIOException");
     }
 
     [TestMethod]
