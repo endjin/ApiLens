@@ -27,7 +27,8 @@ public class SolutionParserService : ISolutionParserService
         }
 
         string content = await fileSystem.ReadAllTextAsync(solutionPath);
-        List<ProjectReference> projects = [];
+        int projectCount = ProjectRegex.Matches(content).Count;
+        List<ProjectReference> projects = new(projectCount);
         string solutionDir = fileSystem.GetDirectoryName(solutionPath) ?? string.Empty;
 
         foreach (Match match in ProjectRegex.Matches(content))
