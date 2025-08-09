@@ -5,6 +5,7 @@ ApiLens is a .NET 9 CLI application that indexes and queries .NET XML API docume
 ## Features
 
 - **Index XML Documentation**: Parse and index .NET XML documentation files
+- **Project/Solution Analysis**: Analyze .NET projects and solutions to discover and index dependencies
 - **NuGet Package Support**: Automatically discover and index documentation from NuGet cache
 - **Version Tracking**: Track and display package versions and target frameworks
 - **Full-Text Search**: Query API documentation using Lucene.NET with advanced Lucene syntax
@@ -37,6 +38,9 @@ Check out the demo scripts in the `Demos/` folder for hands-on examples:
 ```bash
 # Quick start demo
 pwsh ./Demos/core/quick-start.ps1
+
+# Project/Solution analysis demo
+pwsh ./Demos/core/analyze-demo.ps1
 
 # NuGet package indexing demo  
 pwsh ./Demos/nuget/nuget-basic.ps1
@@ -78,6 +82,40 @@ apilens index ./docs --index ./index/custom-index
 ```
 
 **Note**: By convention, all indexes are stored under the `./index/` directory. Demo scripts use `/.tmp/indexes/` to keep them separate.
+
+### Project and Solution Analysis
+
+ApiLens can analyze .NET projects and solutions to discover and index their dependencies:
+
+Analyze a single project:
+```bash
+apilens analyze ./MyProject.csproj
+```
+
+Analyze a solution:
+```bash
+apilens analyze ./MySolution.sln
+```
+
+Include transitive dependencies:
+```bash
+apilens analyze ./MyProject.csproj --include-transitive --use-assets
+```
+
+Clean and rebuild index:
+```bash
+apilens analyze ./MyProject.csproj --clean --index ./my-index
+```
+
+Get analysis results as JSON:
+```bash
+apilens analyze ./MyProject.csproj --format json
+```
+
+Get markdown report:
+```bash
+apilens analyze ./MyProject.csproj --format markdown
+```
 
 ### NuGet Package Indexing
 
@@ -394,6 +432,41 @@ ApiLens is designed to be exposed as an MCP tool for LLMs. The JSON output forma
           "default": "table"
         }
       }
+    },
+    "analyze": {
+      "description": "Analyze .NET projects or solutions to discover and index dependencies",
+      "parameters": {
+        "path": {
+          "type": "string",
+          "description": "Path to .csproj, .fsproj, .vbproj, or .sln file",
+          "required": true
+        },
+        "index_path": {
+          "type": "string",
+          "description": "Index directory path (default: ./.index)"
+        },
+        "include_transitive": {
+          "type": "boolean",
+          "description": "Include transitive dependencies",
+          "default": false
+        },
+        "use_assets": {
+          "type": "boolean",
+          "description": "Parse project.assets.json for resolved versions",
+          "default": false
+        },
+        "clean": {
+          "type": "boolean",
+          "description": "Clean the index before analyzing",
+          "default": false
+        },
+        "format": {
+          "type": "string",
+          "enum": ["table", "json", "markdown"],
+          "description": "Output format",
+          "default": "table"
+        }
+      }
     }
   }
 }
@@ -402,6 +475,11 @@ ApiLens is designed to be exposed as an MCP tool for LLMs. The JSON output forma
 ### Example MCP Usage
 
 ```bash
+# Project and solution analysis
+apilens analyze ./MyProject.csproj --format json
+apilens analyze ./MySolution.sln --include-transitive --format json
+apilens analyze ./MyLib.csproj --use-assets --clean --format json
+
 # Basic API search
 apilens query "string" --format json --max 20
 apilens query "T:System.String" --type id --format json
@@ -462,7 +540,11 @@ The solution is organized under the `Solutions/` directory:
 4. **TypeHierarchyResolver**: Discovers type relationships
 5. **RelatedTypeResolver**: Finds all types related to a member
 6. **NuGetCacheScanner**: Discovers and indexes packages from NuGet cache
-7. **Specialized Commands**: Examples, Exceptions, and Complexity analyzers
+7. **ProjectAnalysisService**: Analyzes .NET projects and solutions
+8. **SolutionParserService**: Parses .sln files to extract project references
+9. **ProjectParserService**: Parses project files for package references
+10. **AssetFileParserService**: Parses project.assets.json for resolved dependencies
+11. **Specialized Commands**: Examples, Exceptions, Complexity, and Analyze commands
 
 ## Development
 
