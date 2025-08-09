@@ -26,7 +26,8 @@ $demoCategories = @{
     core = @(
         @{Name = "basic-usage.ps1"; Description = "Basic ApiLens usage demonstration"},
         @{Name = "quick-start.ps1"; Description = "Quick start guide for ApiLens"},
-        @{Name = "version-info.ps1"; Description = "Version information display demo"}
+        @{Name = "version-info.ps1"; Description = "Version information display demo"},
+        @{Name = "analyze-demo.ps1"; Description = "Project and solution analysis demonstration"}
     )
     nuget = @(
         @{Name = "nuget-basic.ps1"; Description = "Basic NuGet command usage"},
