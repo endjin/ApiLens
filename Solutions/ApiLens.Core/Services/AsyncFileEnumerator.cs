@@ -150,7 +150,10 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
             {
                 while (directoryReader.TryRead(out string? directory))
                 {
-                    if (directory == null) continue;
+                    if (directory == null)
+                    {
+                        continue;
+                    }
 
                     try
                     {
@@ -161,7 +164,7 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
                         }
 
                         // Queue subdirectories
-                        List<DirectoryInfo> subdirs = fileSystem.EnumerateDirectories(directory).ToList();
+                        List<DirectoryInfo> subdirs = [.. fileSystem.EnumerateDirectories(directory)];
                         if (subdirs.Count > 0)
                         {
                             // Increment active directories before writing

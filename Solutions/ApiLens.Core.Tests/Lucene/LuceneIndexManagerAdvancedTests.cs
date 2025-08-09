@@ -303,13 +303,13 @@ public class LuceneIndexManagerAdvancedTests : IDisposable
     {
         // Arrange - Simulate concurrent indexing of multiple files
         int fileCount = 10;
-        List<string> files = Enumerable.Range(1, fileCount).Select(i => $"/test/file{i}.xml").ToList();
+        List<string> files = [.. Enumerable.Range(1, fileCount).Select(i => $"/test/file{i}.xml")];
 
         for (int i = 0; i < files.Count; i++)
         {
             string file = files[i];
-            List<MemberInfo> members = Enumerable.Range(1, 5).Select(j =>
-                CreateMemberInfo($"package{i + 1}", "1.0.0", "net6.0", file, $"Type{j}")).ToList();
+            List<MemberInfo> members = [.. Enumerable.Range(1, 5).Select(j =>
+                CreateMemberInfo($"package{i + 1}", "1.0.0", "net6.0", file, $"Type{j}"))];
 
             mockParser.ParseXmlFileStreamAsync(file, Arg.Any<CancellationToken>()).Returns(CreateAsyncEnumerable(members.ToArray()));
 
@@ -374,16 +374,24 @@ public class LuceneIndexManagerAdvancedTests : IDisposable
         ];
 
         if (!string.IsNullOrEmpty(member.PackageId))
+        {
             doc.Add(new StringField("packageId", member.PackageId, Field.Store.YES));
+        }
 
         if (!string.IsNullOrEmpty(member.PackageVersion))
+        {
             doc.Add(new StringField("packageVersion", member.PackageVersion, Field.Store.YES));
+        }
 
         if (!string.IsNullOrEmpty(member.TargetFramework))
+        {
             doc.Add(new StringField("targetFramework", member.TargetFramework, Field.Store.YES));
+        }
 
         if (!string.IsNullOrEmpty(member.SourceFilePath))
+        {
             doc.Add(new StringField("sourceFilePath", member.SourceFilePath, Field.Store.YES));
+        }
 
         return doc;
     }

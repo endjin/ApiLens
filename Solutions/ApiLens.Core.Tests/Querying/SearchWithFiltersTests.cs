@@ -85,7 +85,7 @@ public class SearchWithFiltersTests : IDisposable
         Assert.IsTrue(results.All(r => r.Name.Contains("Parse", StringComparison.OrdinalIgnoreCase)));
 
         // Should find ParseInt, ParseDouble, TryParse, JsonParser, XmlParser, ParseException
-        List<string> names = results.Select(r => r.Name).ToList();
+        List<string> names = [.. results.Select(r => r.Name)];
         Assert.IsTrue(names.Contains("ParseInt"));
         Assert.IsTrue(names.Contains("ParseDouble"));
         Assert.IsTrue(names.Contains("TryParse"));
@@ -106,7 +106,7 @@ public class SearchWithFiltersTests : IDisposable
         Assert.IsTrue(methods.All(r => r.Name.Contains("Parse", StringComparison.OrdinalIgnoreCase)));
 
         // Should find ParseInt, ParseDouble, TryParse but not JsonParser (Type)
-        List<string> methodNames = methods.Select(r => r.Name).ToList();
+        List<string> methodNames = [.. methods.Select(r => r.Name)];
         Assert.IsTrue(methodNames.Contains("ParseInt"));
         Assert.IsTrue(methodNames.Contains("ParseDouble"));
         Assert.IsTrue(methodNames.Contains("TryParse"));
@@ -124,7 +124,7 @@ public class SearchWithFiltersTests : IDisposable
         Assert.IsTrue(results.All(r => r.Namespace == "Newtonsoft.Json"));
         Assert.IsTrue(results.All(r => r.Name.Contains("Serialize", StringComparison.OrdinalIgnoreCase)));
 
-        List<string> names = results.Select(r => r.Name).ToList();
+        List<string> names = [.. results.Select(r => r.Name)];
         Assert.IsTrue(names.Contains("Serialize") || names.Contains("Deserialize"));
     }
 
@@ -138,7 +138,7 @@ public class SearchWithFiltersTests : IDisposable
         Assert.IsTrue(results.Count > 0);
         Assert.IsTrue(results.All(r => r.Namespace.StartsWith("Newtonsoft.")));
 
-        List<string> names = results.Select(r => r.Name).ToList();
+        List<string> names = [.. results.Select(r => r.Name)];
         Assert.IsTrue(names.Contains("Token") || names.Contains("SelectToken"));
     }
 
@@ -152,7 +152,7 @@ public class SearchWithFiltersTests : IDisposable
         Assert.IsTrue(results.Count > 0);
         Assert.IsTrue(results.All(r => r.Assembly == "Newtonsoft.Json"));
 
-        List<string> names = results.Select(r => r.Name).ToList();
+        List<string> names = [.. results.Select(r => r.Name)];
         Assert.IsTrue(names.Contains("JsonParser"));
     }
 
@@ -169,7 +169,7 @@ public class SearchWithFiltersTests : IDisposable
         Assert.IsTrue(results.All(r => r.Assembly == "System.Core"));
         Assert.IsTrue(results.All(r => r.Name.Contains("Exception")));
 
-        List<string> names = results.Select(r => r.Name).ToList();
+        List<string> names = [.. results.Select(r => r.Name)];
         Assert.IsTrue(names.Contains("ParseException") || names.Contains("ArgumentException"));
     }
 
@@ -184,7 +184,7 @@ public class SearchWithFiltersTests : IDisposable
         Assert.IsTrue(results.All(r => r.Name.EndsWith("Exception")));
         Assert.IsTrue(results.All(r => r.MemberType == MemberType.Type));
 
-        List<string> names = results.Select(r => r.Name).ToList();
+        List<string> names = [.. results.Select(r => r.Name)];
         Assert.IsTrue(names.Contains("ParseException"));
         Assert.IsTrue(names.Contains("IOException"));
         Assert.IsTrue(names.Contains("ArgumentException"));
@@ -200,7 +200,7 @@ public class SearchWithFiltersTests : IDisposable
         Assert.IsTrue(results.Count > 0);
         Assert.IsTrue(results.All(r => r.MemberType == MemberType.Property));
 
-        List<string> names = results.Select(r => r.Name).ToList();
+        List<string> names = [.. results.Select(r => r.Name)];
         Assert.IsTrue(names.Contains("Count"));
     }
 

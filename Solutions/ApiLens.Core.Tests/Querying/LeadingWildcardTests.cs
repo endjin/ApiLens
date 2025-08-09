@@ -138,11 +138,10 @@ public class LeadingWildcardTests : IDisposable
         results.Count.ShouldBeGreaterThanOrEqualTo(4);
 
         // Verify we found different types of exceptions
-        List<string> allExceptionTypes = results
+        List<string> allExceptionTypes = [.. results
             .SelectMany(r => r.Exceptions)
             .Select(e => e.Type)
-            .Distinct()
-            .ToList();
+            .Distinct()];
 
         allExceptionTypes.ShouldContain("System.ArgumentNullException");
         allExceptionTypes.ShouldContain("System.ArgumentException");
@@ -161,11 +160,10 @@ public class LeadingWildcardTests : IDisposable
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Test.Validation.ValidateInput");
 
-        List<string> validationExceptions = results
+        List<string> validationExceptions = [.. results
             .First(r => r.FullName == "Test.Validation.ValidateInput")
             .Exceptions
-            .Select(e => e.Type)
-            .ToList();
+            .Select(e => e.Type)];
 
         validationExceptions.ShouldContain("System.ArgumentNullException");
         validationExceptions.ShouldContain("System.ArgumentException");
@@ -194,11 +192,10 @@ public class LeadingWildcardTests : IDisposable
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Test.Custom.Process");
 
-        List<string> customExceptions = results
+        List<string> customExceptions = [.. results
             .First(r => r.FullName == "Test.Custom.Process")
             .Exceptions
-            .Select(e => e.Type)
-            .ToList();
+            .Select(e => e.Type)];
 
         customExceptions.ShouldContain("MyApp.CustomException");
         customExceptions.ShouldContain("MyApp.ValidationException");
@@ -265,11 +262,10 @@ public class LeadingWildcardTests : IDisposable
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Test.Validation.ValidateInput");
 
-        List<string> exceptions = results
+        List<string> exceptions = [.. results
             .First(r => r.FullName == "Test.Validation.ValidateInput")
             .Exceptions
-            .Select(e => e.Type)
-            .ToList();
+            .Select(e => e.Type)];
 
         exceptions.ShouldContain("System.ArgumentNullException");
         exceptions.ShouldContain("System.ArgumentException");

@@ -148,7 +148,9 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             foreach (MemberInfo member in members)
             {
                 if (cancellationToken.IsCancellationRequested)
+                {
                     break;
+                }
 
                 try
                 {
@@ -250,7 +252,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         };
 
         // Track progress
-        List<string> filePathList = filePaths.ToList();
+        List<string> filePathList = [.. filePaths];
         int filesProcessed = 0;
 
         await Parallel.ForEachAsync(filePathList, parseOptions, async (filePath, ct) =>
@@ -510,7 +512,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             IndexSearcher searcher = new(reader);
 
             // Create a BooleanQuery to combine multiple terms with OR
-            BooleanQuery query = new();
+            BooleanQuery query = [];
             foreach (string term in searchTerms)
             {
                 if (!string.IsNullOrWhiteSpace(term))
@@ -629,7 +631,9 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
     public IndexStatistics? GetIndexStatistics()
     {
         if (string.IsNullOrEmpty(indexPath))
+        {
             return null;
+        }
 
         return new IndexStatistics
         {
@@ -664,7 +668,9 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                 // Skip deleted documents
                 IBits? liveDocs = MultiFields.GetLiveDocs(reader);
                 if (liveDocs != null && !liveDocs.Get(i))
+                {
                     continue;
+                }
 
                 Document? doc = reader.Document(i, fieldsToLoad);
 
@@ -707,7 +713,9 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                 // Skip deleted documents
                 IBits? liveDocs = MultiFields.GetLiveDocs(reader);
                 if (liveDocs != null && !liveDocs.Get(i))
+                {
                     continue;
+                }
 
                 Document? doc = reader.Document(i, fieldsToLoad);
 
@@ -830,7 +838,9 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
     public void Dispose()
     {
         if (disposed)
+        {
             return;
+        }
 
         disposed = true;
 

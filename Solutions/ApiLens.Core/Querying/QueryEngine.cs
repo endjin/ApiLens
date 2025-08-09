@@ -157,16 +157,15 @@ public class QueryEngine : IQueryEngine
         TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults * 2);
 
         // Convert and deduplicate results
-        return ConvertTopDocsToMembers(topDocs)
+        return [.. ConvertTopDocsToMembers(topDocs)
             .GroupBy(m => m.Id)
             .Select(g => g.First())
-            .Take(maxResults)
-            .ToList();
+            .Take(maxResults)];
     }
 
     private Query BuildExceptionSearchQuery(string searchTerm)
     {
-        BooleanQuery queryBuilder = new();
+        BooleanQuery queryBuilder = [];
 
         bool hasWildcards = searchTerm.Contains('*') || searchTerm.Contains('?');
         bool hasNamespace = searchTerm.Contains('.');
@@ -259,9 +258,7 @@ public class QueryEngine : IQueryEngine
         queryBuilder.Add(new TermQuery(new Term("exceptionSimpleName", searchTerm.ToLowerInvariant())), Occur.SHOULD);
 
         // Try exact match with common namespaces
-        List<string> namespacedTypes = CommonExceptionNamespaces
-            .Select(ns => $"{ns}.{searchTerm}")
-            .ToList();
+        List<string> namespacedTypes = [.. CommonExceptionNamespaces.Select(ns => $"{ns}.{searchTerm}")];
 
         foreach (string nsType in namespacedTypes)
         {
@@ -350,10 +347,9 @@ public class QueryEngine : IQueryEngine
         List<MemberInfo> allMembers = ConvertTopDocsToMembers(assemblyDocs);
 
         // Filter to only Type members
-        return allMembers
+        return [.. allMembers
             .Where(m => m.MemberType == MemberType.Type)
-            .Take(maxResults)
-            .ToList();
+            .Take(maxResults)];
     }
 
     public List<MemberInfo> ListTypesFromPackage(string packagePattern, int maxResults)
@@ -366,10 +362,9 @@ public class QueryEngine : IQueryEngine
         List<MemberInfo> allMembers = ConvertTopDocsToMembers(packageDocs);
 
         // Filter to only Type members
-        return allMembers
+        return [.. allMembers
             .Where(m => m.MemberType == MemberType.Type)
-            .Take(maxResults)
-            .ToList();
+            .Take(maxResults)];
     }
 
     public List<MemberInfo> SearchByNamespacePattern(string namespacePattern, int maxResults)
@@ -388,7 +383,7 @@ public class QueryEngine : IQueryEngine
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
         // Create a combined query for assembly and optionally member type
-        BooleanQuery query = new();
+        BooleanQuery query = [];
 
         // Add assembly pattern query
         bool hasWildcards = assemblyPattern.Contains('*') || assemblyPattern.Contains('?');
@@ -422,7 +417,7 @@ public class QueryEngine : IQueryEngine
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
         // Build a combined query with all filters
-        BooleanQuery query = new();
+        BooleanQuery query = [];
 
         // Name pattern - always treat as wildcard if contains * or ?, otherwise add wildcards
         string processedNamePattern = namePattern;
@@ -489,7 +484,9 @@ public class QueryEngine : IQueryEngine
     private List<MemberInfo> ConvertTopDocsToMembers(TopDocs topDocs)
     {
         if (topDocs?.ScoreDocs == null)
+        {
             return [];
+        }
 
         List<MemberInfo> members = new(topDocs.ScoreDocs.Length);
 
@@ -567,13 +564,21 @@ public class QueryEngine : IQueryEngine
                 ReferenceType refType = ReferenceType.SeeAlso;
 
                 if (document.Get($"crossref_Inherits") == crossRefId)
+                {
                     refType = ReferenceType.Inheritance;
+                }
                 else if (document.Get($"crossref_Implements") == crossRefId)
+                {
                     refType = ReferenceType.Inheritance;
+                }
                 else if (document.Get($"crossref_Return") == crossRefId)
+                {
                     refType = ReferenceType.ReturnType;
+                }
                 else if (document.Get($"crossref_Param") == crossRefId)
+                {
                     refType = ReferenceType.Parameter;
+                }
 
                 crossRefs.Add(new CrossReference
                 {

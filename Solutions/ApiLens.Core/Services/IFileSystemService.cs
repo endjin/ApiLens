@@ -98,4 +98,11 @@ public interface IFileSystemService
     /// <param name="path">The directory path.</param>
     /// <returns>Enumerable of directory information.</returns>
     IEnumerable<DirectoryInfo> EnumerateDirectories(string path);
+
+    /// <summary>
+    /// Reads all text from a file.
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <returns>The text content of the file.</returns>
+    Task<string> ReadAllTextAsync(string path);
 }

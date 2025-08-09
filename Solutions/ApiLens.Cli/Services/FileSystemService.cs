@@ -53,7 +53,9 @@ public class FileSystemService : IFileSystemService
     public string CombinePath(params string[] paths)
     {
         if (paths == null || paths.Length == 0)
+        {
             throw new ArgumentException("At least one path segment is required", nameof(paths));
+        }
 
         DirectoryPath result = new(paths[0]);
         for (int i = 1; i < paths.Length; i++)
@@ -164,5 +166,22 @@ public class FileSystemService : IFileSystemService
 
         return directory.GetDirectories("*", SearchScope.Current)
             .Select(d => new DirectoryInfo(d.Path.FullPath));
+    }
+
+    public async Task<string> ReadAllTextAsync(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        FilePath filePath = new(path);
+
+        if (!fileSystem.Exist(filePath))
+        {
+            throw new FileNotFoundException($"File not found: {path}");
+        }
+
+        IFile file = fileSystem.GetFile(filePath);
+        using Stream stream = file.OpenRead();
+        using StreamReader reader = new(stream);
+        return await reader.ReadToEndAsync();
     }
 }

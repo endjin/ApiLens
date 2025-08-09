@@ -63,7 +63,7 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
             else
             {
                 // Get existing packages from index for change detection
-                Dictionary<string, HashSet<string>> indexedPackages = new();
+                Dictionary<string, HashSet<string>> indexedPackages = [];
 
                 await AnsiConsole.Status()
                     .StartAsync("Analyzing index for change detection...", async ctx =>
@@ -336,11 +336,17 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
     private static string FormatDuration(TimeSpan duration)
     {
         if (duration.TotalMilliseconds < 1000)
+        {
             return $"{duration.TotalMilliseconds:N0} ms";
+        }
         else if (duration.TotalSeconds < 60)
+        {
             return $"{duration.TotalSeconds:N2} s";
+        }
         else
+        {
             return $"{duration.TotalMinutes:N2} min";
+        }
     }
 
     /// <summary>

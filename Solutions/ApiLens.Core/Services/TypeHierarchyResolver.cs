@@ -59,7 +59,9 @@ public class TypeHierarchyResolver
 
             // If we didn't find a base type, stop
             if (baseTypes.Count == visitedTypes.Count - 1)
+            {
                 break;
+            }
         }
 
         return baseTypes;
@@ -97,7 +99,9 @@ public class TypeHierarchyResolver
         }
 
         if (member == null)
+        {
             return [];
+        }
 
         List<MemberInfo> relatedTypes = [];
 

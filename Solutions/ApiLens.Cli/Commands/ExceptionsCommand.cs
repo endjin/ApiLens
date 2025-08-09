@@ -276,7 +276,9 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
 
             // Check full type or simple name
             if (Regex.IsMatch(exceptionType, regexPattern, RegexOptions.IgnoreCase))
+            {
                 return true;
+            }
 
             if (!searchPattern.Contains('.'))
             {
@@ -292,7 +294,9 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         // For non-wildcard searches, check various matching strategies
         // 1. Contains check (handles partial matches)
         if (exceptionType.Contains(searchPattern, StringComparison.OrdinalIgnoreCase))
+        {
             return true;
+        }
 
         // 2. If search has namespace, check if exception name matches
         if (searchPattern.Contains('.') && exceptionType.Contains('.'))

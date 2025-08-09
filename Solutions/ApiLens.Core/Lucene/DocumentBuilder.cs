@@ -125,17 +125,23 @@ public class DocumentBuilder : IDocumentBuilder
         contentBuilder.Append(memberInfo.FullName).Append(' ');
 
         if (!string.IsNullOrWhiteSpace(memberInfo.Summary))
+        {
             contentBuilder.Append(memberInfo.Summary).Append(' ');
+        }
 
         if (!string.IsNullOrWhiteSpace(memberInfo.Remarks))
+        {
             contentBuilder.Append(memberInfo.Remarks).Append(' ');
+        }
 
         // Include code examples in content
         foreach (CodeExample example in memberInfo.CodeExamples)
         {
             contentBuilder.Append(example.Code).Append(' ');
             if (!string.IsNullOrWhiteSpace(example.Description))
+            {
                 contentBuilder.Append(example.Description).Append(' ');
+            }
         }
 
         // Include exception types in content
@@ -143,7 +149,9 @@ public class DocumentBuilder : IDocumentBuilder
         {
             contentBuilder.Append(exception.Type).Append(' ');
             if (!string.IsNullOrWhiteSpace(exception.Condition))
+            {
                 contentBuilder.Append(exception.Condition).Append(' ');
+            }
         }
 
         // Include parameter descriptions
@@ -152,7 +160,9 @@ public class DocumentBuilder : IDocumentBuilder
             contentBuilder.Append(parameter.Type).Append(' ');
             contentBuilder.Append(parameter.Name).Append(' ');
             if (!string.IsNullOrWhiteSpace(parameter.Description))
+            {
                 contentBuilder.Append(parameter.Description).Append(' ');
+            }
         }
 
         doc.Add(new TextField("content", contentBuilder.ToString(), Field.Store.NO));
@@ -283,7 +293,9 @@ public class DocumentBuilder : IDocumentBuilder
 
         // Add see also references
         if (!string.IsNullOrWhiteSpace(memberInfo.SeeAlso))
+        {
             parts.Add(memberInfo.SeeAlso);
+        }
 
         return string.Join(" ", parts);
     }

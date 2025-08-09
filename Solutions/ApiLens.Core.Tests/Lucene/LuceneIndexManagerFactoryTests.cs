@@ -71,8 +71,15 @@ public class LuceneIndexManagerFactoryTests
         }
         finally
         {
-            if (Directory.Exists(path1)) Directory.Delete(path1, true);
-            if (Directory.Exists(path2)) Directory.Delete(path2, true);
+            if (Directory.Exists(path1))
+            {
+                Directory.Delete(path1, true);
+            }
+
+            if (Directory.Exists(path2))
+            {
+                Directory.Delete(path2, true);
+            }
         }
     }
 
@@ -106,7 +113,10 @@ public class LuceneIndexManagerFactoryTests
         }
         finally
         {
-            if (Directory.Exists(indexPath)) Directory.Delete(indexPath, true);
+            if (Directory.Exists(indexPath))
+            {
+                Directory.Delete(indexPath, true);
+            }
         }
     }
 
@@ -130,7 +140,10 @@ public class LuceneIndexManagerFactoryTests
         }
         finally
         {
-            if (Directory.Exists(indexPath)) Directory.Delete(indexPath, true);
+            if (Directory.Exists(indexPath))
+            {
+                Directory.Delete(indexPath, true);
+            }
         }
     }
 
@@ -154,7 +167,10 @@ public class LuceneIndexManagerFactoryTests
         }
         finally
         {
-            if (Directory.Exists(indexPath)) Directory.Delete(indexPath, true);
+            if (Directory.Exists(indexPath))
+            {
+                Directory.Delete(indexPath, true);
+            }
         }
     }
 

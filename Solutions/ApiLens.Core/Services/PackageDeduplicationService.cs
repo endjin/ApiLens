@@ -89,9 +89,13 @@ public class PackageDeduplicationService : IPackageDeduplicationService
             {
                 packagesToIndex.Add(normalizedPath);
                 if (isNew)
+                {
                     newPackages++;
+                }
                 else
+                {
                     updatedPackages++;
+                }
 
                 // Track for deletion if using latest-only mode
                 if (latestOnly && existingVersions != null)
@@ -157,7 +161,9 @@ public class PackageDeduplicationService : IPackageDeduplicationService
     private static bool IsNewerThanAll(string newVersion, IEnumerable<string> existingVersions)
     {
         if (!Version.TryParse(newVersion, out Version? newVer))
+        {
             return false;
+        }
 
         foreach (string existingVersion in existingVersions)
         {

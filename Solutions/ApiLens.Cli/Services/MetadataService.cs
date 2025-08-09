@@ -44,7 +44,7 @@ public class MetadataService
         string? queryType = null,
         Dictionary<string, object>? commandMetadata = null)
     {
-        List<MemberInfo> resultsList = results.ToList();
+        List<MemberInfo> resultsList = [.. results];
         IndexStatistics? indexStats = indexManager.GetIndexStatistics();
 
         ResponseMetadata metadata = new()
@@ -57,20 +57,18 @@ public class MetadataService
         };
 
         // Extract unique assemblies
-        metadata.Assemblies = resultsList
+        metadata.Assemblies = [.. resultsList
             .Select(r => r.Assembly)
             .Where(a => !string.IsNullOrEmpty(a))
             .Distinct()
-            .OrderBy(a => a)
-            .ToList();
+            .OrderBy(a => a)];
 
         // Extract unique packages
-        metadata.Packages = resultsList
+        metadata.Packages = [.. resultsList
             .Where(r => !string.IsNullOrEmpty(r.PackageId))
             .Select(r => r.PackageId!)
             .Distinct()
-            .OrderBy(p => p)
-            .ToList();
+            .OrderBy(p => p)];
 
         // Add index statistics if available
         if (indexStats != null)
@@ -99,7 +97,7 @@ public class MetadataService
         string? queryType = null,
         Dictionary<string, object>? commandMetadata = null)
     {
-        List<T> resultsList = results.ToList();
+        List<T> resultsList = [.. results];
         IndexStatistics? indexStats = indexManager.GetIndexStatistics();
 
         ResponseMetadata metadata = new()

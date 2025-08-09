@@ -40,7 +40,7 @@ public class IndexCommandTests
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
 
         // Setup default for GetIndexedPackageVersions
-        mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
+        mockIndexManager.GetIndexedPackageVersions().Returns([]);
 
         // Setup default for GetTotalDocuments
         mockIndexManager.GetTotalDocuments().Returns(0);

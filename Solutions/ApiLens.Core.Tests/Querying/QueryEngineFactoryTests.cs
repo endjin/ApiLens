@@ -142,7 +142,7 @@ public class QueryEngineFactoryTests
             }));
         }
 
-        Task.WaitAll(tasks.ToArray());
+        Task.WaitAll([.. tasks]);
 
         // Assert
         engines.Count.ShouldBe(10);

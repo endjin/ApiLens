@@ -131,10 +131,9 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
     private static void OutputJson(List<MemberInfo> results, string criteria, bool showStats,
         ILuceneIndexManager indexManager, MetadataService metadataService)
     {
-        List<ComplexityMetrics> metrics = results
+        List<ComplexityMetrics> metrics = [.. results
             .Where(r => r.Complexity != null)
-            .Select(r => r.Complexity!)
-            .ToList();
+            .Select(r => r.Complexity!)];
 
         var output = new
         {
@@ -214,10 +213,9 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
             AnsiConsole.WriteLine("## Statistics");
             AnsiConsole.WriteLine();
 
-            List<ComplexityMetrics> metrics = results
+            List<ComplexityMetrics> metrics = [.. results
                 .Where(r => r.Complexity != null)
-                .Select(r => r.Complexity!)
-                .ToList();
+                .Select(r => r.Complexity!)];
 
             if (metrics.Count > 0)
             {
@@ -263,10 +261,9 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
             AnsiConsole.WriteLine();
             AnsiConsole.Write(new Rule("[bold]Statistics[/]").RuleStyle("dim"));
 
-            List<ComplexityMetrics> metrics = results
+            List<ComplexityMetrics> metrics = [.. results
                 .Where(r => r.Complexity != null)
-                .Select(r => r.Complexity!)
-                .ToList();
+                .Select(r => r.Complexity!)];
 
             if (metrics.Count > 0)
             {

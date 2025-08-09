@@ -137,7 +137,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
             results = queryEngine.SearchByNamespacePattern(settings.Namespace, settings.MaxResults);
             if (!settings.IncludeMembers)
             {
-                results = results.Where(m => m.MemberType == MemberType.Type).ToList();
+                results = [.. results.Where(m => m.MemberType == MemberType.Type)];
             }
         }
 
@@ -159,12 +159,12 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
                         .Replace("\\?", ".") + "$";
                     System.Text.RegularExpressions.Regex regex = new(regexPattern,
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    results = results.Where(m => regex.IsMatch(m.Namespace)).ToList();
+                    results = [.. results.Where(m => regex.IsMatch(m.Namespace))];
                 }
                 else
                 {
-                    results = results.Where(m => m.Namespace.Equals(namespacePattern,
-                        StringComparison.OrdinalIgnoreCase)).ToList();
+                    results = [.. results.Where(m => m.Namespace.Equals(namespacePattern,
+                        StringComparison.OrdinalIgnoreCase))];
                 }
             }
 
@@ -182,12 +182,12 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
                         .Replace("\\?", ".") + "$";
                     System.Text.RegularExpressions.Regex regex = new(regexPattern,
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    results = results.Where(m => regex.IsMatch(m.Assembly)).ToList();
+                    results = [.. results.Where(m => regex.IsMatch(m.Assembly))];
                 }
                 else
                 {
-                    results = results.Where(m => m.Assembly.Equals(assemblyPattern,
-                        StringComparison.OrdinalIgnoreCase)).ToList();
+                    results = [.. results.Where(m => m.Assembly.Equals(assemblyPattern,
+                        StringComparison.OrdinalIgnoreCase))];
                 }
             }
         }
@@ -198,10 +198,21 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
     private static void OutputJson(List<MemberInfo> results, ILuceneIndexManager indexManager,
         MetadataService metadataService, Settings settings)
     {
-        List<string> filters = new();
-        if (!string.IsNullOrWhiteSpace(settings.Assembly)) filters.Add($"assembly: {settings.Assembly}");
-        if (!string.IsNullOrWhiteSpace(settings.Package)) filters.Add($"package: {settings.Package}");
-        if (!string.IsNullOrWhiteSpace(settings.Namespace)) filters.Add($"namespace: {settings.Namespace}");
+        List<string> filters = [];
+        if (!string.IsNullOrWhiteSpace(settings.Assembly))
+        {
+            filters.Add($"assembly: {settings.Assembly}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(settings.Package))
+        {
+            filters.Add($"package: {settings.Package}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(settings.Namespace))
+        {
+            filters.Add($"namespace: {settings.Namespace}");
+        }
 
         ResponseMetadata metadata = metadataService.BuildMetadata(results, indexManager,
             query: string.Join(", ", filters),
@@ -241,12 +252,12 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
 
             foreach (MemberInfo member in group.OrderBy(m => m.Namespace).ThenBy(m => m.Name))
             {
-                List<string> row = new()
-                {
+                List<string> row =
+                [
                     member.MemberType.ToString(),
                     Markup.Escape(GenericTypeFormatter.FormatTypeName(member.Name)),
                     Markup.Escape(member.Namespace)
-                };
+                ];
 
                 if (!string.IsNullOrWhiteSpace(settings.Package))
                 {

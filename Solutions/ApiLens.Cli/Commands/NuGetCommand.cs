@@ -69,11 +69,11 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             {
                 string regexPattern = settings.PackageFilter.Replace("*", ".*");
                 Regex regex = new(regexPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
-                packages = allPackages.Where(p => regex.IsMatch(p.PackageId)).ToList();
+                packages = [.. allPackages.Where(p => regex.IsMatch(p.PackageId))];
             }
             else
             {
-                packages = allPackages.ToList();
+                packages = [.. allPackages];
             }
 
             if (packages.Count == 0)
@@ -100,7 +100,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         await Task.Run(() =>
                         {
                             Regex versionRegex = new(settings.VersionFilter, RegexOptions.IgnoreCase);
-                            packages = packages.Where(p => versionRegex.IsMatch(p.Version)).ToList();
+                            packages = [.. packages.Where(p => versionRegex.IsMatch(p.Version))];
                         });
                     });
                 AnsiConsole.MarkupLine($"[green]After version filter: {packages.Count} package(s).[/]");
@@ -116,7 +116,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         ctx.SpinnerStyle(Style.Parse("yellow"));
 
                         ImmutableArray<NuGetPackageInfo> latestPackages = scanner.GetLatestVersions([.. packages]);
-                        packages = latestPackages.ToList();
+                        packages = [.. latestPackages];
                         return Task.CompletedTask;
                     });
                 AnsiConsole.MarkupLine($"[green]After latest-only filter: {packages.Count} package(s) to process.[/]");
@@ -148,7 +148,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             else
             {
                 // Get existing packages from index for change detection
-                Dictionary<string, HashSet<(string Version, string Framework)>> indexedPackagesWithFramework = new();
+                Dictionary<string, HashSet<(string Version, string Framework)>> indexedPackagesWithFramework = [];
                 HashSet<string> indexedXmlPaths = [];
                 HashSet<string> emptyXmlPaths = [];
 
@@ -172,8 +172,8 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                     emptyXmlPaths,
                     settings.LatestOnly);
 
-                packagesToIndex = deduplicationResult.PackagesToIndex.ToList();
-                packageIdsToDelete = deduplicationResult.PackageIdsToDelete.ToHashSet();
+                packagesToIndex = [.. deduplicationResult.PackagesToIndex];
+                packageIdsToDelete = [.. deduplicationResult.PackageIdsToDelete];
 
                 // Report deduplication statistics
                 DeduplicationStats stats = deduplicationResult.Stats;
@@ -260,7 +260,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         maxValue: packagesToIndex.Count);
 
                     // Get all XML files from packages
-                    List<string> xmlFiles = packagesToIndex.Select(p => p.XmlDocumentationPath).Distinct().ToList();
+                    List<string> xmlFiles = [.. packagesToIndex.Select(p => p.XmlDocumentationPath).Distinct()];
 
                     // Index all files using high-performance batch operations
                     Stopwatch stopwatch = Stopwatch.StartNew();
@@ -424,11 +424,17 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
     private static string FormatDuration(TimeSpan duration)
     {
         if (duration.TotalMilliseconds < 1000)
+        {
             return $"{duration.TotalMilliseconds:N0} ms";
+        }
         else if (duration.TotalSeconds < 60)
+        {
             return $"{duration.TotalSeconds:N2} s";
+        }
         else
+        {
             return $"{duration.TotalMinutes:N2} min";
+        }
     }
 
 
