@@ -413,4 +413,5 @@ _codeCoverage/
 _packages/
 # ApiLens demo and test data
 index/
+.index/
 .tmp/
