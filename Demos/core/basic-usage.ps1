@@ -17,10 +17,15 @@
 #>
 
 param(
-    [string]$WorkingDirectory = $PSScriptRoot,
+    [string]$WorkingDirectory = "",
     [switch]$SkipBuild,
     [switch]$Verbose
 )
+
+# Set default working directory if not provided
+if ([string]::IsNullOrEmpty($WorkingDirectory)) {
+    $WorkingDirectory = $PSScriptRoot
+}
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"

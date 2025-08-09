@@ -157,16 +157,15 @@ public class QueryEngine : IQueryEngine
         TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults * 2);
 
         // Convert and deduplicate results
-        return ConvertTopDocsToMembers(topDocs)
+        return [.. ConvertTopDocsToMembers(topDocs)
             .GroupBy(m => m.Id)
             .Select(g => g.First())
-            .Take(maxResults)
-            .ToList();
+            .Take(maxResults)];
     }
 
     private Query BuildExceptionSearchQuery(string searchTerm)
     {
-        BooleanQuery queryBuilder = new();
+        BooleanQuery queryBuilder = [];
 
         bool hasWildcards = searchTerm.Contains('*') || searchTerm.Contains('?');
         bool hasNamespace = searchTerm.Contains('.');
@@ -259,9 +258,7 @@ public class QueryEngine : IQueryEngine
         queryBuilder.Add(new TermQuery(new Term("exceptionSimpleName", searchTerm.ToLowerInvariant())), Occur.SHOULD);
 
         // Try exact match with common namespaces
-        List<string> namespacedTypes = CommonExceptionNamespaces
-            .Select(ns => $"{ns}.{searchTerm}")
-            .ToList();
+        List<string> namespacedTypes = [.. CommonExceptionNamespaces.Select(ns => $"{ns}.{searchTerm}")];
 
         foreach (string nsType in namespacedTypes)
         {
@@ -278,10 +275,7 @@ public class QueryEngine : IQueryEngine
 
     private Query? CreateWildcardQuery(string fieldName, string pattern)
     {
-        // Lucene doesn't allow leading wildcards by default
-        if (pattern.StartsWith('*') || pattern.StartsWith('?'))
-            return null;
-
+        // Leading wildcards are now supported but may impact performance
         try
         {
             return new WildcardQuery(new Term(fieldName, pattern));
@@ -343,10 +337,156 @@ public class QueryEngine : IQueryEngine
         return ConvertTopDocsToMembers(topDocs);
     }
 
+    public List<MemberInfo> ListTypesFromAssembly(string assemblyPattern, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assemblyPattern);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // First search for assembly matches (supports wildcards)
+        TopDocs assemblyDocs = indexManager.SearchByField("assembly", assemblyPattern, maxResults * 10);
+        List<MemberInfo> allMembers = ConvertTopDocsToMembers(assemblyDocs);
+
+        // Filter to only Type members
+        return [.. allMembers
+            .Where(m => m.MemberType == MemberType.Type)
+            .Take(maxResults)];
+    }
+
+    public List<MemberInfo> ListTypesFromPackage(string packagePattern, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packagePattern);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // Search for package matches (supports wildcards)
+        TopDocs packageDocs = indexManager.SearchByField("packageId", packagePattern, maxResults * 10);
+        List<MemberInfo> allMembers = ConvertTopDocsToMembers(packageDocs);
+
+        // Filter to only Type members
+        return [.. allMembers
+            .Where(m => m.MemberType == MemberType.Type)
+            .Take(maxResults)];
+    }
+
+    public List<MemberInfo> SearchByNamespacePattern(string namespacePattern, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(namespacePattern);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // Search namespace field with pattern (supports wildcards)
+        TopDocs topDocs = indexManager.SearchByField("namespace", namespacePattern, maxResults);
+        return ConvertTopDocsToMembers(topDocs);
+    }
+
+    public List<MemberInfo> SearchByAssemblyAndType(string assemblyPattern, MemberType? memberType, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assemblyPattern);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // Create a combined query for assembly and optionally member type
+        BooleanQuery query = [];
+
+        // Add assembly pattern query
+        bool hasWildcards = assemblyPattern.Contains('*') || assemblyPattern.Contains('?');
+        if (hasWildcards)
+        {
+            Query? wildcardQuery = CreateWildcardQuery("assembly", assemblyPattern);
+            if (wildcardQuery != null)
+            {
+                query.Add(wildcardQuery, Occur.MUST);
+            }
+        }
+        else
+        {
+            query.Add(new TermQuery(new Term("assembly", assemblyPattern)), Occur.MUST);
+        }
+
+        // Add member type filter if specified
+        if (memberType.HasValue)
+        {
+            query.Add(new TermQuery(new Term("memberType", memberType.Value.ToString())), Occur.MUST);
+        }
+
+        TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults);
+        return ConvertTopDocsToMembers(topDocs);
+    }
+
+    public List<MemberInfo> SearchWithFilters(string namePattern, MemberType? memberType,
+        string? namespacePattern, string? assemblyPattern, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(namePattern);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // Build a combined query with all filters
+        BooleanQuery query = [];
+
+        // Name pattern - always treat as wildcard if contains * or ?, otherwise add wildcards
+        string processedNamePattern = namePattern;
+        bool hasWildcards = namePattern.Contains('*') || namePattern.Contains('?');
+        if (!hasWildcards)
+        {
+            // Auto-add wildcards for convenience
+            processedNamePattern = $"*{namePattern}*";
+        }
+
+        // Use "name" field for wildcard searches (StringField, not analyzed)
+        Query? nameQuery = CreateWildcardQuery("name", processedNamePattern);
+        if (nameQuery != null)
+        {
+            query.Add(nameQuery, Occur.MUST);
+        }
+
+        // Member type filter
+        if (memberType.HasValue)
+        {
+            query.Add(new TermQuery(new Term("memberType", memberType.Value.ToString())), Occur.MUST);
+        }
+
+        // Namespace pattern filter
+        if (!string.IsNullOrEmpty(namespacePattern))
+        {
+            bool nsHasWildcards = namespacePattern.Contains('*') || namespacePattern.Contains('?');
+            if (nsHasWildcards)
+            {
+                Query? nsQuery = CreateWildcardQuery("namespace", namespacePattern);
+                if (nsQuery != null)
+                {
+                    query.Add(nsQuery, Occur.MUST);
+                }
+            }
+            else
+            {
+                query.Add(new TermQuery(new Term("namespace", namespacePattern)), Occur.MUST);
+            }
+        }
+
+        // Assembly pattern filter
+        if (!string.IsNullOrEmpty(assemblyPattern))
+        {
+            bool asmHasWildcards = assemblyPattern.Contains('*') || assemblyPattern.Contains('?');
+            if (asmHasWildcards)
+            {
+                Query? asmQuery = CreateWildcardQuery("assembly", assemblyPattern);
+                if (asmQuery != null)
+                {
+                    query.Add(asmQuery, Occur.MUST);
+                }
+            }
+            else
+            {
+                query.Add(new TermQuery(new Term("assembly", assemblyPattern)), Occur.MUST);
+            }
+        }
+
+        TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults);
+        return ConvertTopDocsToMembers(topDocs);
+    }
+
     private List<MemberInfo> ConvertTopDocsToMembers(TopDocs topDocs)
     {
         if (topDocs?.ScoreDocs == null)
+        {
             return [];
+        }
 
         List<MemberInfo> members = new(topDocs.ScoreDocs.Length);
 
@@ -424,17 +564,28 @@ public class QueryEngine : IQueryEngine
                 ReferenceType refType = ReferenceType.SeeAlso;
 
                 if (document.Get($"crossref_Inherits") == crossRefId)
+                {
                     refType = ReferenceType.Inheritance;
+                }
                 else if (document.Get($"crossref_Implements") == crossRefId)
+                {
                     refType = ReferenceType.Inheritance;
+                }
                 else if (document.Get($"crossref_Return") == crossRefId)
+                {
                     refType = ReferenceType.ReturnType;
+                }
                 else if (document.Get($"crossref_Param") == crossRefId)
+                {
                     refType = ReferenceType.Parameter;
+                }
 
                 crossRefs.Add(new CrossReference
                 {
-                    SourceId = id, TargetId = crossRefId, Type = refType, Context = string.Empty
+                    SourceId = id,
+                    TargetId = crossRefId,
+                    Type = refType,
+                    Context = string.Empty
                 });
             }
         }
@@ -487,7 +638,8 @@ public class QueryEngine : IQueryEngine
             {
                 attributes.Add(new AttributeInfo
                 {
-                    Type = attrType, Properties = ImmutableDictionary<string, string>.Empty // Not stored in index
+                    Type = attrType,
+                    Properties = ImmutableDictionary<string, string>.Empty // Not stored in index
                 });
             }
         }

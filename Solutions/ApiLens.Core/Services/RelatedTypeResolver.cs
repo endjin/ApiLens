@@ -20,7 +20,9 @@ public partial class RelatedTypeResolver
 
         MemberInfo? member = queryEngine.GetById(memberId);
         if (member == null)
+        {
             return [];
+        }
 
         HashSet<string> relatedTypes = [];
 

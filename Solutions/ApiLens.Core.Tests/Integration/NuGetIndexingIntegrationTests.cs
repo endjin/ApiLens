@@ -40,10 +40,14 @@ public class NuGetIndexingIntegrationTests : IDisposable
         indexManager?.Dispose();
 
         if (Directory.Exists(indexPath))
+        {
             Directory.Delete(indexPath, true);
+        }
 
         if (Directory.Exists(testDataPath))
+        {
             Directory.Delete(testDataPath, true);
+        }
     }
 
     #region End-to-End Indexing Scenarios

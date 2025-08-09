@@ -164,7 +164,7 @@ public class FileSystemServiceTests
         // Don't create the directory - it should not exist
 
         // Act
-        List<string> files = service.GetFiles(path, pattern, false).ToList();
+        List<string> files = [.. service.GetFiles(path, pattern, false)];
 
         // Assert
         files.ShouldBeEmpty();
@@ -315,7 +315,7 @@ public class FileSystemServiceTests
         // Don't create the directory - it should not exist
 
         // Act
-        List<FileInfo> files = service.EnumerateFiles(path).ToList();
+        List<FileInfo> files = [.. service.EnumerateFiles(path)];
 
         // Assert
         files.ShouldBeEmpty();
@@ -430,8 +430,8 @@ public class FileSystemServiceTests
         fakeFileSystem.CreateFile("/test/sub/deep/file4.xml").SetTextContent("xml4");
 
         // Act
-        List<string> nonRecursive = service.GetFiles("/test", "*.xml", false).ToList();
-        List<string> recursive = service.GetFiles("/test", "*.xml", true).ToList();
+        List<string> nonRecursive = [.. service.GetFiles("/test", "*.xml", false)];
+        List<string> recursive = [.. service.GetFiles("/test", "*.xml", true)];
 
         // Assert
         nonRecursive.Count.ShouldBe(1);
@@ -453,7 +453,7 @@ public class FileSystemServiceTests
         fakeFileSystem.CreateFile("/test/sub/large.txt").SetTextContent("large file with lots of content here");
 
         // Act
-        List<FileInfo> files = service.EnumerateFiles("/test", "*.txt", true).ToList();
+        List<FileInfo> files = [.. service.EnumerateFiles("/test", "*.txt", true)];
 
         // Assert
         files.Count.ShouldBe(3);

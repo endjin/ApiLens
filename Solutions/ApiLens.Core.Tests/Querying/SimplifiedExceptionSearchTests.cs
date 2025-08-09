@@ -206,7 +206,7 @@ public class SimplifiedExceptionSearchTests : IDisposable
         results.ShouldContain(r => r.FullName == "FileOperations.ReadFile");
 
         // Verify it found the System.IO.IOException
-        var fileOps = results.First(r => r.FullName == "FileOperations.ReadFile");
+        MemberInfo fileOps = results.First(r => r.FullName == "FileOperations.ReadFile");
         fileOps.Exceptions.ShouldContain(e => e.Type == "System.IO.IOException");
     }
 
@@ -321,16 +321,16 @@ public class SimplifiedExceptionSearchTests : IDisposable
     }
 
     [TestMethod]
-    public void SearchByException_Wildcard_AsteriskException_ReturnsEmptyDueToLeadingWildcard()
+    public void SearchByException_Wildcard_AsteriskException_ReturnsResultsWithLeadingWildcard()
     {
-        // Act - "*Exception" would require leading wildcard support
-        // The CreateWildcardQuery method returns null for leading wildcards
-        // However, the text field fallback search will still find "exception" matches
+        // Act - "*Exception" now supports leading wildcard
+        // This will find all exception types that end with "Exception"
         List<MemberInfo> results = engine.SearchByException("*Exception", 10);
 
-        // Assert - Will find results due to text field fallback search
+        // Assert - Should find multiple results ending with "Exception"
         results.Count.ShouldBeGreaterThanOrEqualTo(1);
         results.ShouldContain(r => r.FullName == "Generic.Execute"); // Has System.Exception
+        // Should also find ArgumentNullException, IOException, etc.
     }
 
     [TestMethod]
@@ -393,8 +393,11 @@ public class SimplifiedExceptionSearchTests : IDisposable
         // Act
         List<MemberInfo> results = engine.SearchByException("CustomIOException", 10);
 
-        // Assert - Custom namespaces not in common list won't be found by simple name
-        results.Count.ShouldBe(0);
+        // Assert - With leading wildcard support, suffix matching now finds custom namespace exceptions
+        // The suffix wildcard "*CustomIOException" matches "MyCompany.IO.CustomIOException"
+        results.Count.ShouldBe(1);
+        results[0].FullName.ShouldBe("Network.DownloadFile");
+        results[0].Exceptions.ShouldContain(e => e.Type == "MyCompany.IO.CustomIOException");
     }
 
     [TestMethod]
@@ -436,7 +439,7 @@ public class SimplifiedExceptionSearchTests : IDisposable
         List<MemberInfo> results = engine.SearchByException("ArgumentNullException", 10);
 
         // Assert - ValidateInput has multiple exceptions but should appear only once in results
-        var validateInputCount = results.Count(r => r.FullName == "Validation.ValidateInput");
+        int validateInputCount = results.Count(r => r.FullName == "Validation.ValidateInput");
         validateInputCount.ShouldBe(1); // Should appear exactly once despite having multiple exceptions
     }
 

@@ -294,7 +294,7 @@ public class DocumentBuilderAdvancedTests
         IIndexableField[]? crossrefs = doc.GetFields("crossref");
         crossrefs.Length.ShouldBe(3);
 
-        List<string> crossrefValues = crossrefs.Select(f => f.GetStringValue()).ToList();
+        List<string> crossrefValues = [.. crossrefs.Select(f => f.GetStringValue())];
         crossrefValues.ShouldContain("T:Example.IService");
         crossrefValues.ShouldContain("M:Example.BaseService.Execute");
         crossrefValues.ShouldContain("P:Example.Service.IsEnabled");

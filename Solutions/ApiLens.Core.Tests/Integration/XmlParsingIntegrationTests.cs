@@ -168,7 +168,7 @@ public class XmlParsingIntegrationTests
         XElement? membersElement = doc.Root?.Element("members");
 
         // Act
-        Dictionary<ReferenceType, List<CrossReference>> referencesByType = new();
+        Dictionary<ReferenceType, List<CrossReference>> referencesByType = [];
         foreach (XElement memberElement in membersElement?.Elements("member") ?? [])
         {
             string? memberId = memberElement.Attribute("name")?.Value;
@@ -178,7 +178,10 @@ public class XmlParsingIntegrationTests
                 foreach (CrossReference reference in refs)
                 {
                     if (!referencesByType.ContainsKey(reference.Type))
+                    {
                         referencesByType[reference.Type] = [];
+                    }
+
                     referencesByType[reference.Type].Add(reference);
                 }
             }

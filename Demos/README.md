@@ -55,12 +55,13 @@ NuGet package cache scanning and analysis features.
 
 Advanced features, integrations, and specialized use cases.
 
-| Script                    | Description                                               |
-|---------------------------|-----------------------------------------------------------|
-| `rich-metadata.ps1`       | Rich metadata extraction for code examples and complexity |
-| `specialized-queries.ps1` | Specialized commands (examples, exceptions, complexity)   |
-| `mcp-integration.ps1`     | Model Context Protocol (MCP) server integration           |
-| `benchmark.ps1`           | Performance benchmarking and optimization analysis        |
+| Script                      | Description                                                         |
+|-----------------------------|---------------------------------------------------------------------|
+| `rich-metadata.ps1`         | Rich metadata extraction for code examples and complexity           |
+| `specialized-queries.ps1`   | Specialized commands (examples, exceptions, complexity)             |
+| `wildcard-and-types-demo.ps1` | 🆕 Leading wildcard search and type listing capabilities         |
+| `mcp-integration.ps1`       | Model Context Protocol (MCP) server integration                     |
+| `benchmark.ps1`             | Performance benchmarking and optimization analysis                  |
 
 ## 🛠️ Prerequisites
 
@@ -97,6 +98,13 @@ The test script will:
 - 📊 Provide a summary of results
 
 ## 💡 Demo Highlights
+
+### 🆕 New Features (v2.0)
+Latest enhancements demonstrated in the demos:
+- **Leading Wildcard Support**: Search for patterns like `*Exception`, `*IOException`
+- **Type Listing Command**: Explore types from packages, assemblies, and namespaces
+- **Enhanced Pattern Matching**: Use wildcards (`*`, `?`) in all search operations
+- **Package API Discovery**: List all types from specific NuGet packages
 
 ### Version Information Tracking
 Many demos showcase ApiLens's ability to track and display version information from NuGet packages:

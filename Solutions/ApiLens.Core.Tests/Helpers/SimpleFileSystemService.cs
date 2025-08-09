@@ -23,4 +23,5 @@ internal class SimpleFileSystemService : IFileSystemService
     public Task<Stream> OpenReadAsync(string path) => Task.FromResult<Stream>(File.OpenRead(path));
     public IEnumerable<DirectoryInfo> EnumerateDirectories(string path) =>
         new DirectoryInfo(path).EnumerateDirectories();
+    public Task<string> ReadAllTextAsync(string path) => File.ReadAllTextAsync(path);
 }

@@ -27,6 +27,11 @@ internal class Program
         services.AddSingleton<IPackageDeduplicationService, PackageDeduplicationService>();
         services.AddSingleton<ILuceneIndexManagerFactory, LuceneIndexManagerFactory>();
         services.AddSingleton<IQueryEngineFactory, QueryEngineFactory>();
+        services.AddSingleton<ISolutionParserService, SolutionParserService>();
+        services.AddSingleton<IProjectParserService, ProjectParserService>();
+        services.AddSingleton<IAssetFileParserService, AssetFileParserService>();
+        services.AddSingleton<IProjectAnalysisService, ProjectAnalysisService>();
+        services.AddSingleton<MetadataService>();
 
         TypeRegistrar registrar = new(services);
         CommandApp app = new(registrar);
@@ -99,6 +104,15 @@ internal class Program
                 .WithExample("stats", "--index", "./custom-index")
                 .WithExample("stats", "--format", "json");
 
+            config.AddCommand<ListTypesCommand>("list-types")
+                .WithDescription("List types from assemblies, packages, or namespaces with filtering support")
+                .WithExample("list-types", "--assembly", "System.Collections")
+                .WithExample("list-types", "--package", "Newtonsoft.Json")
+                .WithExample("list-types", "--namespace", "System.Collections.Generic")
+                .WithExample("list-types", "--package", "Microsoft.Extensions.*", "--namespace", "Microsoft.Extensions.DependencyInjection")
+                .WithExample("list-types", "--assembly", "System.*", "--include-members")
+                .WithExample("list-types", "--package", "Serilog.AspNetCore", "--format", "json");
+
             config.AddCommand<NuGetCommand>("nuget")
                 .WithDescription("""
                                  Scan and index NuGet package cache.
@@ -112,6 +126,18 @@ internal class Program
                 .WithExample("nuget", "--filter", "microsoft.*", "--latest")
                 .WithExample("nuget", "--list")
                 .WithExample("nuget", "--list", "--filter", "system.*");
+
+            config.AddCommand<AnalyzeCommand>("analyze")
+                .WithDescription("""
+                                 Analyze and index all packages from a project or solution.
+                                 
+                                 Parses .csproj, .fsproj, .vbproj, or .sln files to discover all package
+                                 references, then indexes their XML documentation from the NuGet cache.
+                                 """)
+                .WithExample("analyze", "./MyProject.csproj")
+                .WithExample("analyze", "./MySolution.sln")
+                .WithExample("analyze", "./MyProject.csproj", "--include-transitive")
+                .WithExample("analyze", "./MySolution.sln", "--use-assets", "--format", "json");
         });
 
         return app.Run(args);

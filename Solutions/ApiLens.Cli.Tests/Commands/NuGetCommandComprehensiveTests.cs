@@ -272,7 +272,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         mockIndexManager.GetEmptyXmlPaths().Returns([]);
 
         // Deduplication should skip existing package
-        List<NuGetPackageInfo> packagesToIndex = packages.Where(p => p.PackageId != "existing.package").ToList();
+        List<NuGetPackageInfo> packagesToIndex = [.. packages.Where(p => p.PackageId != "existing.package")];
         SetupDeduplicationService(packagesToIndex, skippedPackages: 1);
 
         IndexingResult indexingResult = CreateIndexingResult(successfulDocs: 300, elapsedMs: 75, bytesProcessed: 30000);
@@ -559,7 +559,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
 
     private void SetupEmptyIndex()
     {
-        mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
+        mockIndexManager.GetIndexedPackageVersions().Returns([]);
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(new Dictionary<string, HashSet<(string, string)>>());
         mockIndexManager.GetIndexedXmlPaths().Returns([]);
         mockIndexManager.GetEmptyXmlPaths().Returns([]);

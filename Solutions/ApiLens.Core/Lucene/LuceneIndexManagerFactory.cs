@@ -23,7 +23,9 @@ public class LuceneIndexManagerFactory : ILuceneIndexManagerFactory
     public ILuceneIndexManager Create(string indexPath)
     {
         if (indexPath == null)
+        {
             throw new ArgumentNullException(nameof(indexPath));
+        }
 
         return new LuceneIndexManager(indexPath, parser, documentBuilder);
     }

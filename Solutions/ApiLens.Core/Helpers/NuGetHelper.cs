@@ -20,7 +20,9 @@ public static partial class NuGetHelper
     public static (string PackageId, string Version, string Framework)? ExtractNuGetInfo(string filePath)
     {
         if (filePath is null)
+        {
             return null;
+        }
 
         Match match = NuGetPathRegex().Match(filePath);
 
@@ -44,7 +46,10 @@ public static partial class NuGetHelper
     public static bool IsNuGetPath(string filePath)
     {
         if (filePath is null)
+        {
             return false;
+        }
+
         return NuGetPathRegex().IsMatch(filePath);
     }
 }

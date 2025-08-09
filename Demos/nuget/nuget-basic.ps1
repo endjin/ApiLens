@@ -71,6 +71,21 @@ try {
     Write-Host "Error processing JSON output: $_" -ForegroundColor Red
 }
 
+# NEW: Demo leading wildcard search
+Write-Host "`n🆕 Leading Wildcard Search:" -ForegroundColor Cyan
+Write-Host "$ apilens exceptions '*SerializationException' --index `$indexPath" -ForegroundColor Yellow
+& "$apilens" exceptions "*SerializationException" --index "$indexPath" --max 5
+
+# NEW: Demo type listing from package
+Write-Host "`n🆕 List Types from Package:" -ForegroundColor Cyan
+Write-Host "$ apilens list-types --package 'newtonsoft.json' --max 10" -ForegroundColor Yellow
+& "$apilens" list-types --package "newtonsoft.json" --index "$indexPath" --max 10
+
+# NEW: Demo type listing by namespace
+Write-Host "`n🆕 List Types by Namespace Pattern:" -ForegroundColor Cyan
+Write-Host "$ apilens list-types --namespace 'Newtonsoft.Json.Linq' --max 5" -ForegroundColor Yellow
+& "$apilens" list-types --namespace "Newtonsoft.Json.Linq" --index "$indexPath" --max 5
+
 # Cleanup
 Remove-Item $indexPath -Recurse -Force
 

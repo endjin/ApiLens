@@ -69,7 +69,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
             .Returns([.. allPackages]);
 
         // Empty index
-        mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
+        mockIndexManager.GetIndexedPackageVersions().Returns([]);
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(new Dictionary<string, HashSet<(string, string)>>());
         mockIndexManager.GetIndexedXmlPaths().Returns([]);
         mockIndexManager.GetEmptyXmlPaths().Returns([]);
@@ -134,7 +134,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
             .Returns([.. allPackages]);
 
         // Empty index
-        mockIndexManager.GetIndexedPackageVersions().Returns(new Dictionary<string, HashSet<string>>());
+        mockIndexManager.GetIndexedPackageVersions().Returns([]);
         mockIndexManager.GetIndexedPackageVersionsWithFramework().Returns(new Dictionary<string, HashSet<(string, string)>>());
         mockIndexManager.GetIndexedXmlPaths().Returns([]);
         mockIndexManager.GetEmptyXmlPaths().Returns([]);
@@ -247,7 +247,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
         });
 
         // Setup deduplication service - should skip package1 (3 frameworks) since it's already indexed
-        List<NuGetPackageInfo> packagesToIndex = allPackages.Where(p => p.PackageId != "package1").ToList();
+        List<NuGetPackageInfo> packagesToIndex = [.. allPackages.Where(p => p.PackageId != "package1")];
         SetupDeduplicationService(packagesToIndex, skippedPackages: 3);
 
         NuGetCommand.Settings settings = new()

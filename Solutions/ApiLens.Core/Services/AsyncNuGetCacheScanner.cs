@@ -70,7 +70,8 @@ public partial class AsyncNuGetCacheScanner : INuGetCacheScanner
             await Parallel.ForEachAsync(batch,
                 new ParallelOptions
                 {
-                    CancellationToken = cancellationToken, MaxDegreeOfParallelism = Environment.ProcessorCount
+                    CancellationToken = cancellationToken,
+                    MaxDegreeOfParallelism = Environment.ProcessorCount
                 }, async (xmlFile, ct) =>
                 {
                     NuGetPackageInfo? packageInfo = ParsePackageInfo(xmlFile.FullName);

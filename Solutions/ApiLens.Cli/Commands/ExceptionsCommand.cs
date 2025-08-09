@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
@@ -38,17 +39,20 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
             using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
+            MetadataService metadataService = new();
+            metadataService.StartTiming();
+
             List<MemberInfo> results = queryEngine.GetByExceptionType(settings.ExceptionType, settings.MaxResults);
 
             if (results.Count == 0)
             {
-                if (settings.Format != OutputFormat.Json)
+                if (settings.Format == OutputFormat.Json)
                 {
-                    AnsiConsole.MarkupLine($"[yellow]No methods found that throw {settings.ExceptionType}.[/]");
+                    OutputJson(results, settings.ExceptionType, indexManager, metadataService);
                 }
                 else
                 {
-                    AnsiConsole.WriteLine("[]");
+                    AnsiConsole.MarkupLine($"[yellow]No methods found that throw {settings.ExceptionType}.[/]");
                 }
 
                 return 0;
@@ -57,7 +61,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
             switch (settings.Format)
             {
                 case OutputFormat.Json:
-                    OutputJson(results, settings.ExceptionType);
+                    OutputJson(results, settings.ExceptionType, indexManager, metadataService);
                     break;
                 case OutputFormat.Markdown:
                     OutputMarkdown(results, settings.ExceptionType, settings.ShowDetails);
@@ -77,7 +81,8 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         }
     }
 
-    private static void OutputJson(List<MemberInfo> results, string exceptionType)
+    private static void OutputJson(List<MemberInfo> results, string exceptionType,
+        ILuceneIndexManager indexManager, MetadataService metadataService)
     {
         var output = results.SelectMany(member =>
             member.Exceptions
@@ -96,9 +101,19 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
                     exception = new { type = ex.Type, condition = ex.Condition },
                     searchedType = exceptionType
                 })
-        );
+        ).ToList();
 
-        string json = JsonSerializer.Serialize(output, JsonOptions);
+        ResponseMetadata metadata = metadataService.BuildMetadata(results, indexManager,
+            exceptionType, "exception",
+            new Dictionary<string, object> { ["exceptionType"] = exceptionType });
+
+        JsonResponse<object> response = new()
+        {
+            Results = output,
+            Metadata = metadata
+        };
+
+        string json = JsonSerializer.Serialize(response, JsonOptions);
         AnsiConsole.WriteLine(json);
     }
 
@@ -261,7 +276,9 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
 
             // Check full type or simple name
             if (Regex.IsMatch(exceptionType, regexPattern, RegexOptions.IgnoreCase))
+            {
                 return true;
+            }
 
             if (!searchPattern.Contains('.'))
             {
@@ -277,7 +294,9 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         // For non-wildcard searches, check various matching strategies
         // 1. Contains check (handles partial matches)
         if (exceptionType.Contains(searchPattern, StringComparison.OrdinalIgnoreCase))
+        {
             return true;
+        }
 
         // 2. If search has namespace, check if exception name matches
         if (searchPattern.Contains('.') && exceptionType.Contains('.'))

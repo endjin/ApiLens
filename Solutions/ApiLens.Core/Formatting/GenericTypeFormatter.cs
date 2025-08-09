@@ -13,7 +13,9 @@ public static class GenericTypeFormatter
     public static string FormatTypeName(string typeName)
     {
         if (string.IsNullOrWhiteSpace(typeName))
+        {
             return typeName;
+        }
 
         // Handle double backtick (generic methods)
         if (typeName.Contains("``"))
@@ -90,7 +92,9 @@ public static class GenericTypeFormatter
         // Split by dots to handle namespace
         string[] parts = fullName.Split('.');
         if (parts.Length == 0)
+        {
             return fullName;
+        }
 
         // Format the last part (which might be a generic type)
         parts[^1] = FormatTypeName(parts[^1]);

@@ -60,7 +60,10 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
 
         XmlReaderSettings settings = new()
         {
-            Async = true, IgnoreWhitespace = true, IgnoreComments = true, IgnoreProcessingInstructions = true
+            Async = true,
+            IgnoreWhitespace = true,
+            IgnoreComments = true,
+            IgnoreProcessingInstructions = true
         };
 
         using Stream fileStream = await fileSystem.OpenReadAsync(filePath);
@@ -91,9 +94,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         }
     }
 
-    public async Task<BatchParseResult> ParseXmlFilesAsync(
-        IEnumerable<string> filePaths,
-        CancellationToken cancellationToken = default)
+    public async Task<BatchParseResult> ParseXmlFilesAsync(IEnumerable<string> filePaths, CancellationToken cancellationToken = default)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
         List<MemberInfo> members = [];
@@ -164,11 +165,15 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
     {
         string? nameAttribute = reader.GetAttribute(nameAttributeName);
         if (string.IsNullOrEmpty(nameAttribute))
+        {
             return null;
+        }
 
         (MemberType? memberType, string id) = ParseMemberId(nameAttribute);
         if (memberType == null)
+        {
             return null;
+        }
 
         StringBuilder sb = stringBuilderPool.Rent();
         string? summary = null;
@@ -200,17 +205,26 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                         case "param":
                             ParameterInfo? param = await ParseParameterAsync(subtree, sb);
                             if (param != null)
+                            {
                                 parameters.Add(param);
+                            }
+
                             break;
                         case "exception":
                             ExceptionInfo? exception = await ParseExceptionAsync(subtree, sb);
                             if (exception != null)
+                            {
                                 exceptions.Add(exception);
+                            }
+
                             break;
                         case "example":
                             CodeExample? example = await ParseExampleAsync(subtree, sb);
                             if (example != null)
+                            {
                                 examples.Add(example);
+                            }
+
                             break;
                         case "seealso":
                             seeAlso = subtree.GetAttribute("cref") ?? await ReadElementContentAsync(subtree, sb);
@@ -309,7 +323,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
     {
         string? name = reader.GetAttribute(nameAttributeName);
         if (string.IsNullOrEmpty(name))
+        {
             return null;
+        }
 
         string description = await ReadElementContentAsync(reader, sb);
 
@@ -330,7 +346,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
     {
         string? cref = reader.GetAttribute("cref");
         if (string.IsNullOrEmpty(cref))
+        {
             return null;
+        }
 
         string condition = await ReadElementContentAsync(reader, sb);
 
@@ -342,7 +360,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         // Use a special method that preserves whitespace for code examples
         string code = await ReadCodeContentAsync(reader, sb);
         if (string.IsNullOrEmpty(code))
+        {
             return null;
+        }
 
         return new CodeExample { Code = code, Description = string.Empty };
     }
@@ -364,7 +384,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                     {
                         string? cref = reader.GetAttribute("cref") ?? reader.GetAttribute("name");
                         if (!string.IsNullOrEmpty(cref))
+                        {
                             sb.Append(cref);
+                        }
                     }
 
                     break;
@@ -381,7 +403,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
     private static string NormalizeWhitespace(string text)
     {
         if (string.IsNullOrEmpty(text))
+        {
             return string.Empty;
+        }
 
         // PERFORMANCE: Using pre-compiled regex via source generator
         // This avoids regex compilation on every call (major hot path optimization)
@@ -408,7 +432,10 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
     {
         // Remove the prefix (T:, M:, etc.) if present
         if (cref.Length > 2 && cref[1] == ':')
+        {
             return cref[2..];
+        }
+
         return cref;
     }
 
@@ -436,11 +463,15 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
 
         string? nameAttribute = memberElement.Attribute("name")?.Value;
         if (string.IsNullOrWhiteSpace(nameAttribute))
+        {
             return null;
+        }
 
         (MemberType? memberType, string id) = ParseMemberId(nameAttribute);
         if (memberType == null)
+        {
             return null;
+        }
 
         string summary = ExtractSummary(memberElement);
         string name = ExtractNameFromId(id, memberType.Value);
@@ -452,10 +483,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         string? remarks = ExtractElementText(memberElement, "remarks");
 
         // Extract all seealso references
-        List<string?> seeAlsoElements = memberElement.Elements("seealso")
+        List<string?> seeAlsoElements = [.. memberElement.Elements("seealso")
             .Select(e => e.Attribute("cref")?.Value)
-            .Where(cref => !string.IsNullOrEmpty(cref))
-            .ToList();
+            .Where(cref => !string.IsNullOrEmpty(cref))];
         string? seeAlso = seeAlsoElements.Count > 0 ? string.Join(" ", seeAlsoElements) : null;
 
         // Extract code examples
@@ -533,7 +563,8 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             {
                 exceptions.Add(new ExceptionInfo
                 {
-                    Type = ExtractTypeNameFromCref(cref), Condition = NormalizeWhitespace(exceptionElement.Value)
+                    Type = ExtractTypeNameFromCref(cref),
+                    Condition = NormalizeWhitespace(exceptionElement.Value)
                 });
             }
         }
@@ -580,7 +611,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
     private static (MemberType? Type, string Id) ParseMemberId(string nameAttribute)
     {
         if (string.IsNullOrWhiteSpace(nameAttribute) || nameAttribute.Length < 2)
+        {
             return (null, string.Empty);
+        }
 
         char prefix = nameAttribute[0];
         string id = nameAttribute[2..]; // Skip "X:"
@@ -602,7 +635,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
     {
         XElement? summaryElement = memberElement.Element("summary");
         if (summaryElement == null)
+        {
             return string.Empty;
+        }
 
         return NormalizeWhitespace(summaryElement.Value);
     }
@@ -611,7 +646,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
     {
         XElement? element = parentElement.Element(elementName);
         if (element == null)
+        {
             return null;
+        }
 
         return NormalizeWhitespace(element.Value);
     }
@@ -660,13 +697,20 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
 
         int searchEnd = id.Length;
         if (parenIndex >= 0)
+        {
             searchEnd = Math.Min(searchEnd, parenIndex);
+        }
+
         if (genericIndex >= 0)
+        {
             searchEnd = Math.Min(searchEnd, genericIndex);
+        }
 
         int lastDot = id.LastIndexOf('.', searchEnd - 1);
         if (lastDot <= 0)
+        {
             return string.Empty;
+        }
 
         if (memberType == MemberType.Type)
         {
@@ -705,7 +749,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         List<string> types = [];
 
         if (memberType != MemberType.Method)
+        {
             return types;
+        }
 
         // Find the parameter section in parentheses
         int parenStart = id.IndexOf('(');
@@ -741,15 +787,22 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             else
             {
                 if (c is '{' or '<')
+                {
                     depth++;
+                }
                 else if (c is '}' or '>')
+                {
                     depth--;
+                }
+
                 currentType.Append(c);
             }
         }
 
         if (currentType.Length > 0)
+        {
             types.Add(currentType.ToString().Trim());
+        }
 
         return types;
     }
@@ -757,7 +810,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
     private static string DedentCode(string code)
     {
         if (string.IsNullOrEmpty(code))
+        {
             return string.Empty;
+        }
 
         // Split into lines, preserving empty lines
         // Handle both Windows and Unix line endings
@@ -771,13 +826,19 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         {
             if (!string.IsNullOrWhiteSpace(lines[i]))
             {
-                if (firstNonEmpty == -1) firstNonEmpty = i;
+                if (firstNonEmpty == -1)
+                {
+                    firstNonEmpty = i;
+                }
+
                 lastNonEmpty = i;
             }
         }
 
         if (firstNonEmpty == -1)
+        {
             return string.Empty;
+        }
 
         // Trim to relevant lines
         List<string> relevantLines = [];
@@ -791,24 +852,34 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         foreach (string line in relevantLines)
         {
             if (string.IsNullOrWhiteSpace(line))
+            {
                 continue;
+            }
 
             int indent = 0;
             foreach (char c in line)
             {
                 if (c == ' ')
+                {
                     indent++;
+                }
                 else if (c == '\t')
+                {
                     indent += 4;
+                }
                 else
+                {
                     break;
+                }
             }
 
             minIndent = Math.Min(minIndent, indent);
         }
 
         if (minIndent is 0 or int.MaxValue)
+        {
             return string.Join('\n', relevantLines);
+        }
 
         // Remove minimum indentation from each line
         List<string> result = [];
@@ -855,18 +926,24 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
     private static string RemoveCommonLeadingWhitespace(string text)
     {
         if (string.IsNullOrEmpty(text))
+        {
             return string.Empty;
+        }
 
         // Trim the text first to remove leading/trailing whitespace including newlines
         text = text.Trim();
 
         string[] lines = text.Split('\n');
         if (lines.Length == 0)
+        {
             return string.Empty;
+        }
 
         // Special case: if there's only one line, just return it
         if (lines.Length == 1)
+        {
             return text;
+        }
 
         // Find the minimum indentation among lines that have indentation
         // (skip lines with 0 indentation as they're likely already at the left margin)
@@ -876,15 +953,21 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         foreach (string line in lines)
         {
             if (string.IsNullOrWhiteSpace(line))
+            {
                 continue;
+            }
 
             int indent = 0;
             foreach (char c in line)
             {
                 if (c == ' ')
+                {
                     indent++;
+                }
                 else
+                {
                     break;
+                }
             }
 
             // Only consider lines with some indentation
@@ -897,7 +980,9 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
 
         // If no lines have indentation, or we couldn't find a common indent, return as-is
         if (!hasIndentedLines || minIndent == int.MaxValue)
+        {
             return text;
+        }
 
         // Remove the common indentation from indented lines only
         for (int i = 0; i < lines.Length; i++)
@@ -907,9 +992,13 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             foreach (char c in lines[i])
             {
                 if (c == ' ')
+                {
                     lineIndent++;
+                }
                 else
+                {
                     break;
+                }
             }
 
             // Only dedent lines that have at least the minimum indentation

@@ -59,12 +59,14 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
         // Recursive case: use parallel scanning with channels
         Channel<FileInfo> fileChannel = Channel.CreateUnbounded<FileInfo>(new UnboundedChannelOptions
         {
-            SingleWriter = false, SingleReader = true
+            SingleWriter = false,
+            SingleReader = true
         });
 
         Channel<string> directoryChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions
         {
-            SingleWriter = false, SingleReader = false
+            SingleWriter = false,
+            SingleReader = false
         });
 
         // Start with the root directory
@@ -148,7 +150,10 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
             {
                 while (directoryReader.TryRead(out string? directory))
                 {
-                    if (directory == null) continue;
+                    if (directory == null)
+                    {
+                        continue;
+                    }
 
                     try
                     {
@@ -159,7 +164,7 @@ public class AsyncFileEnumerator : IAsyncFileEnumerator
                         }
 
                         // Queue subdirectories
-                        List<DirectoryInfo> subdirs = fileSystem.EnumerateDirectories(directory).ToList();
+                        List<DirectoryInfo> subdirs = [.. fileSystem.EnumerateDirectories(directory)];
                         if (subdirs.Count > 0)
                         {
                             // Increment active directories before writing

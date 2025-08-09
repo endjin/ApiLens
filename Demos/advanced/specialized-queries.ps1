@@ -208,8 +208,8 @@ Write-Host "Command: " -NoNewline -ForegroundColor DarkGray
 Write-Host "apilens examples 'catch' --format json --index $IndexPath" -ForegroundColor Yellow
 & $apilens examples "catch" --format json --index $IndexPath
 
-# Demo 2: Exceptions Command
-Write-Host "`n`n🎯 DEMO 2: Exceptions Command" -ForegroundColor Yellow
+# Demo 2: Exceptions Command with Leading Wildcards
+Write-Host "`n`n🎯 DEMO 2: Exceptions Command with Leading Wildcards" -ForegroundColor Yellow
 Write-Host "Finding methods that throw specific exceptions" -ForegroundColor Gray
 
 Write-Host "`n2.1 Find methods that throw ArgumentNullException:" -ForegroundColor Magenta
@@ -217,7 +217,17 @@ Write-Host "Command: " -NoNewline -ForegroundColor DarkGray
 Write-Host "apilens exceptions 'System.ArgumentNullException' --index $IndexPath" -ForegroundColor Yellow
 & $apilens exceptions "System.ArgumentNullException" --index $IndexPath
 
-Write-Host "`n2.2 Get detailed exception information (Markdown format):" -ForegroundColor Magenta
+Write-Host "`n2.2 🆕 NEW: Leading wildcard search - Find all exceptions ending with 'Exception':" -ForegroundColor Magenta
+Write-Host "Command: " -NoNewline -ForegroundColor DarkGray
+Write-Host "apilens exceptions '*Exception' --index $IndexPath --max 5" -ForegroundColor Yellow
+& $apilens exceptions "*Exception" --index $IndexPath --max 5
+
+Write-Host "`n2.3 🆕 NEW: Find all IO-related exceptions with leading wildcard:" -ForegroundColor Magenta
+Write-Host "Command: " -NoNewline -ForegroundColor DarkGray
+Write-Host "apilens exceptions '*IOException' --index $IndexPath" -ForegroundColor Yellow
+& $apilens exceptions "*IOException" --index $IndexPath
+
+Write-Host "`n2.4 Get detailed exception information (Markdown format):" -ForegroundColor Magenta
 Write-Host "Command: " -NoNewline -ForegroundColor DarkGray
 Write-Host "apilens exceptions 'System.IO.IOException' --format markdown --details --index $IndexPath" -ForegroundColor Yellow
 & $apilens exceptions "System.IO.IOException" --format markdown --details --index $IndexPath
