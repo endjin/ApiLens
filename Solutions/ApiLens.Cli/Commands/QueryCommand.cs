@@ -63,7 +63,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
                 // Use existing search methods
                 results = settings.QueryType switch
                 {
-                    QueryType.Name => queryEngine.SearchByName(settings.Query, settings.MaxResults),
+                    QueryType.Name => HandleNameQuery(queryEngine, settings.Query, settings.MaxResults),
                     QueryType.Content => queryEngine.SearchByContent(settings.Query, settings.MaxResults),
                     QueryType.Namespace => queryEngine.SearchByNamespace(settings.Query, settings.MaxResults),
                     QueryType.Id => queryEngine.GetById(settings.Query) is { } member ? [member] : [],
@@ -71,6 +71,31 @@ public class QueryCommand : Command<QueryCommand.Settings>
                     QueryType.Method => SearchForMethods(queryEngine, settings.Query, settings.MinParams, settings.MaxParams, settings.MaxResults),
                     _ => []
                 };
+            }
+
+            // Apply additional filters
+            if (settings.WithExamples)
+            {
+                results = results.Where(r => r.CodeExamples.Any()).ToList();
+            }
+
+            if (settings.EntryPointsOnly)
+            {
+                var entryPointMethods = new[] { "Create", "Parse", "Load", "Open", "Build", "From", "New", "Make", "Get", "Add", "Initialize" };
+                results = results.Where(r => 
+                    r.MemberType == MemberType.Method && 
+                    entryPointMethods.Any(ep => 
+                        r.Name.Equals(ep, StringComparison.OrdinalIgnoreCase) || 
+                        r.Name.StartsWith(ep, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+            }
+
+            // Apply sorting
+            if (settings.QualityFirst)
+            {
+                results = results.OrderByDescending(r => r.DocumentationScore)
+                    .ThenBy(r => r.Name)
+                    .ToList();
             }
 
             if (results.Count == 0)
@@ -102,7 +127,10 @@ public class QueryCommand : Command<QueryCommand.Settings>
                     OutputJson(results, indexManager, metadataService, settings);
                     break;
                 case OutputFormat.Table:
-                    OutputTable(results);
+                    if (settings.GroupBy != GroupBy.None)
+                        OutputGroupedTable(results, settings.GroupBy);
+                    else
+                        OutputTable(results);
                     break;
                 case OutputFormat.Markdown:
                     OutputMarkdown(results);
@@ -116,6 +144,25 @@ public class QueryCommand : Command<QueryCommand.Settings>
             AnsiConsole.MarkupLine($"[red]Error during query:[/] {ex.Message}");
             return 1;
         }
+    }
+
+    private static List<MemberInfo> HandleNameQuery(IQueryEngine queryEngine, string query, int maxResults)
+    {
+        // Handle special case of "*" to get all results
+        if (query == "*" || query == "**")
+        {
+            // Use SearchWithFilters with wildcard to get all
+            return queryEngine.SearchWithFilters("*", null, null, null, maxResults);
+        }
+        
+        // Handle wildcards in general
+        if (query.Contains('*') || query.Contains('?'))
+        {
+            return queryEngine.SearchWithFilters(query, null, null, null, maxResults);
+        }
+        
+        // Normal name search for non-wildcard queries
+        return queryEngine.SearchByName(query, maxResults);
     }
 
     private static List<MemberInfo> SearchForMethods(IQueryEngine queryEngine, string pattern, int? minParams, int? maxParams, int maxResults)
@@ -140,7 +187,21 @@ public class QueryCommand : Command<QueryCommand.Settings>
             return paramFilteredMethods.Take(maxResults).ToList();
         }
         
-        // First, search for methods with matching names (supports wildcards)
+        // Handle wildcard for all methods
+        if (pattern == "*" || pattern == "**")
+        {
+            var methodResults = queryEngine.SearchWithFilters("*", MemberType.Method, null, null, maxResults);
+            return methodResults;
+        }
+        
+        // Handle wildcards in pattern
+        if (pattern.Contains('*') || pattern.Contains('?'))
+        {
+            var wildcardResults = queryEngine.SearchWithFilters(pattern, MemberType.Method, null, null, maxResults * 2);
+            return wildcardResults.Take(maxResults).ToList();
+        }
+        
+        // First, search for methods with matching names (no wildcards)
         var nameResults = queryEngine.SearchByName(pattern, maxResults * 2);
         
         // Filter to only methods
@@ -198,6 +259,79 @@ public class QueryCommand : Command<QueryCommand.Settings>
         AnsiConsole.Profile.Width = int.MaxValue;
         AnsiConsole.WriteLine(json);
         AnsiConsole.Profile.Width = originalWidth;
+    }
+
+    private static void OutputGroupedTable(List<MemberInfo> results, GroupBy groupBy)
+    {
+        var groups = groupBy switch
+        {
+            GroupBy.Namespace => results.GroupBy(r => r.Namespace),
+            GroupBy.Assembly => results.GroupBy(r => r.Assembly),
+            GroupBy.MemberType => results.GroupBy(r => r.MemberType.ToString()),
+            GroupBy.Category => results.GroupBy(r => CategorizeResult(r)),
+            _ => results.GroupBy(r => "All")
+        };
+
+        foreach (var group in groups.OrderBy(g => g.Key))
+        {
+            AnsiConsole.Write(new Rule($"[bold yellow]{Markup.Escape(group.Key ?? "Unknown")}[/] ({group.Count()} items)") 
+            { 
+                Justification = Justify.Left 
+            });
+            
+            var table = new Table();
+            table.AddColumn("Type");
+            table.AddColumn("Name");
+            if (groupBy != GroupBy.Namespace)
+                table.AddColumn("Namespace");
+            if (groupBy != GroupBy.Assembly)
+                table.AddColumn("Assembly");
+
+            foreach (var result in group.Take(20)) // Limit items per group
+            {
+                var row = new List<string>
+                {
+                    result.MemberType.ToString(),
+                    Markup.Escape(GenericTypeFormatter.FormatTypeName(result.Name))
+                };
+                
+                if (groupBy != GroupBy.Namespace)
+                    row.Add(Markup.Escape(GenericTypeFormatter.FormatTypeName(result.Namespace)));
+                if (groupBy != GroupBy.Assembly)
+                    row.Add(Markup.Escape(result.Assembly));
+                
+                table.AddRow(row.ToArray());
+            }
+
+            AnsiConsole.Write(table);
+            AnsiConsole.WriteLine();
+        }
+    }
+
+    private static string CategorizeResult(MemberInfo member)
+    {
+        // Categorize based on common patterns
+        if (member.Name.EndsWith("Exception"))
+            return "Exceptions";
+        if (member.Name.StartsWith("I") && member.Name.Length > 1 && char.IsUpper(member.Name[1]))
+            return "Interfaces";
+        if (member.Name.EndsWith("Attribute"))
+            return "Attributes";
+        if (member.Name.EndsWith("EventArgs"))
+            return "Events";
+        if (member.Name.EndsWith("Handler") || member.Name.EndsWith("Delegate"))
+            return "Delegates";
+        if (member.Name.EndsWith("Collection") || member.Name.EndsWith("List") || member.Name.EndsWith("Dictionary"))
+            return "Collections";
+        if (member.Name.EndsWith("Builder") || member.Name.EndsWith("Factory"))
+            return "Builders/Factories";
+        if (member.MemberType == MemberType.Method)
+            return "Methods";
+        if (member.MemberType == MemberType.Property)
+            return "Properties";
+        if (member.MemberType == MemberType.Type)
+            return "Types";
+        return "Other";
     }
 
     private static void OutputTable(List<MemberInfo> results)
@@ -343,6 +477,22 @@ public class QueryCommand : Command<QueryCommand.Settings>
         [Description("For method searches: maximum parameter count (0-10). Use with --type method")]
         [CommandOption("--max-params")]
         public int? MaxParams { get; init; }
+
+        [Description("Group results by: none (default), category, namespace, assembly, membertype")]
+        [CommandOption("--group-by")]
+        public GroupBy GroupBy { get; init; } = GroupBy.None;
+
+        [Description("Only show items with code examples")]
+        [CommandOption("--with-examples")]
+        public bool WithExamples { get; init; }
+
+        [Description("Sort results by documentation quality first")]
+        [CommandOption("--quality-first")]
+        public bool QualityFirst { get; init; }
+
+        [Description("Show only main entry point methods (Create, Parse, Load, etc.)")]
+        [CommandOption("--entry-points")]
+        public bool EntryPointsOnly { get; init; }
     }
 
     public enum QueryType
@@ -364,5 +514,23 @@ public class QueryCommand : Command<QueryCommand.Settings>
 
         [Description("Search for methods by name/signature pattern (supports wildcards)")]
         Method
+    }
+
+    public enum GroupBy
+    {
+        [Description("No grouping - flat list")]
+        None,
+
+        [Description("Group by functional category")]
+        Category,
+
+        [Description("Group by namespace")]
+        Namespace,
+
+        [Description("Group by assembly")]
+        Assembly,
+
+        [Description("Group by member type (Type, Method, Property, etc.)")]
+        MemberType
     }
 }

@@ -41,11 +41,9 @@ internal class Program
             config.SetApplicationName("apilens");
             config.SetApplicationVersion("1.0.0");
 
-            // Configure top-level examples to show the drill-down workflow
+            // Configure top-level examples to show the enhanced drill-down workflow
             config.AddExample("analyze", "./MySolution.sln");
-            config.AddExample("nuget", "--list", "--filter", "Newtonsoft.*");
-            config.AddExample("list-types", "--package", "Newtonsoft.Json");
-            config.AddExample("query", "JObject");
+            config.AddExample("explore", "Newtonsoft.Json");
             config.AddExample("hierarchy", "JObject", "--show-members");
             config.AddExample("query", "Parse", "--type", "method", "--min-params", "1");
             config.AddExample("examples", "Parse");
@@ -134,6 +132,13 @@ internal class Program
                 .WithExample("analyze", "./MyProject.csproj", "--include-transitive")
                 .WithExample("analyze", "./MySolution.sln", "--clean")
                 .WithExample("analyze", "./src/MyProject/MyProject.csproj", "--use-assets", "--format", "json");
+
+            config.AddCommand<ExploreCommand>("explore")
+                .WithDescription(HelpText.ExploreCommandDescription)
+                .WithExample("explore", "Newtonsoft.Json")
+                .WithExample("explore", "Microsoft.Extensions.*")
+                .WithExample("explore", "Serilog", "--show-complexity")
+                .WithExample("explore", "System.Text.Json", "--format", "json");
         });
 
         return app.Run(args);

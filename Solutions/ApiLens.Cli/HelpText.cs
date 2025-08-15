@@ -261,6 +261,38 @@ internal static class HelpText
           List available: apilens nuget --list --filter "System.*"
         """;
 
+    public const string ExploreCommandDescription = """
+        Interactive package exploration with guided navigation and insights.
+        
+        BEST STARTING POINT for understanding a new package!
+        Provides an overview of the package structure, key types, and entry points.
+        
+        WHAT IT SHOWS:
+          - Package statistics and documentation coverage
+          - Main namespaces with type counts
+          - Entry point types (classes with Create, Parse, Load methods)
+          - Key interfaces to understand the API design
+          - Most complex types (by member count)
+          - Suggested next steps for exploration
+        
+        USE THIS WHEN:
+          - Starting with a new package
+          - Understanding package organization
+          - Finding the main types to work with
+          - Assessing package complexity
+        
+        WORKFLOW:
+          1. apilens explore PackageName
+          2. Note the entry point types
+          3. Use hierarchy command on key types
+          4. Query for specific functionality
+        
+        EXAMPLES:
+          Basic exploration: apilens explore Newtonsoft.Json
+          With complexity: apilens explore Serilog --show-complexity
+          JSON output: apilens explore System.Text.Json --format json
+        """;
+
     // Workflow examples for LLMs
     public const string WorkflowExamples = """
         COMPLETE WORKFLOW EXAMPLES:
