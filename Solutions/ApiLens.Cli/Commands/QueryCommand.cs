@@ -45,8 +45,40 @@ public class QueryCommand : Command<QueryCommand.Settings>
 
             List<MemberInfo> results;
 
-            // Check if we have any filters specified
-            if (settings.MemberTypeFilter.HasValue ||
+            // Check if declaring type filter is specified
+            if (!string.IsNullOrEmpty(settings.DeclaringTypeFilter))
+            {
+                // Search by declaring type first
+                results = queryEngine.SearchByDeclaringType(settings.DeclaringTypeFilter, settings.MaxResults * 2);
+                
+                // Then filter by query if provided
+                if (!string.IsNullOrEmpty(settings.Query) && settings.Query != "*")
+                {
+                    var queryLower = settings.Query.ToLowerInvariant();
+                    bool hasWildcards = settings.Query.Contains('*') || settings.Query.Contains('?');
+                    
+                    if (hasWildcards)
+                    {
+                        var pattern = queryLower.Replace("*", ".*").Replace("?", ".");
+                        var regex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        results = results.Where(r => regex.IsMatch(r.Name)).ToList();
+                    }
+                    else
+                    {
+                        results = results.Where(r => r.Name.Contains(queryLower, StringComparison.OrdinalIgnoreCase)).ToList();
+                    }
+                }
+                
+                // Apply member type filter if specified
+                if (settings.MemberTypeFilter.HasValue)
+                {
+                    results = results.Where(r => r.MemberType == settings.MemberTypeFilter.Value).ToList();
+                }
+                
+                results = results.Take(settings.MaxResults).ToList();
+            }
+            // Check if we have any other filters specified
+            else if (settings.MemberTypeFilter.HasValue ||
                 !string.IsNullOrEmpty(settings.NamespaceFilter) ||
                 !string.IsNullOrEmpty(settings.AssemblyFilter))
             {
@@ -476,6 +508,10 @@ public class QueryCommand : Command<QueryCommand.Settings>
         [Description("Filter by assembly pattern. Supports wildcards: *.Core matches all Core assemblies")]
         [CommandOption("--assembly")]
         public string? AssemblyFilter { get; init; }
+
+        [Description("Filter by declaring type. Shows only members of the specified type")]
+        [CommandOption("--declaring-type")]
+        public string? DeclaringTypeFilter { get; init; }
 
         [Description("For method searches: minimum parameter count (0-10). Use with --type method")]
         [CommandOption("--min-params")]

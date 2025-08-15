@@ -41,6 +41,16 @@ public class DocumentBuilder : IDocumentBuilder
             new StringField("memberTypeFacet", memberInfo.MemberType.ToString(), Field.Store.YES)
         ];
 
+        // Add declaring type for non-type members
+        if (memberInfo.MemberType != MemberType.Type)
+        {
+            string declaringType = ExtractDeclaringType(memberInfo.FullName);
+            if (!string.IsNullOrEmpty(declaringType))
+            {
+                doc.Add(new StringField("declaringType", declaringType, Field.Store.YES));
+            }
+        }
+
         // Add type-specific search fields
         switch (memberInfo.MemberType)
         {
@@ -206,6 +216,8 @@ public class DocumentBuilder : IDocumentBuilder
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageId))
         {
             doc.Add(new StringField("packageId", memberInfo.PackageId, Field.Store.YES));
+            // Add normalized package ID for case-insensitive search
+            doc.Add(new StringField("packageIdNormalized", memberInfo.PackageId.ToLowerInvariant(), Field.Store.NO));
         }
 
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageVersion))
@@ -403,5 +415,13 @@ public class DocumentBuilder : IDocumentBuilder
     {
         int lastDot = declaringType.LastIndexOf('.');
         return lastDot >= 0 ? declaringType[..lastDot] : string.Empty;
+    }
+
+    private static string ExtractDeclaringType(string fullName)
+    {
+        // For members, the declaring type is everything before the last '.'
+        // E.g., "System.String.Split" -> "System.String"
+        int lastDot = fullName.LastIndexOf('.');
+        return lastDot > 0 ? fullName[..lastDot] : string.Empty;
     }
 }

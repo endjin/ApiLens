@@ -49,7 +49,9 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(namespaceName);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("namespaceText", namespaceName, maxResults);
+        // Use exact match on StringField for consistency with other commands
+        var query = new TermQuery(new Term("namespace", namespaceName));
+        TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -91,6 +93,16 @@ public class QueryEngine : IQueryEngine
 
         // Search for the type's members by searching for members whose fullName starts with the type name
         TopDocs topDocs = indexManager.SearchByField("fullNameText", typeName + ".", maxResults);
+        return ConvertTopDocsToMembers(topDocs);
+    }
+
+    public List<MemberInfo> SearchByDeclaringType(string declaringType, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(declaringType);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // Search for members that belong to the specified declaring type
+        TopDocs topDocs = indexManager.SearchByField("declaringType", declaringType, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -315,7 +327,16 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("packageId", packageId, maxResults);
+        // Use normalized package ID for case-insensitive search
+        string normalizedPackageId = packageId.ToLowerInvariant();
+        TopDocs topDocs = indexManager.SearchByField("packageIdNormalized", normalizedPackageId, maxResults);
+        
+        // Fallback to original field for backward compatibility with old indexes
+        if (topDocs.TotalHits == 0)
+        {
+            topDocs = indexManager.SearchByField("packageId", packageId, maxResults);
+        }
+        
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -357,8 +378,26 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(packagePattern);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        // Search for package matches (supports wildcards)
-        TopDocs packageDocs = indexManager.SearchByField("packageId", packagePattern, maxResults * 10);
+        // Use normalized field for case-insensitive search if no wildcards
+        TopDocs packageDocs;
+        if (!packagePattern.Contains('*') && !packagePattern.Contains('?'))
+        {
+            // Exact match - use normalized field
+            string normalizedPattern = packagePattern.ToLowerInvariant();
+            packageDocs = indexManager.SearchByField("packageIdNormalized", normalizedPattern, maxResults * 10);
+            
+            // Fallback for old indexes
+            if (packageDocs.TotalHits == 0)
+            {
+                packageDocs = indexManager.SearchByField("packageId", packagePattern, maxResults * 10);
+            }
+        }
+        else
+        {
+            // Wildcard search on original field
+            packageDocs = indexManager.SearchByField("packageId", packagePattern, maxResults * 10);
+        }
+        
         List<MemberInfo> allMembers = ConvertTopDocsToMembers(packageDocs);
 
         // Filter to only Type members

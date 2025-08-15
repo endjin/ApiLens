@@ -11,6 +11,7 @@ public interface IQueryEngine : IDisposable
     MemberInfo? GetById(string id);
     List<MemberInfo> GetByType(MemberType memberType, int maxResults);
     List<MemberInfo> GetTypeMembers(string typeName, int maxResults);
+    List<MemberInfo> SearchByDeclaringType(string declaringType, int maxResults);
     List<MemberInfo> SearchByAssembly(string assemblyName, int maxResults);
     List<MemberInfo> SearchByPackage(string packageId, int maxResults);
 

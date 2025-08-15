@@ -152,18 +152,21 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
             // For exact namespace matching, search by namespace field directly
             if (!namespacePattern.Contains('*') && !namespacePattern.Contains('?'))
             {
-                // Exact namespace search
-                results = queryEngine.SearchByNamespace(namespacePattern, settings.MaxResults);
+                // Exact namespace search - get more results to filter for types
+                results = queryEngine.SearchByNamespace(namespacePattern, 
+                    settings.IncludeMembers ? settings.MaxResults : settings.MaxResults * 10);
             }
             else
             {
                 // Wildcard namespace search
-                results = queryEngine.SearchByNamespacePattern(namespacePattern, settings.MaxResults);
+                results = queryEngine.SearchByNamespacePattern(namespacePattern, 
+                    settings.IncludeMembers ? settings.MaxResults : settings.MaxResults * 10);
             }
             
             if (!settings.IncludeMembers)
             {
-                results = [.. results.Where(m => m.MemberType == MemberType.Type)];
+                results = [.. results.Where(m => m.MemberType == MemberType.Type)
+                    .Take(settings.MaxResults)];
             }
         }
 

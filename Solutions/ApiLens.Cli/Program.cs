@@ -76,6 +76,12 @@ internal class Program
                 .WithExample("examples", "Console.WriteLine")
                 .WithExample("examples", "--format", "json", "--max", "10");
 
+            config.AddCommand<MembersCommand>("members")
+                .WithDescription("Show all members of a specific type (methods, properties, fields, etc.)")
+                .WithExample("members", "IndexWriter")
+                .WithExample("members", "System.String", "--show-summary")
+                .WithExample("members", "List", "--distinct", "--max-per-type", "10");
+
             config.AddCommand<ExceptionsCommand>("exceptions")
                 .WithDescription(HelpText.ExceptionsCommandDescription)
                 .WithExample("exceptions", "ArgumentNullException")
