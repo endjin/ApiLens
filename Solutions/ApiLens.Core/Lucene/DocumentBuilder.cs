@@ -36,6 +36,11 @@ public class DocumentBuilder : IDocumentBuilder
             new TextField("nameText", memberInfo.Name, Field.Store.NO),
             new TextField("fullNameText", memberInfo.FullName, Field.Store.NO),
             new TextField("namespaceText", memberInfo.Namespace, Field.Store.NO),
+            
+            // Normalized fields for case-insensitive search
+            new StringField("nameNormalized", memberInfo.Name.ToLowerInvariant(), Field.Store.NO),
+            new StringField("fullNameNormalized", memberInfo.FullName.ToLowerInvariant(), Field.Store.NO),
+            new StringField("namespaceNormalized", memberInfo.Namespace.ToLowerInvariant(), Field.Store.NO),
 
             // Facet field for filtering by member type
             new StringField("memberTypeFacet", memberInfo.MemberType.ToString(), Field.Store.YES)
@@ -195,11 +200,25 @@ public class DocumentBuilder : IDocumentBuilder
         {
             doc.Add(new TextField("returns", SanitizeForStorage(memberInfo.Returns), Field.Store.YES));
         }
+        
+        // Add return type for methods
+        if (!string.IsNullOrWhiteSpace(memberInfo.ReturnType))
+        {
+            doc.Add(new StringField("returnType", memberInfo.ReturnType, Field.Store.YES));
+        }
 
         // Add see also references
         if (!string.IsNullOrWhiteSpace(memberInfo.SeeAlso))
         {
             doc.Add(new TextField("seeAlso", SanitizeForStorage(memberInfo.SeeAlso), Field.Store.YES));
+        }
+        
+        // Add method modifiers
+        if (memberInfo.MemberType == MemberType.Method)
+        {
+            doc.Add(new StringField("isStatic", memberInfo.IsStatic.ToString().ToLowerInvariant(), Field.Store.YES));
+            doc.Add(new StringField("isAsync", memberInfo.IsAsync.ToString().ToLowerInvariant(), Field.Store.YES));
+            doc.Add(new StringField("isExtension", memberInfo.IsExtension.ToString().ToLowerInvariant(), Field.Store.YES));
         }
 
         // Add complexity metrics
@@ -380,32 +399,19 @@ public class DocumentBuilder : IDocumentBuilder
             Assembly = "Unknown", // Would need to be provided separately
             Namespace = ExtractNamespaceFromDeclaringType(methodInfo.DeclaringType),
             Summary = methodInfo.Summary,
-            Remarks = methodInfo.Remarks
+            Remarks = methodInfo.Remarks,
+            IsStatic = methodInfo.IsStatic,
+            IsAsync = methodInfo.IsAsync,
+            IsExtension = methodInfo.IsExtension,
+            ReturnType = methodInfo.ReturnType
         };
 
         Document doc = BuildDocument(memberInfo);
 
-        // Add method-specific fields
-        doc.Add(new StringField("returnType", methodInfo.ReturnType, Field.Store.YES));
-
+        // Add method-specific fields (parameters only, since other fields are already added)
         foreach (ParameterInfo parameter in methodInfo.Parameters)
         {
             doc.Add(new TextField("parameter", $"{parameter.Type} {parameter.Name}", Field.Store.YES));
-        }
-
-        if (methodInfo.IsStatic)
-        {
-            doc.Add(new StringField("isStatic", "true", Field.Store.YES));
-        }
-
-        if (methodInfo.IsExtension)
-        {
-            doc.Add(new StringField("isExtension", "true", Field.Store.YES));
-        }
-
-        if (methodInfo.IsAsync)
-        {
-            doc.Add(new StringField("isAsync", "true", Field.Store.YES));
         }
 
         return doc;
@@ -419,9 +425,23 @@ public class DocumentBuilder : IDocumentBuilder
 
     private static string ExtractDeclaringType(string fullName)
     {
-        // For members, the declaring type is everything before the last '.'
-        // E.g., "System.String.Split" -> "System.String"
-        int lastDot = fullName.LastIndexOf('.');
-        return lastDot > 0 ? fullName[..lastDot] : string.Empty;
+        // Handle method signatures with parameters
+        // E.g., "Namespace.Type.Method(Param1,Param2)" -> "Namespace.Type"
+        
+        // First, remove parameter list if present
+        int parenIndex = fullName.IndexOf('(');
+        string nameWithoutParams = parenIndex > 0 ? fullName[..parenIndex] : fullName;
+        
+        // For generic methods, remove generic parameters
+        // E.g., "Namespace.Type.Method`2" -> "Namespace.Type.Method"
+        int backtickIndex = nameWithoutParams.LastIndexOf('`');
+        if (backtickIndex > 0)
+        {
+            nameWithoutParams = nameWithoutParams[..backtickIndex];
+        }
+        
+        // Now extract the declaring type (everything before last dot)
+        int lastDot = nameWithoutParams.LastIndexOf('.');
+        return lastDot > 0 ? nameWithoutParams[..lastDot] : string.Empty;
     }
 }

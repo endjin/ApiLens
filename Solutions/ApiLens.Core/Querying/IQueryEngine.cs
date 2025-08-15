@@ -6,6 +6,7 @@ public interface IQueryEngine : IDisposable
 {
     // Core search methods
     List<MemberInfo> SearchByName(string name, int maxResults);
+    List<MemberInfo> SearchByName(string name, int maxResults, bool ignoreCase);
     List<MemberInfo> SearchByContent(string searchText, int maxResults);
     List<MemberInfo> SearchByNamespace(string namespaceName, int maxResults);
     MemberInfo? GetById(string id);

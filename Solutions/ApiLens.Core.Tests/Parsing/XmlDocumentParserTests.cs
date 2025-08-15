@@ -158,4 +158,155 @@ public class XmlDocumentParserTests
         members[1].Name.ShouldBe("TestMethod");
         members[1].Assembly.ShouldBe("TestAssembly");
     }
+
+    [TestMethod]
+    public void LinkPropertyTypes_WithPropertyAndGetter_UpdatesPropertyType()
+    {
+        // Arrange
+        var members = new List<MemberInfo>
+        {
+            new MemberInfo
+            {
+                Id = "P:TestNamespace.TestClass.TestProperty",
+                Name = "TestProperty",
+                FullName = "TestNamespace.TestClass.TestProperty",
+                MemberType = MemberType.Property,
+                Assembly = "TestAssembly",
+                Namespace = "TestNamespace",
+                ReturnType = null
+            },
+            new MemberInfo
+            {
+                Id = "M:TestNamespace.TestClass.get_TestProperty",
+                Name = "get_TestProperty",
+                FullName = "TestNamespace.TestClass.get_TestProperty",
+                MemberType = MemberType.Method,
+                Assembly = "TestAssembly",
+                Namespace = "TestNamespace",
+                ReturnType = "System.String"
+            }
+        };
+
+        // Act
+        XmlDocumentParser.LinkPropertyTypes(members);
+
+        // Assert
+        members[0].ReturnType.ShouldBe("System.String");
+    }
+
+    [TestMethod]
+    public void LinkPropertyTypes_WithoutGetter_LeavesPropertyUnchanged()
+    {
+        // Arrange
+        var members = new List<MemberInfo>
+        {
+            new MemberInfo
+            {
+                Id = "P:TestNamespace.TestClass.TestProperty",
+                Name = "TestProperty",
+                FullName = "TestNamespace.TestClass.TestProperty",
+                MemberType = MemberType.Property,
+                Assembly = "TestAssembly",
+                Namespace = "TestNamespace",
+                ReturnType = null
+            }
+        };
+
+        // Act
+        XmlDocumentParser.LinkPropertyTypes(members);
+
+        // Assert
+        members[0].ReturnType.ShouldBeNull();
+    }
+
+    [TestMethod]
+    public void LinkPropertyTypes_WithFields_ExtractsTypeFromReturns()
+    {
+        // Arrange
+        var members = new List<MemberInfo>
+        {
+            new MemberInfo
+            {
+                Id = "F:TestNamespace.TestClass.TestField",
+                Name = "TestField",
+                FullName = "TestNamespace.TestClass.TestField",
+                MemberType = MemberType.Field,
+                Assembly = "TestAssembly",
+                Namespace = "TestNamespace",
+                ReturnType = null,
+                Returns = "An Int32 value representing the count"
+            }
+        };
+
+        // Act
+        XmlDocumentParser.LinkPropertyTypes(members);
+
+        // Assert
+        members[0].ReturnType.ShouldBe("Int32");
+    }
+
+    [TestMethod]
+    public void LinkPropertyTypes_WithEmptyList_HandlesGracefully()
+    {
+        // Arrange
+        var members = new List<MemberInfo>();
+
+        // Act & Assert (should not throw)
+        XmlDocumentParser.LinkPropertyTypes(members);
+        members.Count.ShouldBe(0);
+    }
+
+    [TestMethod]
+    public void LinkPropertyTypes_WithMultiplePropertiesAndGetters_LinksCorrectly()
+    {
+        // Arrange
+        var members = new List<MemberInfo>
+        {
+            new MemberInfo
+            {
+                Id = "P:TestNamespace.TestClass.Property1",
+                Name = "Property1",
+                FullName = "TestNamespace.TestClass.Property1",
+                MemberType = MemberType.Property,
+                Assembly = "TestAssembly",
+                Namespace = "TestNamespace"
+            },
+            new MemberInfo
+            {
+                Id = "P:TestNamespace.TestClass.Property2",
+                Name = "Property2",
+                FullName = "TestNamespace.TestClass.Property2",
+                MemberType = MemberType.Property,
+                Assembly = "TestAssembly",
+                Namespace = "TestNamespace"
+            },
+            new MemberInfo
+            {
+                Id = "M:TestNamespace.TestClass.get_Property1",
+                Name = "get_Property1",
+                FullName = "TestNamespace.TestClass.get_Property1",
+                MemberType = MemberType.Method,
+                Assembly = "TestAssembly",
+                Namespace = "TestNamespace",
+                ReturnType = "System.String"
+            },
+            new MemberInfo
+            {
+                Id = "M:TestNamespace.TestClass.get_Property2",
+                Name = "get_Property2",
+                FullName = "TestNamespace.TestClass.get_Property2",
+                MemberType = MemberType.Method,
+                Assembly = "TestAssembly",
+                Namespace = "TestNamespace",
+                ReturnType = "System.Int32"
+            }
+        };
+
+        // Act
+        XmlDocumentParser.LinkPropertyTypes(members);
+
+        // Assert
+        members[0].ReturnType.ShouldBe("System.String");
+        members[1].ReturnType.ShouldBe("System.Int32");
+    }
 }

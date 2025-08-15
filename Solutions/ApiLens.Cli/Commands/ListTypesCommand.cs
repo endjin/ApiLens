@@ -73,6 +73,13 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
             // Build the combined query
             List<MemberInfo> results = GetFilteredResults(queryEngine, settings);
 
+            // Apply deduplication if requested
+            if (settings.Distinct && results.Count > 0)
+            {
+                var deduplicationService = new ResultDeduplicationService();
+                results = deduplicationService.DeduplicateResults(results, true);
+            }
+
             if (results.Count == 0)
             {
                 if (settings.Format == OutputFormat.Json)
@@ -373,6 +380,10 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         [Description("Output format")]
         [CommandOption("-f|--format")]
         public OutputFormat Format { get; init; } = OutputFormat.Table;
+
+        [Description("Show only distinct types (deduplicate across frameworks)")]
+        [CommandOption("--distinct")]
+        public bool Distinct { get; init; } = true; // Default to true for better UX
     }
 
     public enum GroupByOption

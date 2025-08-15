@@ -28,10 +28,18 @@ public class QueryEngine : IQueryEngine
 
     public List<MemberInfo> SearchByName(string name, int maxResults)
     {
+        return SearchByName(name, maxResults, false);
+    }
+    
+    public List<MemberInfo> SearchByName(string name, int maxResults, bool ignoreCase)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("nameText", name, maxResults);
+        string fieldName = ignoreCase ? "nameNormalized" : "nameText";
+        string searchValue = ignoreCase ? name.ToLowerInvariant() : name;
+        
+        TopDocs topDocs = indexManager.SearchByField(fieldName, searchValue, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -91,9 +99,19 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        // Search for the type's members by searching for members whose fullName starts with the type name
-        TopDocs topDocs = indexManager.SearchByField("fullNameText", typeName + ".", maxResults);
-        return ConvertTopDocsToMembers(topDocs);
+        // If it's a short name, try to find the full type name first
+        if (!typeName.Contains('.'))
+        {
+            var typeResult = SearchByName(typeName, 1)
+                .FirstOrDefault(m => m.MemberType == MemberType.Type);
+            if (typeResult != null)
+            {
+                typeName = typeResult.FullName;
+            }
+        }
+        
+        // Use declaringType field for exact match
+        return SearchByDeclaringType(typeName, maxResults);
     }
 
     public List<MemberInfo> SearchByDeclaringType(string declaringType, int maxResults)
@@ -815,6 +833,11 @@ public class QueryEngine : IQueryEngine
         string? isFromNuGetCacheStr = document.Get("isFromNuGetCache");
         string? sourceFilePath = document.Get("sourceFilePath");
 
+        // Extract method modifiers
+        bool isStatic = bool.TryParse(document.Get("isStatic"), out bool isStaticValue) && isStaticValue;
+        bool isAsync = bool.TryParse(document.Get("isAsync"), out bool isAsyncValue) && isAsyncValue;
+        bool isExtension = bool.TryParse(document.Get("isExtension"), out bool isExtensionValue) && isExtensionValue;
+
         return new MemberInfo
         {
             Id = id,
@@ -826,6 +849,7 @@ public class QueryEngine : IQueryEngine
             Summary = SanitizeString(document.Get("summary")),
             Remarks = SanitizeString(document.Get("remarks")),
             Returns = SanitizeString(document.Get("returns")),
+            ReturnType = document.Get("returnType"),
             SeeAlso = SanitizeString(document.Get("seeAlso")),
             CrossReferences = [.. crossRefs],
             RelatedTypes = relatedTypes,
@@ -834,6 +858,9 @@ public class QueryEngine : IQueryEngine
             Attributes = [.. attributes],
             Parameters = [.. parameters],
             Complexity = complexity,
+            IsStatic = isStatic,
+            IsAsync = isAsync,
+            IsExtension = isExtension,
             PackageId = !string.IsNullOrEmpty(packageId) ? packageId : null,
             PackageVersion = !string.IsNullOrEmpty(packageVersion) ? packageVersion : null,
             TargetFramework = !string.IsNullOrEmpty(targetFramework) ? targetFramework : null,

@@ -20,7 +20,17 @@ public record MemberInfo
     public ComplexityMetrics? Complexity { get; init; }
     public ImmutableArray<ParameterInfo> Parameters { get; init; } = [];
     public string? Returns { get; init; }
+    public string? ReturnType { get; init; }
     public string? SeeAlso { get; init; }
+    
+    // Method modifiers (for methods only)
+    public bool IsStatic { get; init; }
+    public bool IsAsync { get; init; }
+    public bool IsExtension { get; init; }
+    public bool IsVirtual { get; init; }
+    public bool IsAbstract { get; init; }
+    public bool IsOverride { get; init; }
+    public bool IsSealed { get; init; }
 
     // Version tracking fields (all nullable for backward compatibility)
     public string? PackageId { get; init; }

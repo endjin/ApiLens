@@ -72,8 +72,14 @@ public class MembersCommand : Command<MembersCommand.Settings>
             }
 
             // Now find all members of this type
-            // Search for members whose fullName starts with the type's fullName
-            var allMembers = queryEngine.GetTypeMembers(targetType.FullName, settings.MaxResults);
+            // Use declaringType field for accurate member retrieval
+            var allMembers = queryEngine.SearchByDeclaringType(targetType.FullName, settings.MaxResults);
+            
+            // If no results, try with GetTypeMembers as fallback for backward compatibility
+            if (allMembers.Count == 0)
+            {
+                allMembers = queryEngine.GetTypeMembers(targetType.FullName, settings.MaxResults);
+            }
             
             // Apply deduplication if requested
             if (settings.Distinct)
@@ -215,7 +221,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
                 if (group.Key == MemberType.Method)
                 {
                     row.Add(Markup.Escape(FormatParameters(member)));
-                    row.Add(Markup.Escape(member.Returns ?? "void"));
+                    row.Add(Markup.Escape(member.ReturnType ?? ExtractTypeFromMember(member)));
                 }
                 else if (group.Key == MemberType.Property || group.Key == MemberType.Field)
                 {
@@ -282,7 +288,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
                 if (group.Key == MemberType.Method)
                 {
                     AnsiConsole.WriteLine($"- **Parameters**: {FormatParameters(member)}");
-                    AnsiConsole.WriteLine($"- **Returns**: {member.Returns ?? "void"}");
+                    AnsiConsole.WriteLine($"- **Returns**: {member.ReturnType ?? ExtractTypeFromMember(member)}");
                 }
                 
                 if (!string.IsNullOrWhiteSpace(member.Summary))
@@ -299,10 +305,22 @@ public class MembersCommand : Command<MembersCommand.Settings>
 
     private static string FormatMemberName(MemberInfo member)
     {
-        // Extract just the member name from the full name
-        var fullName = member.FullName;
-        var lastDot = fullName.LastIndexOf('.');
-        return lastDot >= 0 ? fullName[(lastDot + 1)..] : member.Name;
+        // Use the Name property directly as it's now properly extracted
+        var name = member.Name;
+        
+        // Add modifiers for methods
+        if (member.MemberType == MemberType.Method)
+        {
+            var modifiers = new List<string>();
+            if (member.IsStatic) modifiers.Add("[static]");
+            if (member.IsAsync) modifiers.Add("[async]");
+            if (member.IsExtension) modifiers.Add("[ext]");
+            
+            if (modifiers.Any())
+                return $"{string.Join(" ", modifiers)} {name}";
+        }
+        
+        return name;
     }
 
     private static string FormatParameters(MemberInfo member)
@@ -311,19 +329,30 @@ public class MembersCommand : Command<MembersCommand.Settings>
             return "()";
         
         var paramStrings = member.Parameters.Select(p => 
-            $"{GenericTypeFormatter.FormatTypeName(p.Type)} {p.Name}");
+        {
+            var type = !string.IsNullOrWhiteSpace(p.Type) ? p.Type : "object";
+            return $"{GenericTypeFormatter.FormatTypeName(type)} {p.Name}";
+        });
         return $"({string.Join(", ", paramStrings)})";
     }
 
     private static string ExtractTypeFromMember(MemberInfo member)
     {
-        // For properties and fields, try to extract the type from the full signature
-        // This is a simplified version - might need enhancement based on actual data
+        // Use the ReturnType property if available
+        if (!string.IsNullOrWhiteSpace(member.ReturnType))
+            return member.ReturnType;
+            
+        // For properties and fields, try to extract from Returns description
         if (!string.IsNullOrWhiteSpace(member.Returns))
-            return member.Returns;
+        {
+            // Try to extract type from the beginning of the returns description
+            var words = member.Returns.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length > 0 && char.IsUpper(words[0][0]))
+                return words[0].TrimEnd('.', ',');
+        }
         
-        // Fallback to parsing from name or summary
-        return "Unknown";
+        // Fallback
+        return member.MemberType == MemberType.Method ? "void" : "object";
     }
 
     public sealed class Settings : CommandSettings
@@ -358,6 +387,6 @@ public class MembersCommand : Command<MembersCommand.Settings>
 
         [Description("Show only distinct members (deduplicate across frameworks)")]
         [CommandOption("--distinct")]
-        public bool Distinct { get; init; }
+        public bool Distinct { get; init; } = true; // Default to true for better UX
     }
 }

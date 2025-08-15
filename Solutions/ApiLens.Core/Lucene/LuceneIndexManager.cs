@@ -279,18 +279,30 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
 
                 Interlocked.Add(ref bytesProcessed, fileSize);
 
-                int membersInFile = 0;
+                // Collect all members from the file first
+                var membersInFile = new List<MemberInfo>();
                 await foreach (MemberInfo member in parser.ParseXmlFileStreamAsync(filePath, ct))
+                {
+                    membersInFile.Add(member);
+                }
+                
+                // Link property types to their getter methods
+                if (membersInFile.Count > 0)
+                {
+                    XmlDocumentParser.LinkPropertyTypes(membersInFile);
+                }
+                
+                // Now index all the members with proper type information
+                foreach (var member in membersInFile)
                 {
                     Document doc = documentBuilder.BuildDocument(member);
                     await documentChannel.Writer.WriteAsync(doc, ct);
                     Interlocked.Increment(ref totalDocuments);
                     Interlocked.Increment(ref successCount);
-                    membersInFile++;
                 }
 
                 // Track files that produce 0 members
-                if (membersInFile == 0)
+                if (membersInFile.Count == 0)
                 {
                     // Add a special document to track empty XML files
                     Document emptyFileDoc =

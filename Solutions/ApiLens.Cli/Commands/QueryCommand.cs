@@ -95,7 +95,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
                 // Use existing search methods
                 results = settings.QueryType switch
                 {
-                    QueryType.Name => HandleNameQuery(queryEngine, settings.Query, settings.MaxResults),
+                    QueryType.Name => HandleNameQuery(queryEngine, settings.Query, settings.MaxResults, settings.IgnoreCase),
                     QueryType.Content => queryEngine.SearchByContent(settings.Query, settings.MaxResults),
                     QueryType.Namespace => queryEngine.SearchByNamespace(settings.Query, settings.MaxResults),
                     QueryType.Id => queryEngine.GetById(settings.Query) is { } member ? [member] : [],
@@ -185,7 +185,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
         }
     }
 
-    private static List<MemberInfo> HandleNameQuery(IQueryEngine queryEngine, string query, int maxResults)
+    private static List<MemberInfo> HandleNameQuery(IQueryEngine queryEngine, string query, int maxResults, bool ignoreCase = false)
     {
         // Handle special case of "*" to get all results
         if (query == "*" || query == "**")
@@ -200,8 +200,8 @@ public class QueryCommand : Command<QueryCommand.Settings>
             return queryEngine.SearchWithFilters(query, null, null, null, maxResults);
         }
         
-        // Normal name search for non-wildcard queries
-        return queryEngine.SearchByName(query, maxResults);
+        // Normal name search for non-wildcard queries - now with ignoreCase support
+        return queryEngine.SearchByName(query, maxResults, ignoreCase);
     }
 
     private static List<MemberInfo> SearchForMethods(IQueryEngine queryEngine, string pattern, int? minParams, int? maxParams, int maxResults)
@@ -539,7 +539,11 @@ public class QueryCommand : Command<QueryCommand.Settings>
 
         [Description("Show only distinct members (one per unique ID, aggregating all framework versions)")]
         [CommandOption("--distinct")]
-        public bool Distinct { get; init; }
+        public bool Distinct { get; init; } = true; // Default to true for better UX
+
+        [Description("Perform case-insensitive search (slower but more flexible)")]
+        [CommandOption("--ignore-case|-c")]
+        public bool IgnoreCase { get; init; }
     }
 
     public enum QueryType
