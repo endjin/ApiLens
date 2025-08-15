@@ -126,7 +126,16 @@ Write-Host "`n🔎 DEMO 8: Get specific member by ID" -ForegroundColor Green
 Write-Command "apilens query 'M:DemoLib.StringHelper.Reverse(System.String)' --type id --index $indexDir" "Query by exact member ID"
 & $apilens query "M:DemoLib.StringHelper.Reverse(System.String)" --type id --index "$indexDir"
 
-Write-Host "`n🔎 DEMO 9: Specialized Commands Preview" -ForegroundColor Green
+Write-Host "`n🔎 DEMO 9: NEW - Deduplication Features" -ForegroundColor Green
+Write-Host "ApiLens now properly handles duplicate entries across framework versions!" -ForegroundColor Gray
+
+Write-Command "apilens list-types --assembly DemoLib --distinct true" "Show unique types (NEW: --distinct now works and defaults to true!)"
+& $apilens list-types --assembly "DemoLib" --distinct true --index "$indexDir"
+
+Write-Command "apilens list-types --assembly DemoLib --distinct false" "Compare: Show all versions (demonstrates why deduplication helps)"
+& $apilens list-types --assembly "DemoLib" --distinct false --index "$indexDir"
+
+Write-Host "`n🔎 DEMO 10: Specialized Commands Preview" -ForegroundColor Green
 Write-Host "ApiLens has specialized commands for advanced analysis:" -ForegroundColor Gray
 
 Write-Command "apilens examples --index $indexDir" "Find methods with code examples"
@@ -135,7 +144,7 @@ Write-Command "apilens examples --index $indexDir" "Find methods with code examp
 Write-Command "apilens complexity --min-params 1 --index $indexDir" "Analyze method complexity"
 & $apilens complexity --min-params 1 --index "$indexDir" | Select-Object -First 2
 
-Write-Host "`n🔎 DEMO 10: JSON Processing for LLMs" -ForegroundColor Green
+Write-Host "`n🔎 DEMO 11: JSON Processing for LLMs" -ForegroundColor Green
 Write-Command "apilens query 'StringHelper' --format json --index $indexDir" "Get structured data for LLM processing"
 $jsonData = & $apilens query "StringHelper" --format json --index "$indexDir"
 if ($jsonData -and $jsonData -ne "[]") {
@@ -159,6 +168,8 @@ Write-Host "   • Exact name matching" -ForegroundColor Cyan
 Write-Host "   • Wildcard searches (* and ?) in content" -ForegroundColor Cyan  
 Write-Host "   • Fuzzy searches (~) for similar terms" -ForegroundColor Cyan
 Write-Host "   • Full Lucene query syntax (AND, OR, NOT, phrases)" -ForegroundColor Cyan
+Write-Host "   • 🆕 Smart deduplication (--distinct defaults to true)" -ForegroundColor Cyan
+Write-Host "   • 🆕 Property type linking for richer metadata" -ForegroundColor Cyan
 Write-Host "   • Specialized commands: examples, exceptions, complexity" -ForegroundColor Cyan
 Write-Host "   • Multiple output formats: table, JSON, markdown" -ForegroundColor Cyan
 Write-Host "   • Rich metadata extraction for LLM integration" -ForegroundColor Cyan
