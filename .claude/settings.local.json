@@ -41,9 +41,19 @@
       "Bash(tree:*)",
       "Bash(unzip:*)",
       "WebFetch(domain:*)",
-      "Bash(/dev/null)",
       "Bash(true)",
-      "Bash(.apilens.exe nuget:*)"
+      "Bash(./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens nuget --list --filter \"newtonsoft.*\")",
+      "Bash(./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens exceptions \"IOException\" --index /tmp/apilens-test/index/test-index --max 5)",
+      "Bash(./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens exceptions \"IOException\" --index /tmp/apilens-demo/indexes/nuget-demo-index --max 5)",
+      "Bash(./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens exceptions \"*IOException\" --index /tmp/apilens-demo/indexes/nuget-demo-index --max 5)",
+      "Bash(./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens list-types --namespace \"Newtonsoft.Json.Linq\" --max 10)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "Bash(/workspaces/ApiLens/Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens query --help)",
+      "Bash(/workspaces/ApiLens/Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens hierarchy --help)",
+      "Bash(./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens query --help)",
+      "Bash(./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens list-types --help)"
     ],
     "deny": []
   }

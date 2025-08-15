@@ -236,25 +236,53 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             string name = ExtractNameFromId(id, memberType.Value);
             string fullName = ExtractFullNameFromId(id, memberType.Value);
             string namespaceName = ExtractNamespaceFromId(id, memberType.Value);
+            
+            // Extract parameter types from ID and update parameter info
+            List<string> parameterTypes = ExtractParameterTypesFromId(id, memberType.Value);
+            for (int i = 0; i < parameters.Count && i < parameterTypes.Count; i++)
+            {
+                parameters[i] = parameters[i] with { Type = parameterTypes[i], Position = i };
+            }
+            
+            // Extract return type for methods
+            string? returnType = null;
+            if (memberType.Value == MemberType.Method)
+            {
+                returnType = ExtractReturnTypeFromId(id, memberType.Value);
+                // If we have a returns description but no type, try to extract it
+                if (returnType == "void" && !string.IsNullOrWhiteSpace(returns))
+                {
+                    // Sometimes the return type is in the returns description
+                    // This is a heuristic - ideally would be in the signature
+                    returnType = ExtractTypeFromReturnsDescription(returns);
+                }
+            }
+            
+            // Detect method modifiers (these would ideally come from reflection or more detailed XML)
+            bool isStatic = DetectStaticFromSignature(id, memberType.Value);
+            bool isAsync = DetectAsyncFromSignature(id, returns);
+            bool isExtension = DetectExtensionFromParameters(parameters);
 
+            // Sanitize nameAttribute to remove any control characters that break JSON
+            string sanitizedNameAttribute = nameAttribute.Replace("\n", " ").Replace("\r", " ").Replace("\t", " ");
+            
             // Create a unique ID that includes package information to avoid collisions
             // between the same type in different packages/versions/frameworks
             string uniqueId;
             if (nugetInfo.HasValue)
             {
                 // For NuGet packages: include package, version, and framework
-                uniqueId =
-                    $"{nameAttribute}|{nugetInfo.Value.PackageId}|{nugetInfo.Value.Version}|{nugetInfo.Value.Framework}";
+                uniqueId = $"{sanitizedNameAttribute}|{nugetInfo.Value.PackageId}|{nugetInfo.Value.Version}|{nugetInfo.Value.Framework}";
             }
             else if (fileHash != null)
             {
                 // For local files: include assembly name and file hash
-                uniqueId = $"{nameAttribute}|{assemblyName.ToLowerInvariant()}|{fileHash}";
+                uniqueId = $"{sanitizedNameAttribute}|{assemblyName.ToLowerInvariant()}|{fileHash}";
             }
             else
             {
                 // Fallback to original behavior
-                uniqueId = nameAttribute;
+                uniqueId = sanitizedNameAttribute;
             }
 
             return new MemberInfo
@@ -268,10 +296,14 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                 Summary = summary,
                 Remarks = remarks,
                 Returns = returns,
+                ReturnType = returnType,
                 SeeAlso = seeAlso,
                 Parameters = [.. parameters],
                 Exceptions = [.. exceptions],
                 CodeExamples = [.. examples],
+                IsStatic = isStatic,
+                IsAsync = isAsync,
+                IsExtension = isExtension,
                 IndexedAt = DateTime.UtcNow,
                 // Set package information - either from NuGet or from file
                 PackageId = nugetInfo?.PackageId ?? (fileHash != null ? assemblyName.ToLowerInvariant() : null),
@@ -428,6 +460,83 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         }
     }
 
+    /// <summary>
+    /// Links properties to their getter methods to extract return types.
+    /// This should be called after all members have been parsed from an XML file.
+    /// </summary>
+    public static void LinkPropertyTypes(List<MemberInfo> members)
+    {
+        // Group members by their declaring type for efficient lookup
+        var membersByType = members
+            .GroupBy(m => ExtractDeclaringTypeFromFullName(m.FullName))
+            .ToDictionary(g => g.Key, g => g.ToList());
+        
+        // Process each property to find its getter
+        var properties = members.Where(m => m.MemberType == MemberType.Property).ToList();
+        
+        foreach (var property in properties)
+        {
+            // Build getter method name: TypeName.get_PropertyName
+            // For example: Spectre.Console.Table.Columns -> Spectre.Console.Table.get_Columns
+            var lastDot = property.FullName.LastIndexOf('.');
+            if (lastDot > 0)
+            {
+                var typeName = property.FullName.Substring(0, lastDot);
+                var propertyName = property.FullName.Substring(lastDot + 1);
+                var getterFullName = $"{typeName}.get_{propertyName}";
+                
+                // Find the getter in the same declaring type
+                var declaringType = ExtractDeclaringTypeFromFullName(property.FullName);
+                if (membersByType.TryGetValue(declaringType, out var typeMembers))
+                {
+                    var getter = typeMembers.FirstOrDefault(m => 
+                        m.MemberType == MemberType.Method && 
+                        m.FullName.StartsWith(getterFullName));
+                    
+                    if (getter != null && !string.IsNullOrWhiteSpace(getter.ReturnType))
+                    {
+                        // Update the property with the getter's return type
+                        var index = members.IndexOf(property);
+                        if (index >= 0)
+                        {
+                            members[index] = property with { ReturnType = getter.ReturnType };
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Also process fields - they might have type information in their returns documentation
+        var fields = members.Where(m => m.MemberType == MemberType.Field).ToList();
+        foreach (var field in fields)
+        {
+            if (string.IsNullOrWhiteSpace(field.ReturnType) && !string.IsNullOrWhiteSpace(field.Returns))
+            {
+                // Try to extract type from returns description
+                var extractedType = ExtractTypeFromReturnsDescription(field.Returns);
+                if (!string.IsNullOrWhiteSpace(extractedType))
+                {
+                    var index = members.IndexOf(field);
+                    if (index >= 0)
+                    {
+                        members[index] = field with { ReturnType = extractedType };
+                    }
+                }
+            }
+        }
+    }
+    
+    private static string ExtractDeclaringTypeFromFullName(string fullName)
+    {
+        // Remove parameters if it's a method
+        int parenIndex = fullName.IndexOf('(');
+        string nameWithoutParams = parenIndex > 0 ? fullName.Substring(0, parenIndex) : fullName;
+        
+        // Get everything before the last dot (which is the member name)
+        int lastDot = nameWithoutParams.LastIndexOf('.');
+        return lastDot > 0 ? nameWithoutParams.Substring(0, lastDot) : string.Empty;
+    }
+
     private static string ExtractTypeNameFromCref(string cref)
     {
         // Remove the prefix (T:, M:, etc.) if present
@@ -582,6 +691,22 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             };
         }
 
+        // Extract return type for methods
+        string? returnType = null;
+        if (memberType.Value == MemberType.Method)
+        {
+            returnType = ExtractReturnTypeFromId(id, memberType.Value);
+            if (returnType == "void" && !string.IsNullOrWhiteSpace(returns))
+            {
+                returnType = ExtractTypeFromReturnsDescription(returns);
+            }
+        }
+        
+        // Detect method modifiers
+        bool isStatic = DetectStaticFromSignature(id, memberType.Value);
+        bool isAsync = DetectAsyncFromSignature(id, returns);
+        bool isExtension = DetectExtensionFromParameters(parameters);
+
         return new MemberInfo
         {
             Id = nameAttribute,
@@ -593,11 +718,15 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             Summary = summary,
             Remarks = remarks,
             Returns = returns,
+            ReturnType = returnType,
             SeeAlso = seeAlso,
             Parameters = [.. parameters],
             Exceptions = [.. exceptions],
             CodeExamples = [.. examples],
             Complexity = complexity,
+            IsStatic = isStatic,
+            IsAsync = isAsync,
+            IsExtension = isExtension,
             // Note: NuGet package info cannot be determined here without file path
             PackageId = null,
             PackageVersion = null,
@@ -662,22 +791,44 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         }
 
         // For members, extract the member name
+        // Find the position of parameters (if any)
         int parenIndex = id.IndexOf('(');
-        int memberStart = id.LastIndexOf('.', parenIndex >= 0 ? parenIndex : id.Length - 1);
-
-        if (memberStart >= 0)
+        string idWithoutParams = parenIndex >= 0 ? id.Substring(0, parenIndex) : id;
+        
+        // Find the last dot to get the member name
+        int lastDotIndex = idWithoutParams.LastIndexOf('.');
+        if (lastDotIndex >= 0)
         {
-            string memberName = parenIndex >= 0
-                ? id.Substring(memberStart + 1, parenIndex - memberStart - 1)
-                : id[(memberStart + 1)..];
-
-            // Handle special names
-            return memberName switch
+            string memberName = idWithoutParams.Substring(lastDotIndex + 1);
+            
+            // Remove generic arity from the member name if present (e.g., "Select``2" -> "Select")
+            int genericIndex = memberName.IndexOf('`');
+            if (genericIndex > 0)
             {
-                "#ctor" => ".ctor",
-                "#cctor" => ".cctor",
-                _ => memberName
-            };
+                memberName = memberName.Substring(0, genericIndex);
+            }
+            
+            // Handle special constructor names
+            if (memberName == "#ctor")
+            {
+                // Extract the class name for constructor
+                string className = idWithoutParams.Substring(0, lastDotIndex);
+                int classNameStart = className.LastIndexOf('.');
+                string ctorName = classNameStart >= 0 ? className.Substring(classNameStart + 1) : className;
+                // Remove generic arity from class name too
+                int classGenericIndex = ctorName.IndexOf('`');
+                if (classGenericIndex > 0)
+                {
+                    ctorName = ctorName.Substring(0, classGenericIndex);
+                }
+                return ctorName;
+            }
+            else if (memberName == "#cctor")
+            {
+                return "Static Constructor";
+            }
+            
+            return memberName;
         }
 
         return id;
@@ -764,11 +915,215 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             {
                 // Split by comma, handling nested generics
                 List<string> paramTypes = SplitParameterTypes(paramSection);
+                // Clean up the types to make them more readable
+                for (int i = 0; i < paramTypes.Count; i++)
+                {
+                    paramTypes[i] = CleanupTypeName(paramTypes[i]);
+                }
                 types.AddRange(paramTypes);
             }
         }
 
         return types;
+    }
+    
+    private static string ExtractReturnTypeFromId(string id, MemberType memberType)
+    {
+        // Return type comes after the closing parenthesis in some XML doc formats
+        // Format: "MethodName(params)~ReturnType" or sometimes just descriptions in <returns> tag
+        if (memberType != MemberType.Method)
+        {
+            return string.Empty;
+        }
+        
+        int parenEnd = id.LastIndexOf(')');
+        if (parenEnd >= 0 && parenEnd < id.Length - 1)
+        {
+            // Check if there's a return type indicator after the parameters
+            string afterParams = id.Substring(parenEnd + 1);
+            if (afterParams.StartsWith("~"))
+            {
+                return CleanupTypeName(afterParams.Substring(1));
+            }
+        }
+        
+        // Default return type for methods without explicit return type
+        // Will be overridden by <returns> tag content if available
+        return "void";
+    }
+    
+    private static string CleanupTypeName(string typeName)
+    {
+        // Clean up common type name patterns from XML documentation
+        typeName = typeName.Trim();
+        
+        // Handle common XML doc type prefixes
+        if (typeName.StartsWith("T:"))
+            typeName = typeName.Substring(2);
+        
+        // Handle generic types - convert {T} to <T>
+        if (typeName.Contains('{') && typeName.Contains('}'))
+        {
+            typeName = typeName.Replace('{', '<').Replace('}', '>');
+        }
+        
+        // Handle arrays
+        if (typeName.EndsWith("[]"))
+        {
+            string elementType = typeName.Substring(0, typeName.Length - 2);
+            elementType = CleanupTypeName(elementType);
+            return elementType + "[]";
+        }
+        
+        // Extract just the type name for common generics
+        if (typeName.StartsWith("System.Collections.Generic."))
+        {
+            typeName = typeName.Substring("System.Collections.Generic.".Length);
+            
+            // Handle IEnumerable<T>, List<T>, Dictionary<K,V> etc
+            if (typeName.StartsWith("IEnumerable<") || typeName.StartsWith("List<") || 
+                typeName.StartsWith("Dictionary<") || typeName.StartsWith("IList<") ||
+                typeName.StartsWith("HashSet<") || typeName.StartsWith("Queue<") ||
+                typeName.StartsWith("Stack<"))
+            {
+                // Keep the generic type but simplify inner types
+                int genericStart = typeName.IndexOf('<');
+                if (genericStart > 0)
+                {
+                    string genericType = typeName.Substring(0, genericStart);
+                    string innerTypes = typeName.Substring(genericStart + 1, typeName.Length - genericStart - 2);
+                    var simplifiedInner = SimplifyInnerTypes(innerTypes);
+                    return $"{genericType}<{simplifiedInner}>";
+                }
+            }
+        }
+        
+        // Handle nullable types
+        if (typeName.StartsWith("System.Nullable`1[") && typeName.EndsWith("]"))
+        {
+            string innerType = typeName.Substring("System.Nullable`1[".Length, 
+                typeName.Length - "System.Nullable`1[".Length - 1);
+            return CleanupTypeName(innerType) + "?";
+        }
+        
+        // Simplify System types
+        typeName = typeName switch
+        {
+            "System.String" => "string",
+            "System.Int32" => "int",
+            "System.Int64" => "long",
+            "System.Boolean" => "bool",
+            "System.Void" => "void",
+            "System.Object" => "object",
+            "System.Double" => "double",
+            "System.Single" => "float",
+            "System.Decimal" => "decimal",
+            "System.Byte" => "byte",
+            "System.Char" => "char",
+            "System.DateTime" => "DateTime",
+            "System.Guid" => "Guid",
+            "System.TimeSpan" => "TimeSpan",
+            _ => typeName
+        };
+        
+        // Remove namespace for well-known types
+        if (typeName.StartsWith("System.") && !typeName.Contains('<'))
+        {
+            return typeName.Substring(7); // Remove "System."
+        }
+        
+        // For other types, take just the last part (class name)
+        if (!typeName.Contains('<') && typeName.Contains('.'))
+        {
+            int lastDot = typeName.LastIndexOf('.');
+            return typeName.Substring(lastDot + 1);
+        }
+        
+        return typeName;
+    }
+    
+    private static string SimplifyInnerTypes(string innerTypes)
+    {
+        // Handle nested generics and multiple type parameters
+        var parts = new List<string>();
+        var current = new System.Text.StringBuilder();
+        int depth = 0;
+        
+        foreach (char c in innerTypes)
+        {
+            if (c == ',' && depth == 0)
+            {
+                parts.Add(CleanupTypeName(current.ToString()));
+                current.Clear();
+            }
+            else
+            {
+                if (c == '<' || c == '{') depth++;
+                else if (c == '>' || c == '}') depth--;
+                current.Append(c);
+            }
+        }
+        
+        if (current.Length > 0)
+        {
+            parts.Add(CleanupTypeName(current.ToString()));
+        }
+        
+        return string.Join(", ", parts);
+    }
+    
+    private static bool DetectStaticFromSignature(string id, MemberType memberType)
+    {
+        // Static constructors are always static
+        if (id.Contains("#cctor"))
+            return true;
+            
+        // This is a heuristic - ideally would come from reflection
+        // Some XML docs include modifiers in the signature
+        return false;
+    }
+    
+    private static bool DetectAsyncFromSignature(string id, string? returns)
+    {
+        // Check if return type contains Task or ValueTask
+        if (!string.IsNullOrEmpty(returns))
+        {
+            return returns.Contains("Task") || returns.Contains("ValueTask");
+        }
+        return false;
+    }
+    
+    private static bool DetectExtensionFromParameters(List<ParameterInfo> parameters)
+    {
+        // Extension methods have "this" as the first parameter modifier
+        // This would need to be detected from the XML or reflection
+        if (parameters.Count > 0)
+        {
+            // Check if first parameter description mentions "this"
+            var firstParam = parameters[0];
+            return firstParam.Description?.StartsWith("this ", StringComparison.OrdinalIgnoreCase) ?? false;
+        }
+        return false;
+    }
+    
+    private static string ExtractTypeFromReturnsDescription(string returns)
+    {
+        // Try to extract type from returns description
+        // Common patterns: "Returns a <type>", "An <type>", "The <type>"
+        if (returns.StartsWith("A ") || returns.StartsWith("An ") || returns.StartsWith("The "))
+        {
+            var words = returns.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length > 1)
+            {
+                // Take the second word as potential type
+                var potentialType = words[1].TrimEnd('.', ',', ';');
+                if (!string.IsNullOrEmpty(potentialType) && char.IsUpper(potentialType[0]))
+                {
+                    return CleanupTypeName(potentialType);
+                }
+            }
+        }
+        return "void";
     }
 
     private static List<string> SplitParameterTypes(string paramSection)

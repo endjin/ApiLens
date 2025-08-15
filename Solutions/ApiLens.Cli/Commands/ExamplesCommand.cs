@@ -13,7 +13,8 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        Encoder = JsonSanitizer.CreateSafeJsonEncoder(),
+        Converters = { new SanitizingJsonConverterFactory() }
     };
 
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
@@ -134,7 +135,12 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
         };
 
         string json = JsonSerializer.Serialize(response, JsonOptions);
+        
+        // Temporarily set unlimited width to prevent JSON wrapping
+        var originalWidth = AnsiConsole.Profile.Width;
+        AnsiConsole.Profile.Width = int.MaxValue;
         AnsiConsole.WriteLine(json);
+        AnsiConsole.Profile.Width = originalWidth;
     }
 
     private static void OutputMarkdown(List<MemberInfo> results, string? searchPattern)

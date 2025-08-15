@@ -115,10 +115,10 @@ public class XmlMetadataParsingTests
         member.ShouldNotBeNull();
         member.Parameters.Length.ShouldBe(2);
         member.Parameters[0].Name.ShouldBe("a");
-        member.Parameters[0].Type.ShouldBe("System.Int32");
+        member.Parameters[0].Type.ShouldBe("int");
         member.Parameters[0].Description.ShouldBe("The first number.");
         member.Parameters[1].Name.ShouldBe("b");
-        member.Parameters[1].Type.ShouldBe("System.Int32");
+        member.Parameters[1].Type.ShouldBe("int");
         member.Parameters[1].Description.ShouldBe("The second number.");
     }
 

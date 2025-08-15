@@ -28,10 +28,18 @@ public class QueryEngine : IQueryEngine
 
     public List<MemberInfo> SearchByName(string name, int maxResults)
     {
+        return SearchByName(name, maxResults, false);
+    }
+    
+    public List<MemberInfo> SearchByName(string name, int maxResults, bool ignoreCase)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("nameText", name, maxResults);
+        string fieldName = ignoreCase ? "nameNormalized" : "nameText";
+        string searchValue = ignoreCase ? name.ToLowerInvariant() : name;
+        
+        TopDocs topDocs = indexManager.SearchByField(fieldName, searchValue, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -49,7 +57,9 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(namespaceName);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("namespaceText", namespaceName, maxResults);
+        // Use exact match on StringField for consistency with other commands
+        var query = new TermQuery(new Term("namespace", namespaceName));
+        TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -89,8 +99,28 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        // Search for the type's members by searching for members whose fullName starts with the type name
-        TopDocs topDocs = indexManager.SearchByField("fullNameText", typeName + ".", maxResults);
+        // If it's a short name, try to find the full type name first
+        if (!typeName.Contains('.'))
+        {
+            var typeResult = SearchByName(typeName, 1)
+                .FirstOrDefault(m => m.MemberType == MemberType.Type);
+            if (typeResult != null)
+            {
+                typeName = typeResult.FullName;
+            }
+        }
+        
+        // Use declaringType field for exact match
+        return SearchByDeclaringType(typeName, maxResults);
+    }
+
+    public List<MemberInfo> SearchByDeclaringType(string declaringType, int maxResults)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(declaringType);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // Search for members that belong to the specified declaring type
+        TopDocs topDocs = indexManager.SearchByField("declaringType", declaringType, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -315,7 +345,16 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("packageId", packageId, maxResults);
+        // Use normalized package ID for case-insensitive search
+        string normalizedPackageId = packageId.ToLowerInvariant();
+        TopDocs topDocs = indexManager.SearchByField("packageIdNormalized", normalizedPackageId, maxResults);
+        
+        // Fallback to original field for backward compatibility with old indexes
+        if (topDocs.TotalHits == 0)
+        {
+            topDocs = indexManager.SearchByField("packageId", packageId, maxResults);
+        }
+        
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -357,8 +396,26 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(packagePattern);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        // Search for package matches (supports wildcards)
-        TopDocs packageDocs = indexManager.SearchByField("packageId", packagePattern, maxResults * 10);
+        // Use normalized field for case-insensitive search if no wildcards
+        TopDocs packageDocs;
+        if (!packagePattern.Contains('*') && !packagePattern.Contains('?'))
+        {
+            // Exact match - use normalized field
+            string normalizedPattern = packagePattern.ToLowerInvariant();
+            packageDocs = indexManager.SearchByField("packageIdNormalized", normalizedPattern, maxResults * 10);
+            
+            // Fallback for old indexes
+            if (packageDocs.TotalHits == 0)
+            {
+                packageDocs = indexManager.SearchByField("packageId", packagePattern, maxResults * 10);
+            }
+        }
+        else
+        {
+            // Wildcard search on original field
+            packageDocs = indexManager.SearchByField("packageId", packagePattern, maxResults * 10);
+        }
+        
         List<MemberInfo> allMembers = ConvertTopDocsToMembers(packageDocs);
 
         // Filter to only Type members
@@ -413,8 +470,13 @@ public class QueryEngine : IQueryEngine
     public List<MemberInfo> SearchWithFilters(string namePattern, MemberType? memberType,
         string? namespacePattern, string? assemblyPattern, int maxResults)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(namePattern);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
+
+        // Special handling for "*" or empty pattern to get all items
+        if (string.IsNullOrWhiteSpace(namePattern) || namePattern == "*")
+        {
+            return GetAllWithFilters(memberType, namespacePattern, assemblyPattern, maxResults);
+        }
 
         // Build a combined query with all filters
         BooleanQuery query = [];
@@ -481,6 +543,61 @@ public class QueryEngine : IQueryEngine
         return ConvertTopDocsToMembers(topDocs);
     }
 
+    private List<MemberInfo> GetAllWithFilters(MemberType? memberType, 
+        string? namespacePattern, string? assemblyPattern, int maxResults)
+    {
+        // Build a query that matches all documents with optional filters
+        BooleanQuery query = [];
+        
+        // Use MatchAllDocsQuery as the base to get all documents
+        query.Add(new MatchAllDocsQuery(), Occur.MUST);
+        
+        // Apply member type filter if specified
+        if (memberType.HasValue)
+        {
+            query.Add(new TermQuery(new Term("memberType", memberType.Value.ToString())), Occur.MUST);
+        }
+        
+        // Apply namespace pattern filter if specified
+        if (!string.IsNullOrEmpty(namespacePattern))
+        {
+            bool nsHasWildcards = namespacePattern.Contains('*') || namespacePattern.Contains('?');
+            if (nsHasWildcards)
+            {
+                Query? nsQuery = CreateWildcardQuery("namespace", namespacePattern);
+                if (nsQuery != null)
+                {
+                    query.Add(nsQuery, Occur.MUST);
+                }
+            }
+            else
+            {
+                query.Add(new TermQuery(new Term("namespace", namespacePattern)), Occur.MUST);
+            }
+        }
+        
+        // Apply assembly pattern filter if specified
+        if (!string.IsNullOrEmpty(assemblyPattern))
+        {
+            bool asmHasWildcards = assemblyPattern.Contains('*') || assemblyPattern.Contains('?');
+            if (asmHasWildcards)
+            {
+                Query? asmQuery = CreateWildcardQuery("assembly", assemblyPattern);
+                if (asmQuery != null)
+                {
+                    query.Add(asmQuery, Occur.MUST);
+                }
+            }
+            else
+            {
+                query.Add(new TermQuery(new Term("assembly", assemblyPattern)), Occur.MUST);
+            }
+        }
+        
+        TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults);
+        return ConvertTopDocsToMembers(topDocs);
+    }
+
     private List<MemberInfo> ConvertTopDocsToMembers(TopDocs topDocs)
     {
         if (topDocs?.ScoreDocs == null)
@@ -522,14 +639,27 @@ public class QueryEngine : IQueryEngine
         return members;
     }
 
+    private static string? SanitizeString(string? input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+        
+        // Replace common control characters that break JSON
+        return input.Replace("\n", " ")
+                   .Replace("\r", " ")
+                   .Replace("\t", " ")
+                   .Replace("\b", " ")
+                   .Replace("\f", " ");
+    }
+
     private static MemberInfo? ConvertDocumentToMember(Document document)
     {
-        string? id = document.Get("id");
+        string? id = SanitizeString(document.Get("id"));
         string? memberTypeStr = document.Get("memberType");
-        string? name = document.Get("name");
-        string? fullName = document.Get("fullName");
-        string? assembly = document.Get("assembly");
-        string? namespaceName = document.Get("namespace");
+        string? name = SanitizeString(document.Get("name"));
+        string? fullName = SanitizeString(document.Get("fullName"));
+        string? assembly = SanitizeString(document.Get("assembly"));
+        string? namespaceName = SanitizeString(document.Get("namespace"));
 
         if (string.IsNullOrEmpty(id) ||
             string.IsNullOrEmpty(memberTypeStr) ||
@@ -703,6 +833,11 @@ public class QueryEngine : IQueryEngine
         string? isFromNuGetCacheStr = document.Get("isFromNuGetCache");
         string? sourceFilePath = document.Get("sourceFilePath");
 
+        // Extract method modifiers
+        bool isStatic = bool.TryParse(document.Get("isStatic"), out bool isStaticValue) && isStaticValue;
+        bool isAsync = bool.TryParse(document.Get("isAsync"), out bool isAsyncValue) && isAsyncValue;
+        bool isExtension = bool.TryParse(document.Get("isExtension"), out bool isExtensionValue) && isExtensionValue;
+
         return new MemberInfo
         {
             Id = id,
@@ -711,10 +846,11 @@ public class QueryEngine : IQueryEngine
             FullName = fullName,
             Assembly = assembly,
             Namespace = namespaceName,
-            Summary = document.Get("summary"),
-            Remarks = document.Get("remarks"),
-            Returns = document.Get("returns"),
-            SeeAlso = document.Get("seeAlso"),
+            Summary = SanitizeString(document.Get("summary")),
+            Remarks = SanitizeString(document.Get("remarks")),
+            Returns = SanitizeString(document.Get("returns")),
+            ReturnType = document.Get("returnType"),
+            SeeAlso = SanitizeString(document.Get("seeAlso")),
             CrossReferences = [.. crossRefs],
             RelatedTypes = relatedTypes,
             CodeExamples = [.. examples],
@@ -722,11 +858,14 @@ public class QueryEngine : IQueryEngine
             Attributes = [.. attributes],
             Parameters = [.. parameters],
             Complexity = complexity,
+            IsStatic = isStatic,
+            IsAsync = isAsync,
+            IsExtension = isExtension,
             PackageId = !string.IsNullOrEmpty(packageId) ? packageId : null,
             PackageVersion = !string.IsNullOrEmpty(packageVersion) ? packageVersion : null,
             TargetFramework = !string.IsNullOrEmpty(targetFramework) ? targetFramework : null,
             IsFromNuGetCache = bool.TryParse(isFromNuGetCacheStr, out bool isFromCache) && isFromCache,
-            SourceFilePath = !string.IsNullOrEmpty(sourceFilePath) ? sourceFilePath : null
+            SourceFilePath = !string.IsNullOrEmpty(sourceFilePath) ? SanitizeString(sourceFilePath) : null
         };
     }
 

@@ -14,7 +14,8 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        Encoder = JsonSanitizer.CreateSafeJsonEncoder(),
+        Converters = { new SanitizingJsonConverterFactory() }
     };
 
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
@@ -55,7 +56,12 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
                         Metadata = metadataService.BuildMetadata(indexManager)
                     };
                     string errorJson = JsonSerializer.Serialize(errorResponse, JsonOptions);
+                    
+                    // Temporarily set unlimited width to prevent JSON wrapping
+                    var originalWidth = AnsiConsole.Profile.Width;
+                    AnsiConsole.Profile.Width = int.MaxValue;
                     AnsiConsole.WriteLine(errorJson);
+                    AnsiConsole.Profile.Width = originalWidth;
                 }
                 else
                 {
@@ -66,6 +72,13 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
 
             // Build the combined query
             List<MemberInfo> results = GetFilteredResults(queryEngine, settings);
+
+            // Apply deduplication if requested
+            if (settings.Distinct && results.Count > 0)
+            {
+                var deduplicationService = new ResultDeduplicationService();
+                results = deduplicationService.DeduplicateResults(results, true);
+            }
 
             if (results.Count == 0)
             {
@@ -122,22 +135,45 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         // Start with the most specific filter
         if (!string.IsNullOrWhiteSpace(settings.Package))
         {
+            // Use the package pattern as-is - users can add wildcards if needed
+            string packagePattern = settings.Package;
+            
             results = settings.IncludeMembers
-                ? queryEngine.SearchByPackage(settings.Package, settings.MaxResults)
-                : queryEngine.ListTypesFromPackage(settings.Package, settings.MaxResults);
+                ? queryEngine.SearchByPackage(packagePattern, settings.MaxResults)
+                : queryEngine.ListTypesFromPackage(packagePattern, settings.MaxResults);
         }
         else if (!string.IsNullOrWhiteSpace(settings.Assembly))
         {
+            // Use the assembly pattern as-is - users can add wildcards if needed
+            string assemblyPattern = settings.Assembly;
+            
             results = settings.IncludeMembers
-                ? queryEngine.SearchByAssembly(settings.Assembly, settings.MaxResults)
-                : queryEngine.ListTypesFromAssembly(settings.Assembly, settings.MaxResults);
+                ? queryEngine.SearchByAssembly(assemblyPattern, settings.MaxResults)
+                : queryEngine.ListTypesFromAssembly(assemblyPattern, settings.MaxResults);
         }
         else if (!string.IsNullOrWhiteSpace(settings.Namespace))
         {
-            results = queryEngine.SearchByNamespacePattern(settings.Namespace, settings.MaxResults);
+            // Use the namespace pattern as-is for exact or wildcard matching
+            string namespacePattern = settings.Namespace;
+            
+            // For exact namespace matching, search by namespace field directly
+            if (!namespacePattern.Contains('*') && !namespacePattern.Contains('?'))
+            {
+                // Exact namespace search - get more results to filter for types
+                results = queryEngine.SearchByNamespace(namespacePattern, 
+                    settings.IncludeMembers ? settings.MaxResults : settings.MaxResults * 10);
+            }
+            else
+            {
+                // Wildcard namespace search
+                results = queryEngine.SearchByNamespacePattern(namespacePattern, 
+                    settings.IncludeMembers ? settings.MaxResults : settings.MaxResults * 10);
+            }
+            
             if (!settings.IncludeMembers)
             {
-                results = [.. results.Where(m => m.MemberType == MemberType.Type)];
+                results = [.. results.Where(m => m.MemberType == MemberType.Type)
+                    .Take(settings.MaxResults)];
             }
         }
 
@@ -230,7 +266,12 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         };
 
         string json = JsonSerializer.Serialize(response, JsonOptions);
+        
+        // Temporarily set unlimited width to prevent JSON wrapping
+        var originalWidth = AnsiConsole.Profile.Width;
+        AnsiConsole.Profile.Width = int.MaxValue;
         AnsiConsole.WriteLine(json);
+        AnsiConsole.Profile.Width = originalWidth;
     }
 
     private static void OutputTable(IEnumerable<IGrouping<string, MemberInfo>> groupedResults, Settings settings)
@@ -339,6 +380,10 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         [Description("Output format")]
         [CommandOption("-f|--format")]
         public OutputFormat Format { get; init; } = OutputFormat.Table;
+
+        [Description("Show only distinct types (deduplicate across frameworks)")]
+        [CommandOption("--distinct")]
+        public bool Distinct { get; init; } = true; // Default to true for better UX
     }
 
     public enum GroupByOption

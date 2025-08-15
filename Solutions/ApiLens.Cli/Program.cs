@@ -41,103 +41,110 @@ internal class Program
             config.SetApplicationName("apilens");
             config.SetApplicationVersion("1.0.0");
 
+            // Configure top-level examples to show the enhanced drill-down workflow
+            config.AddExample("analyze", "./MySolution.sln");
+            config.AddExample("explore", "Newtonsoft.Json");
+            config.AddExample("hierarchy", "JObject", "--show-members");
+            config.AddExample("query", "Parse", "--type", "method", "--min-params", "1");
+            config.AddExample("examples", "Parse");
+
             config.AddCommand<IndexCommand>("index")
-                .WithDescription("Index XML documentation files")
+                .WithDescription(HelpText.IndexCommandDescription)
                 .WithExample("index", "./docs")
                 .WithExample("index", "./docs", "--clean")
-                .WithExample("index", "./MyLib.xml", "--index", "./custom-index");
+                .WithExample("index", "./MyLib.xml", "--index", "./custom-index")
+                .WithExample("index", "C:\\Program Files\\dotnet\\packs", "--pattern", "**/*.xml");
 
             config.AddCommand<QueryCommand>("query")
-                .WithDescription("""
-                                 Query the API documentation index.
-
-                                 QUERY SYNTAX:
-                                   Name searches (default): Require exact matches, case-insensitive
-                                   Content searches: Support full Lucene query syntax including:
-                                     - Wildcards: * (multiple chars), ? (single char)
-                                       Example: string* matches string, strings, stringify
-                                     - Fuzzy: ~ for similar terms
-                                       Example: roam~ matches foam, roams
-                                     - Boolean: AND, OR, NOT (must be uppercase)
-                                       Example: string AND utility
-                                     - Phrases: Use quotes for exact phrases
-                                       Example: "strongly typed"
-                                     
-                                 SEARCH TYPES:
-                                   name      - Exact name match (default)
-                                   content   - Full-text search in documentation
-                                   namespace - Exact namespace match
-                                   id        - Exact member ID (e.g., T:System.String)
-                                   assembly  - Exact assembly name match
-                                 """)
+                .WithDescription(HelpText.QueryCommandDescription)
                 .WithExample("query", "String")
                 .WithExample("query", "List<T>")
+                .WithExample("query", "Parse", "--type", "method")
+                .WithExample("query", "Parse", "--type", "method", "--min-params", "1", "--max-params", "2")
                 .WithExample("query", "string*", "--type", "content")
-                .WithExample("query", "utilit?", "--type", "content")
-                .WithExample("query", "tokenze~", "--type", "content")
                 .WithExample("query", "\"extension methods\"", "--type", "content")
-                .WithExample("query", "string AND manipulation", "--type", "content")
+                .WithExample("query", "async AND task", "--type", "content")
                 .WithExample("query", "System.Collections.Generic", "--type", "namespace")
+                .WithExample("query", "List", "--member-type", "Type", "--namespace", "System.Collections.*")
                 .WithExample("query", "T:System.String", "--type", "id", "--format", "json");
 
             config.AddCommand<ExamplesCommand>("examples")
-                .WithDescription("Search for code examples or list methods with examples")
+                .WithDescription(HelpText.ExamplesCommandDescription)
                 .WithExample("examples")
                 .WithExample("examples", "CalculateTotal")
-                .WithExample("examples", "async", "--max", "20");
+                .WithExample("examples", "async", "--max", "20")
+                .WithExample("examples", "Console.WriteLine")
+                .WithExample("examples", "--format", "json", "--max", "10");
+
+            config.AddCommand<MembersCommand>("members")
+                .WithDescription("Show all members of a specific type (methods, properties, fields, etc.)")
+                .WithExample("members", "IndexWriter")
+                .WithExample("members", "System.String", "--show-summary")
+                .WithExample("members", "List", "--distinct", "--max-per-type", "10");
 
             config.AddCommand<ExceptionsCommand>("exceptions")
-                .WithDescription("Find methods that throw specific exceptions")
+                .WithDescription(HelpText.ExceptionsCommandDescription)
                 .WithExample("exceptions", "ArgumentNullException")
                 .WithExample("exceptions", "System.IO.IOException", "--details")
-                .WithExample("exceptions", "ValidationException", "--max", "50");
+                .WithExample("exceptions", "*ValidationException")
+                .WithExample("exceptions", "*Exception", "--max", "10")
+                .WithExample("exceptions", "IOException", "--format", "json");
 
             config.AddCommand<ComplexityCommand>("complexity")
-                .WithDescription("Analyze method complexity and parameter counts")
+                .WithDescription(HelpText.ComplexityCommandDescription)
                 .WithExample("complexity", "--min-params", "5")
+                .WithExample("complexity", "--max-params", "1")
+                .WithExample("complexity", "--min-params", "2", "--max-params", "4")
                 .WithExample("complexity", "--min-complexity", "10", "--stats")
-                .WithExample("complexity", "--min-params", "2", "--max-params", "4", "--sort", "params");
+                .WithExample("complexity", "--stats", "--format", "json");
 
             config.AddCommand<StatsCommand>("stats")
-                .WithDescription("Display index statistics including size, document count, and field information")
+                .WithDescription(HelpText.StatsCommandDescription)
                 .WithExample("stats")
-                .WithExample("stats", "--index", "./custom-index")
-                .WithExample("stats", "--format", "json");
+                .WithExample("stats", "--doc-metrics")
+                .WithExample("stats", "--doc-metrics", "--format", "json")
+                .WithExample("stats", "--index", "./custom-index");
+
+            config.AddCommand<HierarchyCommand>("hierarchy")
+                .WithDescription(HelpText.HierarchyCommandDescription)
+                .WithExample("hierarchy", "String")
+                .WithExample("hierarchy", "List")
+                .WithExample("hierarchy", "Dictionary", "--show-members")
+                .WithExample("hierarchy", "IEnumerable", "--format", "json")
+                .WithExample("hierarchy", "Exception", "--show-members", "--show-inherited");
 
             config.AddCommand<ListTypesCommand>("list-types")
-                .WithDescription("List types from assemblies, packages, or namespaces with filtering support")
-                .WithExample("list-types", "--assembly", "System.Collections")
+                .WithDescription(HelpText.ListTypesCommandDescription)
                 .WithExample("list-types", "--package", "Newtonsoft.Json")
-                .WithExample("list-types", "--namespace", "System.Collections.Generic")
-                .WithExample("list-types", "--package", "Microsoft.Extensions.*", "--namespace", "Microsoft.Extensions.DependencyInjection")
+                .WithExample("list-types", "--package", "Microsoft.*", "--max", "50")
+                .WithExample("list-types", "--namespace", "System.Collections.*")
+                .WithExample("list-types", "--package", "Newtonsoft.Json", "--namespace", "Newtonsoft.Json.Linq")
                 .WithExample("list-types", "--assembly", "System.*", "--include-members")
-                .WithExample("list-types", "--package", "Serilog.AspNetCore", "--format", "json");
+                .WithExample("list-types", "--package", "Serilog.*", "--format", "json");
 
             config.AddCommand<NuGetCommand>("nuget")
-                .WithDescription("""
-                                 Scan and index NuGet package cache.
-
-                                 Automatically discovers your NuGet cache location and indexes all packages
-                                 with XML documentation. Supports filtering, latest-version selection, and
-                                 listing packages without indexing.
-                                 """)
+                .WithDescription(HelpText.NuGetCommandDescription)
                 .WithExample("nuget")
-                .WithExample("nuget", "--clean", "--latest")
-                .WithExample("nuget", "--filter", "microsoft.*", "--latest")
+                .WithExample("nuget", "--clean", "--latest-only")
+                .WithExample("nuget", "--filter", "Microsoft.*", "--latest-only")
+                .WithExample("nuget", "--filter", "System.*", "--latest-only")
                 .WithExample("nuget", "--list")
-                .WithExample("nuget", "--list", "--filter", "system.*");
+                .WithExample("nuget", "--list", "--filter", "Newtonsoft.*");
 
             config.AddCommand<AnalyzeCommand>("analyze")
-                .WithDescription("""
-                                 Analyze and index all packages from a project or solution.
-                                 
-                                 Parses .csproj, .fsproj, .vbproj, or .sln files to discover all package
-                                 references, then indexes their XML documentation from the NuGet cache.
-                                 """)
+                .WithDescription(HelpText.AnalyzeCommandDescription)
                 .WithExample("analyze", "./MyProject.csproj")
                 .WithExample("analyze", "./MySolution.sln")
                 .WithExample("analyze", "./MyProject.csproj", "--include-transitive")
-                .WithExample("analyze", "./MySolution.sln", "--use-assets", "--format", "json");
+                .WithExample("analyze", "./MySolution.sln", "--clean")
+                .WithExample("analyze", "./src/MyProject/MyProject.csproj", "--use-assets", "--format", "json");
+
+            config.AddCommand<ExploreCommand>("explore")
+                .WithDescription(HelpText.ExploreCommandDescription)
+                .WithExample("explore", "Newtonsoft.Json")
+                .WithExample("explore", "Microsoft.Extensions.*")
+                .WithExample("explore", "Serilog", "--show-complexity")
+                .WithExample("explore", "System.Text.Json", "--format", "json");
         });
 
         return app.Run(args);

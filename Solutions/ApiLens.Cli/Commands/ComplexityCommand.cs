@@ -13,7 +13,8 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        Encoder = JsonSanitizer.CreateSafeJsonEncoder(),
+        Converters = { new SanitizingJsonConverterFactory() }
     };
 
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
@@ -77,7 +78,12 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
                         Metadata = metadataService.BuildMetadata(indexManager)
                     };
                     string errorJson = JsonSerializer.Serialize(errorResponse, JsonOptions);
+                    
+                    // Temporarily set unlimited width to prevent JSON wrapping
+                    var originalWidth = AnsiConsole.Profile.Width;
+                    AnsiConsole.Profile.Width = int.MaxValue;
                     AnsiConsole.WriteLine(errorJson);
+                    AnsiConsole.Profile.Width = originalWidth;
                 }
 
                 return 1;
@@ -185,7 +191,12 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
         };
 
         string json = JsonSerializer.Serialize(response, JsonOptions);
+        
+        // Temporarily set unlimited width to prevent JSON wrapping
+        var originalWidth = AnsiConsole.Profile.Width;
+        AnsiConsole.Profile.Width = int.MaxValue;
         AnsiConsole.WriteLine(json);
+        AnsiConsole.Profile.Width = originalWidth;
     }
 
     private static void OutputMarkdown(List<MemberInfo> results, string criteria, bool showStats)

@@ -41,6 +41,8 @@ $demoCategories = @{
         @{Name = "specialized-queries.ps1"; Description = "Specialized query demonstrations"},
         @{Name = "wildcard-and-types-demo.ps1"; Description = "Leading wildcards and type listing demo"},
         @{Name = "enhanced-wildcard-demo.ps1"; Description = "Enhanced wildcard search with filters"},
+        @{Name = "deduplication-demo.ps1"; Description = "Deduplication features and framework prioritization demo"},
+        @{Name = "property-type-linking-demo.ps1"; Description = "Property type linking feature demonstration"},
         @{Name = "mcp-integration.ps1"; Description = "Model Context Protocol integration"},
         @{Name = "benchmark.ps1"; Description = "Performance benchmarking"; Skip = $true; Reason = "Benchmark takes too long for regular testing"}
     )

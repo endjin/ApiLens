@@ -6,13 +6,26 @@ namespace ApiLens.Core.Lucene;
 
 public class DocumentBuilder : IDocumentBuilder
 {
+    private static string SanitizeForStorage(string? input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input ?? string.Empty;
+        
+        // Replace control characters that can break JSON and other formats
+        return input.Replace("\n", " ")
+                   .Replace("\r", " ")
+                   .Replace("\t", " ")
+                   .Replace("\b", " ")
+                   .Replace("\f", " ");
+    }
+
     public Document BuildDocument(MemberInfo memberInfo)
     {
         ArgumentNullException.ThrowIfNull(memberInfo);
 
         Document doc =
         [
-            new StringField("id", memberInfo.Id, Field.Store.YES),
+            new StringField("id", SanitizeForStorage(memberInfo.Id), Field.Store.YES),
             new StringField("memberType", memberInfo.MemberType.ToString(), Field.Store.YES),
             new StringField("name", memberInfo.Name, Field.Store.YES),
             new StringField("fullName", memberInfo.FullName, Field.Store.YES),
@@ -23,10 +36,25 @@ public class DocumentBuilder : IDocumentBuilder
             new TextField("nameText", memberInfo.Name, Field.Store.NO),
             new TextField("fullNameText", memberInfo.FullName, Field.Store.NO),
             new TextField("namespaceText", memberInfo.Namespace, Field.Store.NO),
+            
+            // Normalized fields for case-insensitive search
+            new StringField("nameNormalized", memberInfo.Name.ToLowerInvariant(), Field.Store.NO),
+            new StringField("fullNameNormalized", memberInfo.FullName.ToLowerInvariant(), Field.Store.NO),
+            new StringField("namespaceNormalized", memberInfo.Namespace.ToLowerInvariant(), Field.Store.NO),
 
             // Facet field for filtering by member type
             new StringField("memberTypeFacet", memberInfo.MemberType.ToString(), Field.Store.YES)
         ];
+
+        // Add declaring type for non-type members
+        if (memberInfo.MemberType != MemberType.Type)
+        {
+            string declaringType = ExtractDeclaringType(memberInfo.FullName);
+            if (!string.IsNullOrEmpty(declaringType))
+            {
+                doc.Add(new StringField("declaringType", declaringType, Field.Store.YES));
+            }
+        }
 
         // Add type-specific search fields
         switch (memberInfo.MemberType)
@@ -51,12 +79,12 @@ public class DocumentBuilder : IDocumentBuilder
         // Add optional fields
         if (!string.IsNullOrWhiteSpace(memberInfo.Summary))
         {
-            doc.Add(new TextField("summary", memberInfo.Summary, Field.Store.YES));
+            doc.Add(new TextField("summary", SanitizeForStorage(memberInfo.Summary), Field.Store.YES));
         }
 
         if (!string.IsNullOrWhiteSpace(memberInfo.Remarks))
         {
-            doc.Add(new TextField("remarks", memberInfo.Remarks, Field.Store.YES));
+            doc.Add(new TextField("remarks", SanitizeForStorage(memberInfo.Remarks), Field.Store.YES));
         }
 
         // Add cross-references
@@ -170,13 +198,27 @@ public class DocumentBuilder : IDocumentBuilder
         // Add returns documentation
         if (!string.IsNullOrWhiteSpace(memberInfo.Returns))
         {
-            doc.Add(new TextField("returns", memberInfo.Returns, Field.Store.YES));
+            doc.Add(new TextField("returns", SanitizeForStorage(memberInfo.Returns), Field.Store.YES));
+        }
+        
+        // Add return type for methods
+        if (!string.IsNullOrWhiteSpace(memberInfo.ReturnType))
+        {
+            doc.Add(new StringField("returnType", memberInfo.ReturnType, Field.Store.YES));
         }
 
         // Add see also references
         if (!string.IsNullOrWhiteSpace(memberInfo.SeeAlso))
         {
-            doc.Add(new TextField("seeAlso", memberInfo.SeeAlso, Field.Store.YES));
+            doc.Add(new TextField("seeAlso", SanitizeForStorage(memberInfo.SeeAlso), Field.Store.YES));
+        }
+        
+        // Add method modifiers
+        if (memberInfo.MemberType == MemberType.Method)
+        {
+            doc.Add(new StringField("isStatic", memberInfo.IsStatic.ToString().ToLowerInvariant(), Field.Store.YES));
+            doc.Add(new StringField("isAsync", memberInfo.IsAsync.ToString().ToLowerInvariant(), Field.Store.YES));
+            doc.Add(new StringField("isExtension", memberInfo.IsExtension.ToString().ToLowerInvariant(), Field.Store.YES));
         }
 
         // Add complexity metrics
@@ -193,6 +235,8 @@ public class DocumentBuilder : IDocumentBuilder
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageId))
         {
             doc.Add(new StringField("packageId", memberInfo.PackageId, Field.Store.YES));
+            // Add normalized package ID for case-insensitive search
+            doc.Add(new StringField("packageIdNormalized", memberInfo.PackageId.ToLowerInvariant(), Field.Store.NO));
         }
 
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageVersion))
@@ -209,7 +253,7 @@ public class DocumentBuilder : IDocumentBuilder
             Field.Store.YES));
 
         // Always add sourceFilePath for proper change detection tracking
-        doc.Add(new StringField("sourceFilePath", memberInfo.SourceFilePath ?? string.Empty, Field.Store.YES));
+        doc.Add(new StringField("sourceFilePath", SanitizeForStorage(memberInfo.SourceFilePath ?? string.Empty), Field.Store.YES));
 
         // Add searchable version field
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageVersion))
@@ -355,32 +399,19 @@ public class DocumentBuilder : IDocumentBuilder
             Assembly = "Unknown", // Would need to be provided separately
             Namespace = ExtractNamespaceFromDeclaringType(methodInfo.DeclaringType),
             Summary = methodInfo.Summary,
-            Remarks = methodInfo.Remarks
+            Remarks = methodInfo.Remarks,
+            IsStatic = methodInfo.IsStatic,
+            IsAsync = methodInfo.IsAsync,
+            IsExtension = methodInfo.IsExtension,
+            ReturnType = methodInfo.ReturnType
         };
 
         Document doc = BuildDocument(memberInfo);
 
-        // Add method-specific fields
-        doc.Add(new StringField("returnType", methodInfo.ReturnType, Field.Store.YES));
-
+        // Add method-specific fields (parameters only, since other fields are already added)
         foreach (ParameterInfo parameter in methodInfo.Parameters)
         {
             doc.Add(new TextField("parameter", $"{parameter.Type} {parameter.Name}", Field.Store.YES));
-        }
-
-        if (methodInfo.IsStatic)
-        {
-            doc.Add(new StringField("isStatic", "true", Field.Store.YES));
-        }
-
-        if (methodInfo.IsExtension)
-        {
-            doc.Add(new StringField("isExtension", "true", Field.Store.YES));
-        }
-
-        if (methodInfo.IsAsync)
-        {
-            doc.Add(new StringField("isAsync", "true", Field.Store.YES));
         }
 
         return doc;
@@ -390,5 +421,27 @@ public class DocumentBuilder : IDocumentBuilder
     {
         int lastDot = declaringType.LastIndexOf('.');
         return lastDot >= 0 ? declaringType[..lastDot] : string.Empty;
+    }
+
+    private static string ExtractDeclaringType(string fullName)
+    {
+        // Handle method signatures with parameters
+        // E.g., "Namespace.Type.Method(Param1,Param2)" -> "Namespace.Type"
+        
+        // First, remove parameter list if present
+        int parenIndex = fullName.IndexOf('(');
+        string nameWithoutParams = parenIndex > 0 ? fullName[..parenIndex] : fullName;
+        
+        // For generic methods, remove generic parameters
+        // E.g., "Namespace.Type.Method`2" -> "Namespace.Type.Method"
+        int backtickIndex = nameWithoutParams.LastIndexOf('`');
+        if (backtickIndex > 0)
+        {
+            nameWithoutParams = nameWithoutParams[..backtickIndex];
+        }
+        
+        // Now extract the declaring type (everything before last dot)
+        int lastDot = nameWithoutParams.LastIndexOf('.');
+        return lastDot > 0 ? nameWithoutParams[..lastDot] : string.Empty;
     }
 }
