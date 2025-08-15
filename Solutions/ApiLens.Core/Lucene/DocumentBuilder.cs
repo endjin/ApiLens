@@ -6,13 +6,26 @@ namespace ApiLens.Core.Lucene;
 
 public class DocumentBuilder : IDocumentBuilder
 {
+    private static string SanitizeForStorage(string? input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input ?? string.Empty;
+        
+        // Replace control characters that can break JSON and other formats
+        return input.Replace("\n", " ")
+                   .Replace("\r", " ")
+                   .Replace("\t", " ")
+                   .Replace("\b", " ")
+                   .Replace("\f", " ");
+    }
+
     public Document BuildDocument(MemberInfo memberInfo)
     {
         ArgumentNullException.ThrowIfNull(memberInfo);
 
         Document doc =
         [
-            new StringField("id", memberInfo.Id, Field.Store.YES),
+            new StringField("id", SanitizeForStorage(memberInfo.Id), Field.Store.YES),
             new StringField("memberType", memberInfo.MemberType.ToString(), Field.Store.YES),
             new StringField("name", memberInfo.Name, Field.Store.YES),
             new StringField("fullName", memberInfo.FullName, Field.Store.YES),
@@ -51,12 +64,12 @@ public class DocumentBuilder : IDocumentBuilder
         // Add optional fields
         if (!string.IsNullOrWhiteSpace(memberInfo.Summary))
         {
-            doc.Add(new TextField("summary", memberInfo.Summary, Field.Store.YES));
+            doc.Add(new TextField("summary", SanitizeForStorage(memberInfo.Summary), Field.Store.YES));
         }
 
         if (!string.IsNullOrWhiteSpace(memberInfo.Remarks))
         {
-            doc.Add(new TextField("remarks", memberInfo.Remarks, Field.Store.YES));
+            doc.Add(new TextField("remarks", SanitizeForStorage(memberInfo.Remarks), Field.Store.YES));
         }
 
         // Add cross-references
@@ -170,13 +183,13 @@ public class DocumentBuilder : IDocumentBuilder
         // Add returns documentation
         if (!string.IsNullOrWhiteSpace(memberInfo.Returns))
         {
-            doc.Add(new TextField("returns", memberInfo.Returns, Field.Store.YES));
+            doc.Add(new TextField("returns", SanitizeForStorage(memberInfo.Returns), Field.Store.YES));
         }
 
         // Add see also references
         if (!string.IsNullOrWhiteSpace(memberInfo.SeeAlso))
         {
-            doc.Add(new TextField("seeAlso", memberInfo.SeeAlso, Field.Store.YES));
+            doc.Add(new TextField("seeAlso", SanitizeForStorage(memberInfo.SeeAlso), Field.Store.YES));
         }
 
         // Add complexity metrics
@@ -209,7 +222,7 @@ public class DocumentBuilder : IDocumentBuilder
             Field.Store.YES));
 
         // Always add sourceFilePath for proper change detection tracking
-        doc.Add(new StringField("sourceFilePath", memberInfo.SourceFilePath ?? string.Empty, Field.Store.YES));
+        doc.Add(new StringField("sourceFilePath", SanitizeForStorage(memberInfo.SourceFilePath ?? string.Empty), Field.Store.YES));
 
         // Add searchable version field
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageVersion))

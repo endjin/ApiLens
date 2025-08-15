@@ -3,17 +3,23 @@ using System.Text.Json;
 using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
+using ApiLens.Core.Querying;
 
 namespace ApiLens.Cli.Commands;
 
 public class StatsCommand : Command<StatsCommand.Settings>
 {
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
+    private readonly IQueryEngineFactory queryEngineFactory;
 
-    public StatsCommand(ILuceneIndexManagerFactory indexManagerFactory)
+    public StatsCommand(
+        ILuceneIndexManagerFactory indexManagerFactory,
+        IQueryEngineFactory queryEngineFactory)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
+        ArgumentNullException.ThrowIfNull(queryEngineFactory);
         this.indexManagerFactory = indexManagerFactory;
+        this.queryEngineFactory = queryEngineFactory;
     }
 
     public override int Execute(CommandContext context, Settings settings)
@@ -28,6 +34,14 @@ public class StatsCommand : Command<StatsCommand.Settings>
 
             // Get index statistics
             IndexStatistics? stats = indexManager.GetIndexStatistics();
+            
+            // Calculate documentation quality metrics if requested
+            DocumentationMetrics? docMetrics = null;
+            if (settings.IncludeDocumentationMetrics && stats != null)
+            {
+                using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
+                docMetrics = CalculateDocumentationMetrics(queryEngine, stats);
+            }
 
             if (stats == null)
             {
@@ -39,7 +53,12 @@ public class StatsCommand : Command<StatsCommand.Settings>
                         Metadata = metadataService.BuildMetadata(indexManager)
                     };
                     string errorJson = JsonSerializer.Serialize(errorResponse, GetJsonOptions());
+                    
+                    // Temporarily set unlimited width to prevent JSON wrapping
+                    var originalWidth = AnsiConsole.Profile.Width;
+                    AnsiConsole.Profile.Width = int.MaxValue;
                     AnsiConsole.WriteLine(errorJson);
+                    AnsiConsole.Profile.Width = originalWidth;
                 }
                 else
                 {
@@ -51,14 +70,14 @@ public class StatsCommand : Command<StatsCommand.Settings>
             switch (settings.Format)
             {
                 case OutputFormat.Json:
-                    OutputJson(stats, indexManager, metadataService);
+                    OutputJson(stats, docMetrics, indexManager, metadataService);
                     break;
                 case OutputFormat.Markdown:
-                    OutputMarkdown(stats);
+                    OutputMarkdown(stats, docMetrics);
                     break;
                 case OutputFormat.Table:
                 default:
-                    OutputTable(stats);
+                    OutputTable(stats, docMetrics);
                     break;
             }
 
@@ -71,7 +90,7 @@ public class StatsCommand : Command<StatsCommand.Settings>
         }
     }
 
-    private static void OutputTable(IndexStatistics stats)
+    private static void OutputTable(IndexStatistics stats, DocumentationMetrics? docMetrics)
     {
         AnsiConsole.WriteLine();
         Table table = new();
@@ -90,21 +109,68 @@ public class StatsCommand : Command<StatsCommand.Settings>
         }
 
         AnsiConsole.Write(table);
+
+        // Show documentation metrics if available
+        if (docMetrics != null)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.Write(new Rule("[bold yellow]Documentation Quality Metrics[/]"));
+            
+            Table docTable = new();
+            docTable.AddColumn("Metric");
+            docTable.AddColumn("Value");
+            
+            docTable.AddRow("Total Members", docMetrics.TotalMembers.ToString("N0"));
+            docTable.AddRow("Documented Members", $"{docMetrics.DocumentedMembers:N0} ({docMetrics.DocumentationCoverage:P1})");
+            docTable.AddRow("Well-Documented", $"{docMetrics.WellDocumentedMembers:N0} ({docMetrics.WellDocumentedPercentage:P1})");
+            docTable.AddRow("With Examples", $"{docMetrics.MembersWithExamples:N0} ({docMetrics.ExampleCoverage:P1})");
+            docTable.AddRow("Average Score", $"{docMetrics.AverageDocScore:F1}/100");
+            
+            if (docMetrics.PoorlyDocumentedTypes.Any())
+            {
+                docTable.AddRow("[dim]Needs Attention[/]", string.Join(", ", docMetrics.PoorlyDocumentedTypes.Take(3)));
+            }
+            
+            AnsiConsole.Write(docTable);
+        }
     }
 
-    private static void OutputJson(IndexStatistics stats, ILuceneIndexManager indexManager,
+    private static void OutputJson(IndexStatistics stats, DocumentationMetrics? docMetrics, ILuceneIndexManager indexManager,
         MetadataService metadataService)
     {
-        var statsData = new
-        {
-            stats.IndexPath,
-            stats.TotalSizeInBytes,
-            TotalSizeFormatted = FormatSize(stats.TotalSizeInBytes),
-            stats.DocumentCount,
-            stats.FieldCount,
-            stats.FileCount,
-            LastModified = stats.LastModified?.ToString("O")
-        };
+        object statsData = docMetrics != null ? 
+            new
+            {
+                stats.IndexPath,
+                stats.TotalSizeInBytes,
+                TotalSizeFormatted = FormatSize(stats.TotalSizeInBytes),
+                stats.DocumentCount,
+                stats.FieldCount,
+                stats.FileCount,
+                LastModified = stats.LastModified?.ToString("O"),
+                DocumentationMetrics = new
+                {
+                    docMetrics.TotalMembers,
+                    docMetrics.DocumentedMembers,
+                    docMetrics.WellDocumentedMembers,
+                    docMetrics.MembersWithExamples,
+                    docMetrics.AverageDocScore,
+                    docMetrics.DocumentationCoverage,
+                    docMetrics.WellDocumentedPercentage,
+                    docMetrics.ExampleCoverage,
+                    docMetrics.PoorlyDocumentedTypes
+                }
+            } :
+            new
+            {
+                stats.IndexPath,
+                stats.TotalSizeInBytes,
+                TotalSizeFormatted = FormatSize(stats.TotalSizeInBytes),
+                stats.DocumentCount,
+                stats.FieldCount,
+                stats.FileCount,
+                LastModified = stats.LastModified?.ToString("O")
+            };
 
         ResponseMetadata metadata = metadataService.BuildMetadata(indexManager,
             queryType: "stats");
@@ -116,7 +182,12 @@ public class StatsCommand : Command<StatsCommand.Settings>
         };
 
         string json = JsonSerializer.Serialize(response, GetJsonOptions());
+        
+        // Temporarily set unlimited width to prevent JSON wrapping
+        var originalWidth = AnsiConsole.Profile.Width;
+        AnsiConsole.Profile.Width = int.MaxValue;
         AnsiConsole.WriteLine(json);
+        AnsiConsole.Profile.Width = originalWidth;
     }
 
     private static JsonSerializerOptions GetJsonOptions()
@@ -125,11 +196,12 @@ public class StatsCommand : Command<StatsCommand.Settings>
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            Encoder = JsonSanitizer.CreateSafeJsonEncoder(),
+            Converters = { new SanitizingJsonConverterFactory() }
         };
     }
 
-    private static void OutputMarkdown(IndexStatistics stats)
+    private static void OutputMarkdown(IndexStatistics stats, DocumentationMetrics? docMetrics)
     {
         AnsiConsole.WriteLine("# Index Statistics");
         AnsiConsole.WriteLine();
@@ -160,6 +232,47 @@ public class StatsCommand : Command<StatsCommand.Settings>
         return $"{size:0.##} {sizes[order]}";
     }
 
+    private static DocumentationMetrics CalculateDocumentationMetrics(IQueryEngine queryEngine, IndexStatistics stats)
+    {
+        // Sample a reasonable number of documents for analysis
+        int sampleSize = Math.Min(stats.DocumentCount, 1000);
+        var allMembers = queryEngine.SearchByContent("*", sampleSize);
+        
+        // Find poorly documented public types
+        var publicTypes = allMembers
+            .Where(m => m.MemberType == MemberType.Type && m.DocumentationScore < 40)
+            .OrderBy(m => m.DocumentationScore)
+            .Take(10)
+            .Select(m => m.Name)
+            .ToList();
+        
+        var metrics = new DocumentationMetrics
+        {
+            TotalMembers = stats.DocumentCount,
+            DocumentedMembers = allMembers.Count(m => m.IsDocumented),
+            WellDocumentedMembers = allMembers.Count(m => m.IsWellDocumented),
+            MembersWithExamples = allMembers.Count(m => m.CodeExamples.Any()),
+            AverageDocScore = allMembers.Any() ? allMembers.Average(m => m.DocumentationScore) : 0,
+            PoorlyDocumentedTypes = publicTypes
+        };
+        
+        return metrics;
+    }
+
+    private class DocumentationMetrics
+    {
+        public int TotalMembers { get; init; }
+        public int DocumentedMembers { get; init; }
+        public int WellDocumentedMembers { get; init; }
+        public int MembersWithExamples { get; init; }
+        public double AverageDocScore { get; init; }
+        public List<string> PoorlyDocumentedTypes { get; init; } = [];
+        
+        public double DocumentationCoverage => TotalMembers > 0 ? (double)DocumentedMembers / TotalMembers : 0;
+        public double WellDocumentedPercentage => TotalMembers > 0 ? (double)WellDocumentedMembers / TotalMembers : 0;
+        public double ExampleCoverage => TotalMembers > 0 ? (double)MembersWithExamples / TotalMembers : 0;
+    }
+
     public sealed class Settings : CommandSettings
     {
         [Description("Path to the Lucene index directory")]
@@ -169,5 +282,9 @@ public class StatsCommand : Command<StatsCommand.Settings>
         [Description("Output format")]
         [CommandOption("-f|--format")]
         public OutputFormat Format { get; init; } = OutputFormat.Table;
+
+        [Description("Include documentation quality metrics")]
+        [CommandOption("-d|--doc-metrics")]
+        public bool IncludeDocumentationMetrics { get; init; }
     }
 }

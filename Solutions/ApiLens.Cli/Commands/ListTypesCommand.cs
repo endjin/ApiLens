@@ -14,7 +14,8 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        Encoder = JsonSanitizer.CreateSafeJsonEncoder(),
+        Converters = { new SanitizingJsonConverterFactory() }
     };
 
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
@@ -55,7 +56,12 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
                         Metadata = metadataService.BuildMetadata(indexManager)
                     };
                     string errorJson = JsonSerializer.Serialize(errorResponse, JsonOptions);
+                    
+                    // Temporarily set unlimited width to prevent JSON wrapping
+                    var originalWidth = AnsiConsole.Profile.Width;
+                    AnsiConsole.Profile.Width = int.MaxValue;
                     AnsiConsole.WriteLine(errorJson);
+                    AnsiConsole.Profile.Width = originalWidth;
                 }
                 else
                 {
@@ -122,19 +128,43 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         // Start with the most specific filter
         if (!string.IsNullOrWhiteSpace(settings.Package))
         {
+            // Add wildcard support for partial package names
+            string packagePattern = settings.Package;
+            if (!packagePattern.Contains('*') && !packagePattern.Contains('?'))
+            {
+                // If no wildcards, add them for partial matching
+                packagePattern = $"*{packagePattern}*";
+            }
+            
             results = settings.IncludeMembers
-                ? queryEngine.SearchByPackage(settings.Package, settings.MaxResults)
-                : queryEngine.ListTypesFromPackage(settings.Package, settings.MaxResults);
+                ? queryEngine.SearchByPackage(packagePattern, settings.MaxResults)
+                : queryEngine.ListTypesFromPackage(packagePattern, settings.MaxResults);
         }
         else if (!string.IsNullOrWhiteSpace(settings.Assembly))
         {
+            // Add wildcard support for partial assembly names
+            string assemblyPattern = settings.Assembly;
+            if (!assemblyPattern.Contains('*') && !assemblyPattern.Contains('?'))
+            {
+                // If no wildcards, add them for partial matching
+                assemblyPattern = $"*{assemblyPattern}*";
+            }
+            
             results = settings.IncludeMembers
-                ? queryEngine.SearchByAssembly(settings.Assembly, settings.MaxResults)
-                : queryEngine.ListTypesFromAssembly(settings.Assembly, settings.MaxResults);
+                ? queryEngine.SearchByAssembly(assemblyPattern, settings.MaxResults)
+                : queryEngine.ListTypesFromAssembly(assemblyPattern, settings.MaxResults);
         }
         else if (!string.IsNullOrWhiteSpace(settings.Namespace))
         {
-            results = queryEngine.SearchByNamespacePattern(settings.Namespace, settings.MaxResults);
+            // Add wildcard support for partial namespace names
+            string namespacePattern = settings.Namespace;
+            if (!namespacePattern.Contains('*') && !namespacePattern.Contains('?'))
+            {
+                // If no wildcards, add them for partial matching
+                namespacePattern = $"*{namespacePattern}*";
+            }
+            
+            results = queryEngine.SearchByNamespacePattern(namespacePattern, settings.MaxResults);
             if (!settings.IncludeMembers)
             {
                 results = [.. results.Where(m => m.MemberType == MemberType.Type)];
@@ -230,7 +260,12 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         };
 
         string json = JsonSerializer.Serialize(response, JsonOptions);
+        
+        // Temporarily set unlimited width to prevent JSON wrapping
+        var originalWidth = AnsiConsole.Profile.Width;
+        AnsiConsole.Profile.Width = int.MaxValue;
         AnsiConsole.WriteLine(json);
+        AnsiConsole.Profile.Width = originalWidth;
     }
 
     private static void OutputTable(IEnumerable<IGrouping<string, MemberInfo>> groupedResults, Settings settings)

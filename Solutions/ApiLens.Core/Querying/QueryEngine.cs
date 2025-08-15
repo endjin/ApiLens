@@ -522,14 +522,27 @@ public class QueryEngine : IQueryEngine
         return members;
     }
 
+    private static string? SanitizeString(string? input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+        
+        // Replace common control characters that break JSON
+        return input.Replace("\n", " ")
+                   .Replace("\r", " ")
+                   .Replace("\t", " ")
+                   .Replace("\b", " ")
+                   .Replace("\f", " ");
+    }
+
     private static MemberInfo? ConvertDocumentToMember(Document document)
     {
-        string? id = document.Get("id");
+        string? id = SanitizeString(document.Get("id"));
         string? memberTypeStr = document.Get("memberType");
-        string? name = document.Get("name");
-        string? fullName = document.Get("fullName");
-        string? assembly = document.Get("assembly");
-        string? namespaceName = document.Get("namespace");
+        string? name = SanitizeString(document.Get("name"));
+        string? fullName = SanitizeString(document.Get("fullName"));
+        string? assembly = SanitizeString(document.Get("assembly"));
+        string? namespaceName = SanitizeString(document.Get("namespace"));
 
         if (string.IsNullOrEmpty(id) ||
             string.IsNullOrEmpty(memberTypeStr) ||
@@ -711,10 +724,10 @@ public class QueryEngine : IQueryEngine
             FullName = fullName,
             Assembly = assembly,
             Namespace = namespaceName,
-            Summary = document.Get("summary"),
-            Remarks = document.Get("remarks"),
-            Returns = document.Get("returns"),
-            SeeAlso = document.Get("seeAlso"),
+            Summary = SanitizeString(document.Get("summary")),
+            Remarks = SanitizeString(document.Get("remarks")),
+            Returns = SanitizeString(document.Get("returns")),
+            SeeAlso = SanitizeString(document.Get("seeAlso")),
             CrossReferences = [.. crossRefs],
             RelatedTypes = relatedTypes,
             CodeExamples = [.. examples],
@@ -726,7 +739,7 @@ public class QueryEngine : IQueryEngine
             PackageVersion = !string.IsNullOrEmpty(packageVersion) ? packageVersion : null,
             TargetFramework = !string.IsNullOrEmpty(targetFramework) ? targetFramework : null,
             IsFromNuGetCache = bool.TryParse(isFromNuGetCacheStr, out bool isFromCache) && isFromCache,
-            SourceFilePath = !string.IsNullOrEmpty(sourceFilePath) ? sourceFilePath : null
+            SourceFilePath = !string.IsNullOrEmpty(sourceFilePath) ? SanitizeString(sourceFilePath) : null
         };
     }
 

@@ -237,24 +237,26 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             string fullName = ExtractFullNameFromId(id, memberType.Value);
             string namespaceName = ExtractNamespaceFromId(id, memberType.Value);
 
+            // Sanitize nameAttribute to remove any control characters that break JSON
+            string sanitizedNameAttribute = nameAttribute.Replace("\n", " ").Replace("\r", " ").Replace("\t", " ");
+            
             // Create a unique ID that includes package information to avoid collisions
             // between the same type in different packages/versions/frameworks
             string uniqueId;
             if (nugetInfo.HasValue)
             {
                 // For NuGet packages: include package, version, and framework
-                uniqueId =
-                    $"{nameAttribute}|{nugetInfo.Value.PackageId}|{nugetInfo.Value.Version}|{nugetInfo.Value.Framework}";
+                uniqueId = $"{sanitizedNameAttribute}|{nugetInfo.Value.PackageId}|{nugetInfo.Value.Version}|{nugetInfo.Value.Framework}";
             }
             else if (fileHash != null)
             {
                 // For local files: include assembly name and file hash
-                uniqueId = $"{nameAttribute}|{assemblyName.ToLowerInvariant()}|{fileHash}";
+                uniqueId = $"{sanitizedNameAttribute}|{assemblyName.ToLowerInvariant()}|{fileHash}";
             }
             else
             {
                 // Fallback to original behavior
-                uniqueId = nameAttribute;
+                uniqueId = sanitizedNameAttribute;
             }
 
             return new MemberInfo

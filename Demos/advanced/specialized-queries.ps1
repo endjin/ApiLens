@@ -232,6 +232,30 @@ Write-Host "Command: " -NoNewline -ForegroundColor DarkGray
 Write-Host "apilens exceptions 'System.IO.IOException' --format markdown --details --index $IndexPath" -ForegroundColor Yellow
 & $apilens exceptions "System.IO.IOException" --format markdown --details --index $IndexPath
 
+# Demo 2.5: NEW Method Signature Search
+Write-Host "`n`n🎯 DEMO 2.5: Method Signature Search" -ForegroundColor Yellow
+Write-Host "🆕 NEW: Searching for methods by signature and parameter count" -ForegroundColor Gray
+
+Write-Host "`n2.5.1 Search for methods by name (new Method query type):" -ForegroundColor Magenta
+Write-Host "Command: " -NoNewline -ForegroundColor DarkGray
+Write-Host "apilens query 'Validate' --type method --index $IndexPath" -ForegroundColor Yellow
+& $apilens query "Validate" --type method --index $IndexPath
+
+Write-Host "`n2.5.2 Filter methods by parameter count:" -ForegroundColor Magenta
+Write-Host "Command: " -NoNewline -ForegroundColor DarkGray
+Write-Host "apilens query 'Validate' --type method --min-params 2 --index $IndexPath" -ForegroundColor Yellow
+& $apilens query "Validate" --type method --min-params 2 --index $IndexPath
+
+Write-Host "`n2.5.3 Find methods with specific parameter range:" -ForegroundColor Magenta
+Write-Host "Command: " -NoNewline -ForegroundColor DarkGray
+Write-Host "apilens query 'Validate' --type method --min-params 1 --max-params 2 --index $IndexPath" -ForegroundColor Yellow
+& $apilens query "Validate" --type method --min-params 1 --max-params 2 --index $IndexPath
+
+Write-Host "`n2.5.4 Method search with JSON output for automation:" -ForegroundColor Magenta
+Write-Host "Command: " -NoNewline -ForegroundColor DarkGray
+Write-Host "apilens query 'Password' --type method --format json --index $IndexPath" -ForegroundColor Yellow
+& $apilens query "Password" --type method --format json --index $IndexPath
+
 # Demo 3: Complexity Command
 Write-Host "`n`n🎯 DEMO 3: Complexity Command" -ForegroundColor Yellow
 Write-Host "Analyzing method complexity and parameter counts" -ForegroundColor Gray

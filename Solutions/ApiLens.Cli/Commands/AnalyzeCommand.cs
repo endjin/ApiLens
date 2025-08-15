@@ -301,7 +301,12 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
                     Frameworks = analysisResult.Frameworks,
                     ElapsedSeconds = elapsed.TotalSeconds
                 }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                
+                // Temporarily set unlimited width to prevent JSON wrapping
+                var originalWidth = AnsiConsole.Profile.Width;
+                AnsiConsole.Profile.Width = int.MaxValue;
                 AnsiConsole.WriteLine(json);
+                AnsiConsole.Profile.Width = originalWidth;
                 break;
 
             case OutputFormat.Markdown:
