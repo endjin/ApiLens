@@ -128,13 +128,8 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         // Start with the most specific filter
         if (!string.IsNullOrWhiteSpace(settings.Package))
         {
-            // Add wildcard support for partial package names
+            // Use the package pattern as-is - users can add wildcards if needed
             string packagePattern = settings.Package;
-            if (!packagePattern.Contains('*') && !packagePattern.Contains('?'))
-            {
-                // If no wildcards, add them for partial matching
-                packagePattern = $"*{packagePattern}*";
-            }
             
             results = settings.IncludeMembers
                 ? queryEngine.SearchByPackage(packagePattern, settings.MaxResults)
@@ -142,13 +137,8 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         }
         else if (!string.IsNullOrWhiteSpace(settings.Assembly))
         {
-            // Add wildcard support for partial assembly names
+            // Use the assembly pattern as-is - users can add wildcards if needed
             string assemblyPattern = settings.Assembly;
-            if (!assemblyPattern.Contains('*') && !assemblyPattern.Contains('?'))
-            {
-                // If no wildcards, add them for partial matching
-                assemblyPattern = $"*{assemblyPattern}*";
-            }
             
             results = settings.IncludeMembers
                 ? queryEngine.SearchByAssembly(assemblyPattern, settings.MaxResults)
@@ -156,15 +146,21 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         }
         else if (!string.IsNullOrWhiteSpace(settings.Namespace))
         {
-            // Add wildcard support for partial namespace names
+            // Use the namespace pattern as-is for exact or wildcard matching
             string namespacePattern = settings.Namespace;
+            
+            // For exact namespace matching, search by namespace field directly
             if (!namespacePattern.Contains('*') && !namespacePattern.Contains('?'))
             {
-                // If no wildcards, add them for partial matching
-                namespacePattern = $"*{namespacePattern}*";
+                // Exact namespace search
+                results = queryEngine.SearchByNamespace(namespacePattern, settings.MaxResults);
+            }
+            else
+            {
+                // Wildcard namespace search
+                results = queryEngine.SearchByNamespacePattern(namespacePattern, settings.MaxResults);
             }
             
-            results = queryEngine.SearchByNamespacePattern(namespacePattern, settings.MaxResults);
             if (!settings.IncludeMembers)
             {
                 results = [.. results.Where(m => m.MemberType == MemberType.Type)];

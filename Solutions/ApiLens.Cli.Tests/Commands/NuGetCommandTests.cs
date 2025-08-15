@@ -299,7 +299,7 @@ public sealed class NuGetCommandTests : IDisposable
             latestPackages,
             new HashSet<string>(),
             allPackages.Length - latestPackages.Length,
-            new DeduplicationStats
+            new ApiLens.Core.Services.DeduplicationStats
             {
                 TotalScannedPackages = allPackages.Length,
                 UniqueXmlFiles = latestPackages.Length,

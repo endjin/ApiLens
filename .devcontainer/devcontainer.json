@@ -1,0 +1,36 @@
+{
+	"name": "C# (.NET)",
+	"image": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {},
+		"ghcr.io/devcontainers/features/powershell:1": {},
+		"ghcr.io/devcontainers/features/common-utils:2": {
+			"installZsh": "true",
+			"username": "vscode",
+			"upgradePackages": "false",
+			"nonFreePackages": "true"
+	}
+	},
+"postCreateCommand": "sudo chsh vscode -s \"$(which pwsh)\" && npm install -g @anthropic-ai/claude-code && sudo dotnet workload update && claude --dangerously-skip-permissions",
+	"customizations": {
+		"vscode": {
+			"settings": { 
+			"remote.extensionKind": {
+					"RooVeterinaryInc.roo-cline": [
+						"workspace"
+					]
+			},
+			"terminal.integrated.defaultProfile.linux": "pwsh"
+			},
+			"extensions": [
+				"RooVeterinaryInc.roo-cline",
+				"ms-vscode.powershell",
+				"anthropic.claude-code",
+				"ms-dotnettools.csdevkit"
+			]
+		}
+	},
+	"remoteEnv": {
+		"PERPLEXITY_API_KEY": "${localEnv:PERPLEXITY_API_KEY}",
+	}
+}

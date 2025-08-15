@@ -98,6 +98,13 @@ public class QueryCommand : Command<QueryCommand.Settings>
                     .ToList();
             }
 
+            // Apply deduplication if requested
+            if (settings.Distinct && results.Count > 0)
+            {
+                var deduplicationService = new ResultDeduplicationService();
+                results = deduplicationService.DeduplicateResults(results, true);
+            }
+
             if (results.Count == 0)
             {
                 if (settings.Format == OutputFormat.Json)
@@ -493,6 +500,10 @@ public class QueryCommand : Command<QueryCommand.Settings>
         [Description("Show only main entry point methods (Create, Parse, Load, etc.)")]
         [CommandOption("--entry-points")]
         public bool EntryPointsOnly { get; init; }
+
+        [Description("Show only distinct members (one per unique ID, aggregating all framework versions)")]
+        [CommandOption("--distinct")]
+        public bool Distinct { get; init; }
     }
 
     public enum QueryType
