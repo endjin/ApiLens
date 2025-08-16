@@ -19,6 +19,7 @@ internal class Program
         services.AddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<IEnvironment, Spectre.IO.Environment>();
         services.AddSingleton<IFileSystemService, FileSystemService>();
+        services.AddSingleton<IIndexPathResolver, IndexPathResolver>();
         services.AddSingleton<IAsyncFileEnumerator, AsyncFileEnumerator>();
         services.AddSingleton<IFileHashHelper, FileHashHelper>();
         services.AddSingleton<IXmlDocumentParser, XmlDocumentParser>();

@@ -17,19 +17,22 @@ public class MembersCommandTests : IDisposable
     private TestConsole console = null!;
     private ILuceneIndexManager mockIndexManager = null!;
     private IQueryEngine mockQueryEngine = null!;
+    private IIndexPathResolver indexPathResolver = null!;
 
     [TestInitialize]
     public void Setup()
     {
         indexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
-        command = new MembersCommand(indexManagerFactory, queryEngineFactory);
+        indexPathResolver = Substitute.For<IIndexPathResolver>();
+        indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
+        command = new MembersCommand(indexManagerFactory, indexPathResolver, queryEngineFactory);
         console = new TestConsole();
         AnsiConsole.Console = console;
 
         mockIndexManager = Substitute.For<ILuceneIndexManager>();
         mockQueryEngine = Substitute.For<IQueryEngine>();
-        
+
         indexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
         queryEngineFactory.Create(mockIndexManager).Returns(mockQueryEngine);
     }
@@ -63,10 +66,10 @@ public class MembersCommandTests : IDisposable
         var targetType = CreateMemberInfo("TestType", MemberType.Type);
         var member1 = CreateMemberInfo("Method1", MemberType.Method, "net8.0");
         var member2 = CreateMemberInfo("Method1", MemberType.Method, "net9.0");
-        
+
         mockQueryEngine.SearchByName("TestType", 10)
             .Returns(new List<MemberInfo> { targetType });
-        
+
         mockQueryEngine.SearchByDeclaringType("TestNamespace.TestType", 1000)
             .Returns(new List<MemberInfo> { member1, member2 });
 
@@ -84,7 +87,7 @@ public class MembersCommandTests : IDisposable
         result.ShouldBe(0);
         mockQueryEngine.Received(1).SearchByName("TestType", 10);
         mockQueryEngine.Received(1).SearchByDeclaringType("TestNamespace.TestType", 1000);
-        
+
         // Verify deduplication happened (check console output)
         var output = console.Output;
         output.ShouldContain("TestType");
@@ -98,10 +101,10 @@ public class MembersCommandTests : IDisposable
         var targetType = CreateMemberInfo("TestType", MemberType.Type);
         var member1 = CreateMemberInfo("Method1", MemberType.Method, "net8.0");
         var member2 = CreateMemberInfo("Method1", MemberType.Method, "net9.0");
-        
+
         mockQueryEngine.SearchByName("TestType", 10)
             .Returns(new List<MemberInfo> { targetType });
-        
+
         mockQueryEngine.SearchByDeclaringType("TestNamespace.TestType", 1000)
             .Returns(new List<MemberInfo> { member1, member2 });
 
@@ -128,7 +131,7 @@ public class MembersCommandTests : IDisposable
         // Arrange
         mockQueryEngine.SearchByName("NonExistentType", 10)
             .Returns(new List<MemberInfo>());
-        
+
         mockQueryEngine.SearchWithFilters("*NonExistentType*", MemberType.Type, null, null, 10)
             .Returns(new List<MemberInfo>());
 
@@ -153,10 +156,10 @@ public class MembersCommandTests : IDisposable
         // Arrange
         var targetType = CreateMemberInfo("TestType", MemberType.Type);
         var method = CreateMemberInfo("TestMethod", MemberType.Method);
-        
+
         mockQueryEngine.SearchByName("TestType", 10)
             .Returns(new List<MemberInfo> { targetType });
-        
+
         mockQueryEngine.SearchByDeclaringType("TestNamespace.TestType", 1000)
             .Returns(new List<MemberInfo> { method });
 
@@ -187,10 +190,10 @@ public class MembersCommandTests : IDisposable
         var method = CreateMemberInfo("TestMethod", MemberType.Method);
         var property = CreateMemberInfo("TestProperty", MemberType.Property);
         var field = CreateMemberInfo("TestField", MemberType.Field);
-        
+
         mockQueryEngine.SearchByName("TestType", 10)
             .Returns(new List<MemberInfo> { targetType });
-        
+
         mockQueryEngine.SearchByDeclaringType("TestNamespace.TestType", 1000)
             .Returns(new List<MemberInfo> { method, property, field });
 
@@ -223,7 +226,7 @@ public class MembersCommandTests : IDisposable
             Namespace = "TestNamespace",
             TargetFramework = framework,
             Summary = $"Summary for {name}",
-            Parameters = type == MemberType.Method 
+            Parameters = type == MemberType.Method
                 ? [new ParameterInfo { Name = "param1", Type = "string", Position = 0, IsOptional = false, IsParams = false, IsOut = false, IsRef = false }]
                 : [],
             ReturnType = type == MemberType.Method ? "void" : null

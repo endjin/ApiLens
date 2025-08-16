@@ -236,14 +236,14 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             string name = ExtractNameFromId(id, memberType.Value);
             string fullName = ExtractFullNameFromId(id, memberType.Value);
             string namespaceName = ExtractNamespaceFromId(id, memberType.Value);
-            
+
             // Extract parameter types from ID and update parameter info
             List<string> parameterTypes = ExtractParameterTypesFromId(id, memberType.Value);
             for (int i = 0; i < parameters.Count && i < parameterTypes.Count; i++)
             {
                 parameters[i] = parameters[i] with { Type = parameterTypes[i], Position = i };
             }
-            
+
             // Extract return type for methods
             string? returnType = null;
             if (memberType.Value == MemberType.Method)
@@ -257,7 +257,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                     returnType = ExtractTypeFromReturnsDescription(returns);
                 }
             }
-            
+
             // Detect method modifiers (these would ideally come from reflection or more detailed XML)
             bool isStatic = DetectStaticFromSignature(id, memberType.Value);
             bool isAsync = DetectAsyncFromSignature(id, returns);
@@ -265,7 +265,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
 
             // Sanitize nameAttribute to remove any control characters that break JSON
             string sanitizedNameAttribute = nameAttribute.Replace("\n", " ").Replace("\r", " ").Replace("\t", " ");
-            
+
             // Create a unique ID that includes package information to avoid collisions
             // between the same type in different packages/versions/frameworks
             string uniqueId;
@@ -470,10 +470,10 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         var membersByType = members
             .GroupBy(m => ExtractDeclaringTypeFromFullName(m.FullName))
             .ToDictionary(g => g.Key, g => g.ToList());
-        
+
         // Process each property to find its getter
         var properties = members.Where(m => m.MemberType == MemberType.Property).ToList();
-        
+
         foreach (var property in properties)
         {
             // Build getter method name: TypeName.get_PropertyName
@@ -484,15 +484,15 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                 var typeName = property.FullName.Substring(0, lastDot);
                 var propertyName = property.FullName.Substring(lastDot + 1);
                 var getterFullName = $"{typeName}.get_{propertyName}";
-                
+
                 // Find the getter in the same declaring type
                 var declaringType = ExtractDeclaringTypeFromFullName(property.FullName);
                 if (membersByType.TryGetValue(declaringType, out var typeMembers))
                 {
-                    var getter = typeMembers.FirstOrDefault(m => 
-                        m.MemberType == MemberType.Method && 
+                    var getter = typeMembers.FirstOrDefault(m =>
+                        m.MemberType == MemberType.Method &&
                         m.FullName.StartsWith(getterFullName));
-                    
+
                     if (getter != null && !string.IsNullOrWhiteSpace(getter.ReturnType))
                     {
                         // Update the property with the getter's return type
@@ -505,7 +505,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                 }
             }
         }
-        
+
         // Also process fields - they might have type information in their returns documentation
         var fields = members.Where(m => m.MemberType == MemberType.Field).ToList();
         foreach (var field in fields)
@@ -525,13 +525,13 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             }
         }
     }
-    
+
     private static string ExtractDeclaringTypeFromFullName(string fullName)
     {
         // Remove parameters if it's a method
         int parenIndex = fullName.IndexOf('(');
         string nameWithoutParams = parenIndex > 0 ? fullName.Substring(0, parenIndex) : fullName;
-        
+
         // Get everything before the last dot (which is the member name)
         int lastDot = nameWithoutParams.LastIndexOf('.');
         return lastDot > 0 ? nameWithoutParams.Substring(0, lastDot) : string.Empty;
@@ -701,7 +701,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                 returnType = ExtractTypeFromReturnsDescription(returns);
             }
         }
-        
+
         // Detect method modifiers
         bool isStatic = DetectStaticFromSignature(id, memberType.Value);
         bool isAsync = DetectAsyncFromSignature(id, returns);
@@ -794,20 +794,20 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         // Find the position of parameters (if any)
         int parenIndex = id.IndexOf('(');
         string idWithoutParams = parenIndex >= 0 ? id.Substring(0, parenIndex) : id;
-        
+
         // Find the last dot to get the member name
         int lastDotIndex = idWithoutParams.LastIndexOf('.');
         if (lastDotIndex >= 0)
         {
             string memberName = idWithoutParams.Substring(lastDotIndex + 1);
-            
+
             // Remove generic arity from the member name if present (e.g., "Select``2" -> "Select")
             int genericIndex = memberName.IndexOf('`');
             if (genericIndex > 0)
             {
                 memberName = memberName.Substring(0, genericIndex);
             }
-            
+
             // Handle special constructor names
             if (memberName == "#ctor")
             {
@@ -827,7 +827,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             {
                 return "Static Constructor";
             }
-            
+
             return memberName;
         }
 
@@ -926,7 +926,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
 
         return types;
     }
-    
+
     private static string ExtractReturnTypeFromId(string id, MemberType memberType)
     {
         // Return type comes after the closing parenthesis in some XML doc formats
@@ -935,7 +935,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         {
             return string.Empty;
         }
-        
+
         int parenEnd = id.LastIndexOf(')');
         if (parenEnd >= 0 && parenEnd < id.Length - 1)
         {
@@ -946,27 +946,27 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                 return CleanupTypeName(afterParams.Substring(1));
             }
         }
-        
+
         // Default return type for methods without explicit return type
         // Will be overridden by <returns> tag content if available
         return "void";
     }
-    
+
     private static string CleanupTypeName(string typeName)
     {
         // Clean up common type name patterns from XML documentation
         typeName = typeName.Trim();
-        
+
         // Handle common XML doc type prefixes
         if (typeName.StartsWith("T:"))
             typeName = typeName.Substring(2);
-        
+
         // Handle generic types - convert {T} to <T>
         if (typeName.Contains('{') && typeName.Contains('}'))
         {
             typeName = typeName.Replace('{', '<').Replace('}', '>');
         }
-        
+
         // Handle arrays
         if (typeName.EndsWith("[]"))
         {
@@ -974,14 +974,14 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             elementType = CleanupTypeName(elementType);
             return elementType + "[]";
         }
-        
+
         // Extract just the type name for common generics
         if (typeName.StartsWith("System.Collections.Generic."))
         {
             typeName = typeName.Substring("System.Collections.Generic.".Length);
-            
+
             // Handle IEnumerable<T>, List<T>, Dictionary<K,V> etc
-            if (typeName.StartsWith("IEnumerable<") || typeName.StartsWith("List<") || 
+            if (typeName.StartsWith("IEnumerable<") || typeName.StartsWith("List<") ||
                 typeName.StartsWith("Dictionary<") || typeName.StartsWith("IList<") ||
                 typeName.StartsWith("HashSet<") || typeName.StartsWith("Queue<") ||
                 typeName.StartsWith("Stack<"))
@@ -997,15 +997,15 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                 }
             }
         }
-        
+
         // Handle nullable types
         if (typeName.StartsWith("System.Nullable`1[") && typeName.EndsWith("]"))
         {
-            string innerType = typeName.Substring("System.Nullable`1[".Length, 
+            string innerType = typeName.Substring("System.Nullable`1[".Length,
                 typeName.Length - "System.Nullable`1[".Length - 1);
             return CleanupTypeName(innerType) + "?";
         }
-        
+
         // Simplify System types
         typeName = typeName switch
         {
@@ -1025,30 +1025,30 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
             "System.TimeSpan" => "TimeSpan",
             _ => typeName
         };
-        
+
         // Remove namespace for well-known types
         if (typeName.StartsWith("System.") && !typeName.Contains('<'))
         {
             return typeName.Substring(7); // Remove "System."
         }
-        
+
         // For other types, take just the last part (class name)
         if (!typeName.Contains('<') && typeName.Contains('.'))
         {
             int lastDot = typeName.LastIndexOf('.');
             return typeName.Substring(lastDot + 1);
         }
-        
+
         return typeName;
     }
-    
+
     private static string SimplifyInnerTypes(string innerTypes)
     {
         // Handle nested generics and multiple type parameters
         var parts = new List<string>();
         var current = new System.Text.StringBuilder();
         int depth = 0;
-        
+
         foreach (char c in innerTypes)
         {
             if (c == ',' && depth == 0)
@@ -1063,26 +1063,26 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
                 current.Append(c);
             }
         }
-        
+
         if (current.Length > 0)
         {
             parts.Add(CleanupTypeName(current.ToString()));
         }
-        
+
         return string.Join(", ", parts);
     }
-    
+
     private static bool DetectStaticFromSignature(string id, MemberType memberType)
     {
         // Static constructors are always static
         if (id.Contains("#cctor"))
             return true;
-            
+
         // This is a heuristic - ideally would come from reflection
         // Some XML docs include modifiers in the signature
         return false;
     }
-    
+
     private static bool DetectAsyncFromSignature(string id, string? returns)
     {
         // Check if return type contains Task or ValueTask
@@ -1092,7 +1092,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         }
         return false;
     }
-    
+
     private static bool DetectExtensionFromParameters(List<ParameterInfo> parameters)
     {
         // Extension methods have "this" as the first parameter modifier
@@ -1105,7 +1105,7 @@ public sealed partial class XmlDocumentParser : IXmlDocumentParser
         }
         return false;
     }
-    
+
     private static string ExtractTypeFromReturnsDescription(string returns)
     {
         // Try to extract type from returns description

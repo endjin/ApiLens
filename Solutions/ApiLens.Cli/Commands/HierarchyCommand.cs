@@ -23,16 +23,20 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
     };
 
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
+    private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
 
     public HierarchyCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
+        IIndexPathResolver indexPathResolver,
         IQueryEngineFactory queryEngineFactory)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
+        ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
 
         this.indexManagerFactory = indexManagerFactory;
+        this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
     }
 
@@ -40,7 +44,11 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
     {
         try
         {
-            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
+            // Resolve the actual index path
+            string resolvedIndexPath = indexPathResolver.ResolveIndexPath(settings.IndexPath);
+
+            // Create index manager
+            using ILuceneIndexManager indexManager = indexManagerFactory.Create(resolvedIndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
             MetadataService metadataService = new();
@@ -48,22 +56,22 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
 
             // Find the type
             var typeResults = queryEngine.SearchByName(settings.TypeName, 10);
-            var targetType = typeResults.FirstOrDefault(m => 
-                m.MemberType == MemberType.Type && 
+            var targetType = typeResults.FirstOrDefault(m =>
+                m.MemberType == MemberType.Type &&
                 (m.Name.Equals(settings.TypeName, StringComparison.OrdinalIgnoreCase) ||
                  m.FullName.Equals(settings.TypeName, StringComparison.OrdinalIgnoreCase)));
 
             if (targetType == null)
             {
                 AnsiConsole.MarkupLine($"[yellow]Type '{settings.TypeName}' not found.[/]");
-                
+
                 // Provide suggestions
                 var suggestions = typeResults
                     .Where(m => m.MemberType == MemberType.Type)
                     .Take(5)
                     .Select(m => m.FullName)
                     .ToList();
-                
+
                 if (suggestions.Any())
                 {
                     AnsiConsole.WriteLine();
@@ -134,9 +142,9 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
         // This is a heuristic approach since we don't have direct derived type info
         var allTypes = queryEngine.SearchByContent($"\"{targetType.FullName}\"", settings.MaxDerivedTypes * 2);
         derivedTypes = allTypes
-            .Where(t => t.MemberType == MemberType.Type && 
+            .Where(t => t.MemberType == MemberType.Type &&
                        t.Id != targetType.Id &&
-                       (t.Summary?.Contains(targetType.Name) == true || 
+                       (t.Summary?.Contains(targetType.Name) == true ||
                         t.CrossReferences.Any(cr => cr.TargetId == targetType.Id)))
             .Take(settings.MaxDerivedTypes)
             .ToList();
@@ -157,7 +165,7 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
         };
     }
 
-    private static void OutputJson(TypeHierarchy hierarchy, MemberInfo targetType, 
+    private static void OutputJson(TypeHierarchy hierarchy, MemberInfo targetType,
         ILuceneIndexManager indexManager, MetadataService metadataService, Settings settings)
     {
         var metadata = metadataService.BuildMetadata(
@@ -177,7 +185,7 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
         };
 
         string json = JsonSerializer.Serialize(response, JsonOptions);
-        
+
         // Temporarily set unlimited width to prevent JSON wrapping
         var originalWidth = AnsiConsole.Profile.Width;
         AnsiConsole.Profile.Width = int.MaxValue;
@@ -235,7 +243,7 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
         if (settings.ShowMembers && hierarchy.Members.Any())
         {
             AnsiConsole.MarkupLine("[bold]Members:[/]");
-            
+
             var memberGroups = hierarchy.Members.GroupBy(m => m.MemberType);
             foreach (var group in memberGroups.OrderBy(g => g.Key))
             {
@@ -320,13 +328,13 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
         {
             AnsiConsole.WriteLine("## Members");
             AnsiConsole.WriteLine();
-            
+
             var memberGroups = hierarchy.Members.GroupBy(m => m.MemberType);
             foreach (var group in memberGroups.OrderBy(g => g.Key))
             {
                 AnsiConsole.WriteLine($"### {group.Key}s");
                 AnsiConsole.WriteLine();
-                
+
                 foreach (var member in group.OrderBy(m => m.Name))
                 {
                     string memberLine = member.MemberType switch
@@ -335,7 +343,7 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
                         _ => $"- `{member.Name}`"
                     };
                     AnsiConsole.WriteLine(memberLine);
-                    
+
                     if (!string.IsNullOrWhiteSpace(member.Summary))
                     {
                         AnsiConsole.WriteLine($"  {member.Summary}");

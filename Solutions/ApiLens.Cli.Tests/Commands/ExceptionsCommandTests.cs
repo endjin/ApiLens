@@ -1,4 +1,5 @@
 using ApiLens.Cli.Commands;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
@@ -11,6 +12,7 @@ public class ExceptionsCommandTests
 {
     private ILuceneIndexManagerFactory indexManagerFactory = null!;
     private IQueryEngineFactory queryEngineFactory = null!;
+    private IIndexPathResolver indexPathResolver = null!;
     private ILuceneIndexManager indexManager = null!;
     private IQueryEngine queryEngine = null!;
     private CommandContext context = null!;
@@ -20,11 +22,13 @@ public class ExceptionsCommandTests
     {
         indexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
+        indexPathResolver = Substitute.For<IIndexPathResolver>();
         indexManager = Substitute.For<ILuceneIndexManager>();
         queryEngine = Substitute.For<IQueryEngine>();
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
 
+        indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
         indexManagerFactory.Create(Arg.Any<string>()).Returns(indexManager);
         queryEngineFactory.Create(indexManager).Returns(queryEngine);
     }
@@ -85,7 +89,7 @@ public class ExceptionsCommandTests
     public void Execute_WithExceptionType_CallsGetByExceptionType()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.ArgumentNullException",
@@ -114,7 +118,7 @@ public class ExceptionsCommandTests
     public void Execute_WithNoResults_ReturnsSuccess()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.CustomException"
@@ -133,7 +137,7 @@ public class ExceptionsCommandTests
     public void Execute_WithException_ReturnsErrorCode()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExceptionsCommand.Settings settings = new() { ExceptionType = "System.Exception" };
 
         queryEngine.When(x => x.GetByExceptionType(Arg.Any<string>(), Arg.Any<int>()))
@@ -150,7 +154,7 @@ public class ExceptionsCommandTests
     public void Execute_DisposesResources()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExceptionsCommand.Settings settings = new() { ExceptionType = "System.Exception" };
 
         queryEngine.GetByExceptionType("System.Exception", 10).Returns([]);
@@ -167,7 +171,7 @@ public class ExceptionsCommandTests
     public void Execute_WithJsonFormat_ProcessesResults()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.InvalidOperationException",
@@ -197,7 +201,7 @@ public class ExceptionsCommandTests
     public void Execute_WithMarkdownFormat_ProcessesResults()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.ArgumentException",
@@ -227,7 +231,7 @@ public class ExceptionsCommandTests
     public void Execute_WithTableFormat_ProcessesResults()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.Exception",
@@ -261,7 +265,7 @@ public class ExceptionsCommandTests
     public void Execute_WithShowDetails_HandlesCorrectly()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.ArgumentNullException",
@@ -289,7 +293,7 @@ public class ExceptionsCommandTests
     public void Execute_WithJsonFormatAndNoResults_ReturnsEmptyArray()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.NonExistentException",
@@ -310,7 +314,7 @@ public class ExceptionsCommandTests
     public void Execute_WithFullyQualifiedExceptionType_Works()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.Collections.Generic.KeyNotFoundException",
@@ -341,7 +345,7 @@ public class ExceptionsCommandTests
     public void Execute_WithEmptyExceptionType_ReturnsSuccess()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = string.Empty

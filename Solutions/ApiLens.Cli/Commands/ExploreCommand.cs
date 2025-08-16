@@ -1,8 +1,6 @@
-using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Text.Json;
 using ApiLens.Cli.Services;
-using ApiLens.Core.Formatting;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
@@ -23,16 +21,20 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
     };
 
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
+    private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
 
     public ExploreCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
+        IIndexPathResolver indexPathResolver,
         IQueryEngineFactory queryEngineFactory)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
+        ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
 
         this.indexManagerFactory = indexManagerFactory;
+        this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
     }
 
@@ -40,7 +42,11 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
     {
         try
         {
-            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
+            // Resolve the actual index path
+            string resolvedIndexPath = indexPathResolver.ResolveIndexPath(settings.IndexPath);
+
+            // Create index manager
+            using ILuceneIndexManager indexManager = indexManagerFactory.Create(resolvedIndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
             MetadataService metadataService = new();
@@ -48,11 +54,11 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
 
             // Get all types from the package
             var packageTypes = queryEngine.SearchByPackage(settings.PackageName, 10000);
-            
+
             if (packageTypes.Count == 0)
             {
                 AnsiConsole.MarkupLine($"[yellow]Package '{settings.PackageName}' not found or has no indexed types.[/]");
-                
+
                 // Suggest similar packages
                 var allPackages = queryEngine.SearchByPackage("*", 100)
                     .Select(m => m.PackageId)
@@ -61,7 +67,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
                     .Where(p => p != null && p.Contains(settings.PackageName.Replace("*", ""), StringComparison.OrdinalIgnoreCase))
                     .Take(5)
                     .ToList();
-                
+
                 if (allPackages.Any())
                 {
                     AnsiConsole.WriteLine();
@@ -76,7 +82,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
 
             // Analyze the package
             var analysis = AnalyzePackage(packageTypes);
-            
+
             // Output results
             switch (settings.Format)
             {
@@ -116,12 +122,12 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         var interfaces = packageTypes.Where(t => t.MemberType == MemberType.Type && t.Name.StartsWith("I") && t.Name.Length > 1 && char.IsUpper(t.Name[1])).ToList();
         var exceptions = packageTypes.Where(t => t.MemberType == MemberType.Type && t.Name.EndsWith("Exception")).ToList();
         var staticClasses = packageTypes.Where(t => t.MemberType == MemberType.Type && t.Summary?.Contains("static") == true).ToList();
-        
+
         // Find entry point types (types with static methods like Create, Parse, etc.)
         var entryPointTypes = packageTypes
             .Where(t => t.MemberType == MemberType.Type)
-            .Where(t => packageTypes.Any(m => 
-                m.MemberType == MemberType.Method && 
+            .Where(t => packageTypes.Any(m =>
+                m.MemberType == MemberType.Method &&
                 m.FullName.StartsWith(t.FullName + ".") &&
                 (m.Name.Equals("Create", StringComparison.OrdinalIgnoreCase) ||
                  m.Name.Equals("Parse", StringComparison.OrdinalIgnoreCase) ||
@@ -136,7 +142,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         var totalTypes = packageTypes.Count(t => t.MemberType == MemberType.Type);
         var typesWithDocs = packageTypes.Count(t => t.MemberType == MemberType.Type && !string.IsNullOrWhiteSpace(t.Summary));
         var methodsWithExamples = packageTypes.Count(m => m.MemberType == MemberType.Method && m.CodeExamples.Any());
-        
+
         // Find most complex types (by member count)
         var typeComplexity = packageTypes
             .Where(t => t.MemberType == MemberType.Type)
@@ -188,13 +194,13 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         };
         overviewTable.AddColumn("[bold]Metric[/]");
         overviewTable.AddColumn("[bold]Value[/]");
-        
+
         overviewTable.AddRow("Total Types", analysis.TotalTypes.ToString());
         overviewTable.AddRow("Total Members", analysis.TotalMembers.ToString());
         overviewTable.AddRow("Namespaces", analysis.Namespaces.Count.ToString());
         overviewTable.AddRow("Documentation Coverage", $"{analysis.DocumentationCoverage:P0}");
         overviewTable.AddRow("Methods with Examples", analysis.MethodsWithExamples.ToString());
-        
+
         AnsiConsole.Write(overviewTable);
         AnsiConsole.WriteLine();
 
@@ -202,7 +208,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         if (analysis.Namespaces.Any())
         {
             AnsiConsole.Write(new Rule("[bold]Namespaces[/]") { Justification = Justify.Left });
-            
+
             var namespaceTable = new Table()
             {
                 Border = TableBorder.Simple
@@ -210,7 +216,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
             namespaceTable.AddColumn("Namespace");
             namespaceTable.AddColumn("Types", column => column.RightAligned());
             namespaceTable.AddColumn("Key Types");
-            
+
             foreach (var ns in analysis.Namespaces.OrderByDescending(n => n.TypeCount).Take(settings.MaxNamespaces))
             {
                 var keyTypes = ns.Types
@@ -219,14 +225,14 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
                     .ThenBy(t => t.Name)
                     .Take(3)
                     .Select(t => Markup.Escape(t.Name ?? "Unknown"));
-                
+
                 namespaceTable.AddRow(
                     Markup.Escape(ns.Name ?? "Unknown"),
                     ns.TypeCount.ToString(),
                     string.Join(", ", keyTypes)
                 );
             }
-            
+
             AnsiConsole.Write(namespaceTable);
             AnsiConsole.WriteLine();
         }
@@ -235,7 +241,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         if (analysis.EntryPointTypes.Any())
         {
             AnsiConsole.Write(new Rule("[bold]Entry Point Types[/] [dim](Good starting points)[/]") { Justification = Justify.Left });
-            
+
             foreach (var type in analysis.EntryPointTypes.Take(settings.MaxEntryPoints))
             {
                 AnsiConsole.MarkupLine($"  [green]→[/] [bold]{Markup.Escape(type.Name)}[/]");
@@ -252,7 +258,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         if (analysis.Interfaces.Any())
         {
             AnsiConsole.Write(new Rule("[bold]Key Interfaces[/]") { Justification = Justify.Left });
-            
+
             foreach (var iface in analysis.Interfaces.OrderBy(i => i.Name).Take(settings.MaxInterfaces))
             {
                 AnsiConsole.MarkupLine($"  [blue]◊[/] {Markup.Escape(iface.Name)}");
@@ -264,14 +270,14 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         if (settings.ShowComplexity && analysis.MostComplexTypes.Any())
         {
             AnsiConsole.Write(new Rule("[bold]Most Complex Types[/] [dim](By member count)[/]") { Justification = Justify.Left });
-            
+
             var complexTable = new Table()
             {
                 Border = TableBorder.Simple
             };
             complexTable.AddColumn("Type");
             complexTable.AddColumn("Members", column => column.RightAligned());
-            
+
             foreach (var complex in analysis.MostComplexTypes.Take(5))
             {
                 complexTable.AddRow(
@@ -279,7 +285,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
                     complex.MemberCount.ToString()
                 );
             }
-            
+
             AnsiConsole.Write(complexTable);
             AnsiConsole.WriteLine();
         }
@@ -287,21 +293,21 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         // Suggested next steps
         AnsiConsole.Write(new Rule("[bold]Suggested Next Steps[/]") { Justification = Justify.Left });
         AnsiConsole.WriteLine();
-        
+
         if (analysis.EntryPointTypes.Any())
         {
             var firstEntry = analysis.EntryPointTypes.First();
             AnsiConsole.MarkupLine($"1. Explore the main type: [cyan]apilens hierarchy \"{firstEntry.Name}\" --show-members[/]");
         }
-        
+
         if (analysis.Namespaces.Any())
         {
             var mainNamespace = analysis.Namespaces.OrderByDescending(n => n.TypeCount).First();
             AnsiConsole.MarkupLine($"2. Browse namespace types: [cyan]apilens list-types --namespace \"{mainNamespace.Name}\"[/]");
         }
-        
+
         AnsiConsole.MarkupLine($"3. Search for examples: [cyan]apilens examples --max 10[/]");
-        
+
         if (analysis.Interfaces.Any())
         {
             var firstInterface = analysis.Interfaces.First();
@@ -359,7 +365,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         };
 
         string json = JsonSerializer.Serialize(response, JsonOptions);
-        
+
         // Temporarily set unlimited width to prevent JSON wrapping
         var originalWidth = AnsiConsole.Profile.Width;
         AnsiConsole.Profile.Width = int.MaxValue;

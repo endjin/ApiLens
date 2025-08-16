@@ -19,16 +19,20 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
     };
 
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
+    private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
 
     public ExceptionsCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
+        IIndexPathResolver indexPathResolver,
         IQueryEngineFactory queryEngineFactory)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
+        ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
 
         this.indexManagerFactory = indexManagerFactory;
+        this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
     }
 
@@ -37,7 +41,11 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         try
         {
             // Create index manager and query engine with the specified path
-            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
+            // Resolve the actual index path
+            string resolvedIndexPath = indexPathResolver.ResolveIndexPath(settings.IndexPath);
+
+            // Create index manager
+            using ILuceneIndexManager indexManager = indexManagerFactory.Create(resolvedIndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
             MetadataService metadataService = new();
@@ -115,7 +123,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         };
 
         string json = JsonSerializer.Serialize(response, JsonOptions);
-        
+
         // Temporarily set unlimited width to prevent JSON wrapping
         var originalWidth = AnsiConsole.Profile.Width;
         AnsiConsole.Profile.Width = int.MaxValue;

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
@@ -17,22 +18,26 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
     private readonly INuGetCacheScanner scanner;
     private readonly IPackageDeduplicationService deduplicationService;
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
+    private readonly IIndexPathResolver indexPathResolver;
 
     public NuGetCommand(
         IFileSystemService fileSystem,
         INuGetCacheScanner scanner,
         IPackageDeduplicationService deduplicationService,
-        ILuceneIndexManagerFactory indexManagerFactory)
+        ILuceneIndexManagerFactory indexManagerFactory,
+        IIndexPathResolver indexPathResolver)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(scanner);
         ArgumentNullException.ThrowIfNull(deduplicationService);
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
+        ArgumentNullException.ThrowIfNull(indexPathResolver);
 
         this.fileSystem = fileSystem;
         this.scanner = scanner;
         this.deduplicationService = deduplicationService;
         this.indexManagerFactory = indexManagerFactory;
+        this.indexPathResolver = indexPathResolver;
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
@@ -133,7 +138,11 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             }
 
             // Create index manager
-            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
+            // Resolve the actual index path
+            string resolvedIndexPath = indexPathResolver.ResolveIndexPath(settings.IndexPath);
+
+            // Create index manager
+            using ILuceneIndexManager indexManager = indexManagerFactory.Create(resolvedIndexPath);
 
             List<NuGetPackageInfo> packagesToIndex;
             HashSet<string> packageIdsToDelete = [];
@@ -176,7 +185,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 packageIdsToDelete = [.. deduplicationResult.PackageIdsToDelete];
 
                 // Report deduplication statistics
-                DeduplicationStats stats = deduplicationResult.Stats;
+                Core.Services.DeduplicationStats stats = deduplicationResult.Stats;
                 int totalInIndex = indexedPackagesWithFramework.Sum(kvp => kvp.Value.Count);
                 int uniquePackageVersions =
                     indexedPackagesWithFramework.Sum(kvp => kvp.Value.Select(v => v.Version).Distinct().Count());

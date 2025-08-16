@@ -1,4 +1,5 @@
 using ApiLens.Cli.Commands;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
@@ -11,6 +12,7 @@ public class ComplexityCommandTests
 {
     private ILuceneIndexManagerFactory indexManagerFactory = null!;
     private IQueryEngineFactory queryEngineFactory = null!;
+    private IIndexPathResolver indexPathResolver = null!;
     private ILuceneIndexManager indexManager = null!;
     private IQueryEngine queryEngine = null!;
     private CommandContext context = null!;
@@ -20,11 +22,13 @@ public class ComplexityCommandTests
     {
         indexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
+        indexPathResolver = Substitute.For<IIndexPathResolver>();
         indexManager = Substitute.For<ILuceneIndexManager>();
         queryEngine = Substitute.For<IQueryEngine>();
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
 
+        indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
         indexManagerFactory.Create(Arg.Any<string>()).Returns(indexManager);
         queryEngineFactory.Create(indexManager).Returns(queryEngine);
     }
@@ -91,7 +95,7 @@ public class ComplexityCommandTests
     public void Execute_WithNoParameters_ReturnsError()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new();
 
         // Act
@@ -105,7 +109,7 @@ public class ComplexityCommandTests
     public void Execute_WithMinComplexity_CallsGetComplexMethods()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new()
         {
             MinComplexity = 10,
@@ -131,7 +135,7 @@ public class ComplexityCommandTests
     public void Execute_WithParameterRange_CallsGetByParameterCount()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new()
         {
             MinParams = 2,
@@ -154,7 +158,7 @@ public class ComplexityCommandTests
     public void Execute_WithMinParamsOnly_CallsGetByParameterCount()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new()
         {
             MinParams = 3,
@@ -176,7 +180,7 @@ public class ComplexityCommandTests
     public void Execute_WithMaxParamsOnly_CallsGetByParameterCount()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new()
         {
             MaxParams = 5,
@@ -198,7 +202,7 @@ public class ComplexityCommandTests
     public void Execute_WithException_ReturnsErrorCode()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new() { MinComplexity = 10 };
 
         queryEngine.When(x => x.GetComplexMethods(Arg.Any<int>(), Arg.Any<int>()))
@@ -215,7 +219,7 @@ public class ComplexityCommandTests
     public void Execute_DisposesResources()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new() { MinComplexity = 5 };
 
         queryEngine.GetComplexMethods(5, 20).Returns([]);
@@ -232,7 +236,7 @@ public class ComplexityCommandTests
     public void Execute_WithJsonFormat_ProcessesResults()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new()
         {
             MinComplexity = 5,
@@ -259,7 +263,7 @@ public class ComplexityCommandTests
     public void Execute_WithMarkdownFormat_ProcessesResults()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new()
         {
             MinComplexity = 5,
@@ -286,7 +290,7 @@ public class ComplexityCommandTests
     public void Execute_WithTableFormat_ProcessesResults()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new()
         {
             MinComplexity = 5,
@@ -324,7 +328,7 @@ public class ComplexityCommandTests
     public void Execute_SortsByComplexity_WhenSpecified()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new()
         {
             MinComplexity = 1,
@@ -362,7 +366,7 @@ public class ComplexityCommandTests
     public void Execute_SortsByParameters_WhenSpecified()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ComplexityCommand.Settings settings = new()
         {
             MinParams = 1,

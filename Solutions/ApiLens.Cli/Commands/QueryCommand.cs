@@ -20,24 +20,31 @@ public class QueryCommand : Command<QueryCommand.Settings>
 
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IQueryEngineFactory queryEngineFactory;
+    private readonly IIndexPathResolver indexPathResolver;
 
     public QueryCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
-        IQueryEngineFactory queryEngineFactory)
+        IQueryEngineFactory queryEngineFactory,
+        IIndexPathResolver indexPathResolver)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
+        ArgumentNullException.ThrowIfNull(indexPathResolver);
 
         this.indexManagerFactory = indexManagerFactory;
         this.queryEngineFactory = queryEngineFactory;
+        this.indexPathResolver = indexPathResolver;
     }
 
     public override int Execute(CommandContext context, Settings settings)
     {
         try
         {
+            // Resolve the actual index path
+            string resolvedIndexPath = indexPathResolver.ResolveIndexPath(settings.IndexPath);
+
             // Create index manager and query engine with the specified path
-            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
+            using ILuceneIndexManager indexManager = indexManagerFactory.Create(resolvedIndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
             MetadataService metadataService = new();
@@ -50,13 +57,13 @@ public class QueryCommand : Command<QueryCommand.Settings>
             {
                 // Search by declaring type first
                 results = queryEngine.SearchByDeclaringType(settings.DeclaringTypeFilter, settings.MaxResults * 2);
-                
+
                 // Then filter by query if provided
                 if (!string.IsNullOrEmpty(settings.Query) && settings.Query != "*")
                 {
                     var queryLower = settings.Query.ToLowerInvariant();
                     bool hasWildcards = settings.Query.Contains('*') || settings.Query.Contains('?');
-                    
+
                     if (hasWildcards)
                     {
                         var pattern = queryLower.Replace("*", ".*").Replace("?", ".");
@@ -68,13 +75,13 @@ public class QueryCommand : Command<QueryCommand.Settings>
                         results = results.Where(r => r.Name.Contains(queryLower, StringComparison.OrdinalIgnoreCase)).ToList();
                     }
                 }
-                
+
                 // Apply member type filter if specified
                 if (settings.MemberTypeFilter.HasValue)
                 {
                     results = results.Where(r => r.MemberType == settings.MemberTypeFilter.Value).ToList();
                 }
-                
+
                 results = results.Take(settings.MaxResults).ToList();
             }
             // Check if we have any other filters specified
@@ -114,10 +121,10 @@ public class QueryCommand : Command<QueryCommand.Settings>
             if (settings.EntryPointsOnly)
             {
                 var entryPointMethods = new[] { "Create", "Parse", "Load", "Open", "Build", "From", "New", "Make", "Get", "Add", "Initialize" };
-                results = results.Where(r => 
-                    r.MemberType == MemberType.Method && 
-                    entryPointMethods.Any(ep => 
-                        r.Name.Equals(ep, StringComparison.OrdinalIgnoreCase) || 
+                results = results.Where(r =>
+                    r.MemberType == MemberType.Method &&
+                    entryPointMethods.Any(ep =>
+                        r.Name.Equals(ep, StringComparison.OrdinalIgnoreCase) ||
                         r.Name.StartsWith(ep, StringComparison.OrdinalIgnoreCase)))
                     .ToList();
             }
@@ -148,12 +155,12 @@ public class QueryCommand : Command<QueryCommand.Settings>
                 {
                     // Provide helpful suggestions
                     AnsiConsole.MarkupLine("[yellow]No results found.[/]");
-                    
+
                     var suggestionService = new SuggestionService(queryEngine);
                     var queryType = ConvertToSuggestionQueryType(settings.QueryType);
                     var similarNames = suggestionService.GetSimilarNames(settings.Query, queryType);
                     var suggestionMessage = suggestionService.FormatSuggestionMessage(settings.Query, queryType, similarNames);
-                    
+
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine("[dim]" + Markup.Escape(suggestionMessage) + "[/]");
                 }
@@ -193,13 +200,13 @@ public class QueryCommand : Command<QueryCommand.Settings>
             // Use SearchWithFilters with wildcard to get all
             return queryEngine.SearchWithFilters("*", null, null, null, maxResults);
         }
-        
+
         // Handle wildcards in general
         if (query.Contains('*') || query.Contains('?'))
         {
             return queryEngine.SearchWithFilters(query, null, null, null, maxResults);
         }
-        
+
         // Normal name search for non-wildcard queries - now with ignoreCase support
         return queryEngine.SearchByName(query, maxResults, ignoreCase);
     }
@@ -212,7 +219,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
             int min = minParams ?? 0;
             int max = maxParams ?? int.MaxValue;
             var paramFilteredMethods = queryEngine.GetByParameterCount(min, max, maxResults * 2);
-            
+
             // If a pattern is specified, filter by it
             if (!string.IsNullOrWhiteSpace(pattern) && pattern != "*")
             {
@@ -222,46 +229,46 @@ public class QueryCommand : Command<QueryCommand.Settings>
                     .Where(m => regex.IsMatch(m.Name))
                     .ToList();
             }
-            
+
             return paramFilteredMethods.Take(maxResults).ToList();
         }
-        
+
         // Handle wildcard for all methods
         if (pattern == "*" || pattern == "**")
         {
             var methodResults = queryEngine.SearchWithFilters("*", MemberType.Method, null, null, maxResults);
             return methodResults;
         }
-        
+
         // Handle wildcards in pattern
         if (pattern.Contains('*') || pattern.Contains('?'))
         {
             var wildcardResults = queryEngine.SearchWithFilters(pattern, MemberType.Method, null, null, maxResults * 2);
             return wildcardResults.Take(maxResults).ToList();
         }
-        
+
         // First, search for methods with matching names (no wildcards)
         var nameResults = queryEngine.SearchByName(pattern, maxResults * 2);
-        
+
         // Filter to only methods
         var methods = nameResults.Where(m => m.MemberType == MemberType.Method).ToList();
-        
+
         // If we have enough results, return them
         if (methods.Count >= maxResults)
         {
             return methods.Take(maxResults).ToList();
         }
-        
+
         // Otherwise, also search in content for method signatures
         var contentResults = queryEngine.SearchByContent(pattern, maxResults);
         var contentMethods = contentResults.Where(m => m.MemberType == MemberType.Method);
-        
+
         // Combine and deduplicate
         var allMethods = methods.Concat(contentMethods)
             .DistinctBy(m => m.Id)
             .Take(maxResults)
             .ToList();
-        
+
         return allMethods;
     }
 
@@ -292,7 +299,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
         };
 
         string json = JsonSerializer.Serialize(response, JsonOptions);
-        
+
         // Temporarily set unlimited width to prevent JSON wrapping
         var originalWidth = AnsiConsole.Profile.Width;
         AnsiConsole.Profile.Width = int.MaxValue;
@@ -313,11 +320,11 @@ public class QueryCommand : Command<QueryCommand.Settings>
 
         foreach (var group in groups.OrderBy(g => g.Key))
         {
-            AnsiConsole.Write(new Rule($"[bold yellow]{Markup.Escape(group.Key ?? "Unknown")}[/] ({group.Count()} items)") 
-            { 
-                Justification = Justify.Left 
+            AnsiConsole.Write(new Rule($"[bold yellow]{Markup.Escape(group.Key ?? "Unknown")}[/] ({group.Count()} items)")
+            {
+                Justification = Justify.Left
             });
-            
+
             var table = new Table();
             table.AddColumn("Type");
             table.AddColumn("Name");
@@ -333,12 +340,12 @@ public class QueryCommand : Command<QueryCommand.Settings>
                     result.MemberType.ToString(),
                     Markup.Escape(GenericTypeFormatter.FormatTypeName(result.Name))
                 };
-                
+
                 if (groupBy != GroupBy.Namespace)
                     row.Add(Markup.Escape(GenericTypeFormatter.FormatTypeName(result.Namespace)));
                 if (groupBy != GroupBy.Assembly)
                     row.Add(Markup.Escape(result.Assembly));
-                
+
                 table.AddRow(row.ToArray());
             }
 

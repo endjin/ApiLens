@@ -19,16 +19,20 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
     };
 
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
+    private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
 
     public ListTypesCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
+        IIndexPathResolver indexPathResolver,
         IQueryEngineFactory queryEngineFactory)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
+        ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
 
         this.indexManagerFactory = indexManagerFactory;
+        this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
     }
 
@@ -37,7 +41,11 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         try
         {
             // Create index manager and query engine
-            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
+            // Resolve the actual index path
+            string resolvedIndexPath = indexPathResolver.ResolveIndexPath(settings.IndexPath);
+
+            // Create index manager
+            using ILuceneIndexManager indexManager = indexManagerFactory.Create(resolvedIndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
             MetadataService metadataService = new();
@@ -56,7 +64,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
                         Metadata = metadataService.BuildMetadata(indexManager)
                     };
                     string errorJson = JsonSerializer.Serialize(errorResponse, JsonOptions);
-                    
+
                     // Temporarily set unlimited width to prevent JSON wrapping
                     var originalWidth = AnsiConsole.Profile.Width;
                     AnsiConsole.Profile.Width = int.MaxValue;
@@ -137,7 +145,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         {
             // Use the package pattern as-is - users can add wildcards if needed
             string packagePattern = settings.Package;
-            
+
             results = settings.IncludeMembers
                 ? queryEngine.SearchByPackage(packagePattern, settings.MaxResults)
                 : queryEngine.ListTypesFromPackage(packagePattern, settings.MaxResults);
@@ -146,7 +154,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         {
             // Use the assembly pattern as-is - users can add wildcards if needed
             string assemblyPattern = settings.Assembly;
-            
+
             results = settings.IncludeMembers
                 ? queryEngine.SearchByAssembly(assemblyPattern, settings.MaxResults)
                 : queryEngine.ListTypesFromAssembly(assemblyPattern, settings.MaxResults);
@@ -155,21 +163,21 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         {
             // Use the namespace pattern as-is for exact or wildcard matching
             string namespacePattern = settings.Namespace;
-            
+
             // For exact namespace matching, search by namespace field directly
             if (!namespacePattern.Contains('*') && !namespacePattern.Contains('?'))
             {
                 // Exact namespace search - get more results to filter for types
-                results = queryEngine.SearchByNamespace(namespacePattern, 
+                results = queryEngine.SearchByNamespace(namespacePattern,
                     settings.IncludeMembers ? settings.MaxResults : settings.MaxResults * 10);
             }
             else
             {
                 // Wildcard namespace search
-                results = queryEngine.SearchByNamespacePattern(namespacePattern, 
+                results = queryEngine.SearchByNamespacePattern(namespacePattern,
                     settings.IncludeMembers ? settings.MaxResults : settings.MaxResults * 10);
             }
-            
+
             if (!settings.IncludeMembers)
             {
                 results = [.. results.Where(m => m.MemberType == MemberType.Type)
@@ -266,7 +274,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         };
 
         string json = JsonSerializer.Serialize(response, JsonOptions);
-        
+
         // Temporarily set unlimited width to prevent JSON wrapping
         var originalWidth = AnsiConsole.Profile.Width;
         AnsiConsole.Profile.Width = int.MaxValue;

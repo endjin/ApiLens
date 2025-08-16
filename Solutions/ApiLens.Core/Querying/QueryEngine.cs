@@ -30,7 +30,7 @@ public class QueryEngine : IQueryEngine
     {
         return SearchByName(name, maxResults, false);
     }
-    
+
     public List<MemberInfo> SearchByName(string name, int maxResults, bool ignoreCase)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -38,7 +38,7 @@ public class QueryEngine : IQueryEngine
 
         string fieldName = ignoreCase ? "nameNormalized" : "nameText";
         string searchValue = ignoreCase ? name.ToLowerInvariant() : name;
-        
+
         TopDocs topDocs = indexManager.SearchByField(fieldName, searchValue, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
@@ -109,7 +109,7 @@ public class QueryEngine : IQueryEngine
                 typeName = typeResult.FullName;
             }
         }
-        
+
         // Use declaringType field for exact match
         return SearchByDeclaringType(typeName, maxResults);
     }
@@ -348,13 +348,13 @@ public class QueryEngine : IQueryEngine
         // Use normalized package ID for case-insensitive search
         string normalizedPackageId = packageId.ToLowerInvariant();
         TopDocs topDocs = indexManager.SearchByField("packageIdNormalized", normalizedPackageId, maxResults);
-        
+
         // Fallback to original field for backward compatibility with old indexes
         if (topDocs.TotalHits == 0)
         {
             topDocs = indexManager.SearchByField("packageId", packageId, maxResults);
         }
-        
+
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -403,7 +403,7 @@ public class QueryEngine : IQueryEngine
             // Exact match - use normalized field
             string normalizedPattern = packagePattern.ToLowerInvariant();
             packageDocs = indexManager.SearchByField("packageIdNormalized", normalizedPattern, maxResults * 10);
-            
+
             // Fallback for old indexes
             if (packageDocs.TotalHits == 0)
             {
@@ -415,7 +415,7 @@ public class QueryEngine : IQueryEngine
             // Wildcard search on original field
             packageDocs = indexManager.SearchByField("packageId", packagePattern, maxResults * 10);
         }
-        
+
         List<MemberInfo> allMembers = ConvertTopDocsToMembers(packageDocs);
 
         // Filter to only Type members
@@ -543,21 +543,21 @@ public class QueryEngine : IQueryEngine
         return ConvertTopDocsToMembers(topDocs);
     }
 
-    private List<MemberInfo> GetAllWithFilters(MemberType? memberType, 
+    private List<MemberInfo> GetAllWithFilters(MemberType? memberType,
         string? namespacePattern, string? assemblyPattern, int maxResults)
     {
         // Build a query that matches all documents with optional filters
         BooleanQuery query = [];
-        
+
         // Use MatchAllDocsQuery as the base to get all documents
         query.Add(new MatchAllDocsQuery(), Occur.MUST);
-        
+
         // Apply member type filter if specified
         if (memberType.HasValue)
         {
             query.Add(new TermQuery(new Term("memberType", memberType.Value.ToString())), Occur.MUST);
         }
-        
+
         // Apply namespace pattern filter if specified
         if (!string.IsNullOrEmpty(namespacePattern))
         {
@@ -575,7 +575,7 @@ public class QueryEngine : IQueryEngine
                 query.Add(new TermQuery(new Term("namespace", namespacePattern)), Occur.MUST);
             }
         }
-        
+
         // Apply assembly pattern filter if specified
         if (!string.IsNullOrEmpty(assemblyPattern))
         {
@@ -593,7 +593,7 @@ public class QueryEngine : IQueryEngine
                 query.Add(new TermQuery(new Term("assembly", assemblyPattern)), Occur.MUST);
             }
         }
-        
+
         TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
@@ -643,7 +643,7 @@ public class QueryEngine : IQueryEngine
     {
         if (string.IsNullOrEmpty(input))
             return input;
-        
+
         // Replace common control characters that break JSON
         return input.Replace("\n", " ")
                    .Replace("\r", " ")

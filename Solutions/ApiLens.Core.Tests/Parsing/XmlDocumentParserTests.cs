@@ -165,8 +165,7 @@ public class XmlDocumentParserTests
         // Arrange
         var members = new List<MemberInfo>
         {
-            new MemberInfo
-            {
+            new() {
                 Id = "P:TestNamespace.TestClass.TestProperty",
                 Name = "TestProperty",
                 FullName = "TestNamespace.TestClass.TestProperty",
@@ -175,8 +174,7 @@ public class XmlDocumentParserTests
                 Namespace = "TestNamespace",
                 ReturnType = null
             },
-            new MemberInfo
-            {
+            new() {
                 Id = "M:TestNamespace.TestClass.get_TestProperty",
                 Name = "get_TestProperty",
                 FullName = "TestNamespace.TestClass.get_TestProperty",
@@ -200,8 +198,7 @@ public class XmlDocumentParserTests
         // Arrange
         var members = new List<MemberInfo>
         {
-            new MemberInfo
-            {
+            new() {
                 Id = "P:TestNamespace.TestClass.TestProperty",
                 Name = "TestProperty",
                 FullName = "TestNamespace.TestClass.TestProperty",
@@ -225,8 +222,7 @@ public class XmlDocumentParserTests
         // Arrange
         var members = new List<MemberInfo>
         {
-            new MemberInfo
-            {
+            new() {
                 Id = "F:TestNamespace.TestClass.TestField",
                 Name = "TestField",
                 FullName = "TestNamespace.TestClass.TestField",
@@ -262,8 +258,7 @@ public class XmlDocumentParserTests
         // Arrange
         var members = new List<MemberInfo>
         {
-            new MemberInfo
-            {
+            new() {
                 Id = "P:TestNamespace.TestClass.Property1",
                 Name = "Property1",
                 FullName = "TestNamespace.TestClass.Property1",
@@ -271,8 +266,7 @@ public class XmlDocumentParserTests
                 Assembly = "TestAssembly",
                 Namespace = "TestNamespace"
             },
-            new MemberInfo
-            {
+            new() {
                 Id = "P:TestNamespace.TestClass.Property2",
                 Name = "Property2",
                 FullName = "TestNamespace.TestClass.Property2",
@@ -280,8 +274,7 @@ public class XmlDocumentParserTests
                 Assembly = "TestAssembly",
                 Namespace = "TestNamespace"
             },
-            new MemberInfo
-            {
+            new() {
                 Id = "M:TestNamespace.TestClass.get_Property1",
                 Name = "get_Property1",
                 FullName = "TestNamespace.TestClass.get_Property1",
@@ -290,8 +283,7 @@ public class XmlDocumentParserTests
                 Namespace = "TestNamespace",
                 ReturnType = "System.String"
             },
-            new MemberInfo
-            {
+            new() {
                 Id = "M:TestNamespace.TestClass.get_Property2",
                 Name = "get_Property2",
                 FullName = "TestNamespace.TestClass.get_Property2",

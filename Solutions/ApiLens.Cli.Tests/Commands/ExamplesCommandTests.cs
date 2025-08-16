@@ -1,4 +1,5 @@
 using ApiLens.Cli.Commands;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
@@ -11,6 +12,7 @@ public class ExamplesCommandTests
 {
     private ILuceneIndexManagerFactory indexManagerFactory = null!;
     private IQueryEngineFactory queryEngineFactory = null!;
+    private IIndexPathResolver indexPathResolver = null!;
     private ILuceneIndexManager indexManager = null!;
     private IQueryEngine queryEngine = null!;
     private CommandContext context = null!;
@@ -20,11 +22,13 @@ public class ExamplesCommandTests
     {
         indexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
+        indexPathResolver = Substitute.For<IIndexPathResolver>();
         indexManager = Substitute.For<ILuceneIndexManager>();
         queryEngine = Substitute.For<IQueryEngine>();
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
 
+        indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
         indexManagerFactory.Create(Arg.Any<string>()).Returns(indexManager);
         queryEngineFactory.Create(indexManager).Returns(queryEngine);
     }
@@ -79,7 +83,7 @@ public class ExamplesCommandTests
     public void Execute_WithNoPattern_CallsGetMethodsWithExamples()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new() { MaxResults = 20 };
 
         List<MemberInfo> expectedResults =
@@ -104,7 +108,7 @@ public class ExamplesCommandTests
     public void Execute_WithPattern_CallsSearchByCodeExample()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new()
         {
             Pattern = "async",
@@ -132,7 +136,7 @@ public class ExamplesCommandTests
     public void Execute_WithEmptyPattern_CallsGetMethodsWithExamples()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new()
         {
             Pattern = "   ", // Whitespace only
@@ -155,7 +159,7 @@ public class ExamplesCommandTests
     public void Execute_WithNoResults_ReturnsSuccess()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new() { Pattern = "nonexistent" };
 
         queryEngine.SearchByCodeExample("nonexistent", 10).Returns([]);
@@ -171,7 +175,7 @@ public class ExamplesCommandTests
     public void Execute_WithException_ReturnsErrorCode()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new();
 
         queryEngine.When(x => x.GetMethodsWithExamples(Arg.Any<int>()))
@@ -188,7 +192,7 @@ public class ExamplesCommandTests
     public void Execute_DisposesResources()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new();
 
         queryEngine.GetMethodsWithExamples(10).Returns([]);
@@ -205,7 +209,7 @@ public class ExamplesCommandTests
     public void Execute_WithJsonFormat_ProcessesResults()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new()
         {
             Format = OutputFormat.Json
@@ -234,7 +238,7 @@ public class ExamplesCommandTests
     public void Execute_WithMarkdownFormat_ProcessesResults()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new()
         {
             Format = OutputFormat.Markdown
@@ -263,7 +267,7 @@ public class ExamplesCommandTests
     public void Execute_WithTableFormat_ProcessesResults()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new()
         {
             Format = OutputFormat.Table
@@ -296,7 +300,7 @@ public class ExamplesCommandTests
     public void Execute_WithMultipleExamplesPerMethod_HandlesCorrectly()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new();
 
         MemberInfo memberInfo = CreateMemberInfoWithExamples(
@@ -319,7 +323,7 @@ public class ExamplesCommandTests
     public void Execute_WithJsonFormatAndNoResults_ReturnsEmptyArray()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new()
         {
             Format = OutputFormat.Json,
@@ -339,7 +343,7 @@ public class ExamplesCommandTests
     public void Execute_SearchWithPattern_ReturnsMatchingExamples()
     {
         // Arrange
-        ExamplesCommand command = new(indexManagerFactory, queryEngineFactory);
+        ExamplesCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
         ExamplesCommand.Settings settings = new()
         {
             Pattern = "Task.Run",

@@ -35,7 +35,7 @@ public class SolutionParserService : ISolutionParserService
         {
             string name = match.Groups[1].Value;
             string relativePath = match.Groups[2].Value;
-            
+
             // Combine the solution directory with the relative project path
             string projectPath = fileSystem.CombinePath(solutionDir, relativePath);
 

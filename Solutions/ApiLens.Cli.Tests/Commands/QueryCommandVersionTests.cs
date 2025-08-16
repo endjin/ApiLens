@@ -1,4 +1,5 @@
 using ApiLens.Cli.Commands;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Helpers;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
@@ -9,7 +10,6 @@ using Lucene.Net.Documents;
 using Spectre.Console;
 using Spectre.Console.Testing;
 using static ApiLens.Cli.Commands.QueryCommand;
-
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]
@@ -19,6 +19,7 @@ public class QueryCommandVersionTests
     private QueryCommand command = null!;
     private ILuceneIndexManagerFactory indexManagerFactory = null!;
     private IQueryEngineFactory queryEngineFactory = null!;
+    private IIndexPathResolver indexPathResolver = null!;
 
     [TestInitialize]
     public void Setup()
@@ -29,6 +30,8 @@ public class QueryCommandVersionTests
         indexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
 
+        indexPathResolver = Substitute.For<IIndexPathResolver>();
+        indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
         // For these integration tests, we'll use real implementations
         indexManagerFactory.Create(Arg.Any<string>()).Returns(callInfo =>
         {
@@ -40,7 +43,7 @@ public class QueryCommandVersionTests
         });
         queryEngineFactory.Create(Arg.Any<ILuceneIndexManager>()).Returns(callInfo => new QueryEngine(callInfo.Arg<ILuceneIndexManager>()));
 
-        command = new QueryCommand(indexManagerFactory, queryEngineFactory);
+        command = new QueryCommand(indexManagerFactory, queryEngineFactory, indexPathResolver);
     }
 
     [TestCleanup]
@@ -62,7 +65,7 @@ public class QueryCommandVersionTests
         {
             Query = "TestClass",
             IndexPath = indexPath,
-            QueryType = QueryType.Name,
+            QueryType = ApiLens.Cli.Commands.QueryCommand.QueryType.Name,
             Format = OutputFormat.Table
         };
 
@@ -91,7 +94,7 @@ public class QueryCommandVersionTests
         {
             Query = "TestClass",
             IndexPath = indexPath,
-            QueryType = QueryType.Name,
+            QueryType = ApiLens.Cli.Commands.QueryCommand.QueryType.Name,
             Format = OutputFormat.Json
         };
 
@@ -121,7 +124,7 @@ public class QueryCommandVersionTests
         {
             Query = "OldClass",
             IndexPath = indexPath,
-            QueryType = QueryType.Name,
+            QueryType = ApiLens.Cli.Commands.QueryCommand.QueryType.Name,
             Format = OutputFormat.Table
         };
 
@@ -148,7 +151,7 @@ public class QueryCommandVersionTests
         {
             Query = "TestClass",
             IndexPath = indexPath,
-            QueryType = QueryType.Name,
+            QueryType = ApiLens.Cli.Commands.QueryCommand.QueryType.Name,
             Format = OutputFormat.Markdown
         };
 
