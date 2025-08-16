@@ -89,8 +89,8 @@ apilens query JsonSerializer
 # 4. Discover type hierarchies
 apilens hierarchy JObject --show-members
 
-# 5. Find code examples
-apilens examples "async await"
+# 5. Find members of a specific type
+apilens members JsonSerializer --show-summary
 ```
 
 ### Demo Scripts
@@ -247,20 +247,22 @@ apilens hierarchy IEnumerable --format json
 
 ### 📝 examples - Find Code Examples
 
-Find and search within code examples:
+Find methods with code examples and search within example code:
 
 ```bash
 # List all methods with examples
 apilens examples
 
-# Search for specific patterns
-apilens examples "async await"
-apilens examples "using statement"
-apilens examples "LINQ"
+# Search for patterns within example code (not member names)
+apilens examples typeof
+apilens examples "new object[]"
+apilens examples ItemConverter
 
 # Get structured data
 apilens examples --format json --max 10
 ```
+
+**Note**: Currently searches within the example code text, not by member/type names. To find examples for a specific type, use `query` first to locate members, then check if they have examples.
 
 ### ⚠️ exceptions - Find Exception Information
 
@@ -433,12 +435,12 @@ ApiLens is designed for Model Context Protocol integration, providing structured
 
 ```bash
 # Understanding API usage
-apilens examples "HttpClient" --format json
+apilens examples --format json
 apilens query "HttpClient" --type content --format json
 
 # Error handling guidance
 apilens exceptions "IOException" --details --format json
-apilens examples "try catch" --format json
+apilens examples --format json --max 20
 
 # API complexity analysis
 apilens complexity --max-params 2 --format json    # Simple APIs
@@ -446,7 +448,7 @@ apilens complexity --min-params 5 --format json    # Complex APIs
 
 # Package exploration workflow
 apilens analyze ./project.csproj --format json
-apilens explore "PackageName" --format json
+apilens explore "packagename" --format json
 apilens hierarchy "MainType" --show-members --format json
 ```
 
@@ -538,6 +540,7 @@ ApiLens/
 ## Recent Improvements
 
 - **Smart Index Management**: Index location now uses environment variables and home directory defaults
+- **Case-Insensitive Package Search**: Package names are now case-insensitive (requires index rebuild with `--clean`)
 - **Enhanced Package Exploration**: New `explore` command for interactive package discovery
 - **Improved Demo Scripts**: All demos updated with consistent path resolution
 - **Better Error Messages**: Helpful suggestions when queries return no results
