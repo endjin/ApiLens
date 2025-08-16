@@ -4,17 +4,19 @@ ApiLens is a .NET 9 CLI application that indexes and queries .NET XML API docume
 
 ## Features
 
-- **Index XML Documentation**: Parse and index .NET XML documentation files
+- **Index XML Documentation**: Parse and index .NET XML documentation files with incremental updates
 - **Project/Solution Analysis**: Analyze .NET projects and solutions to discover and index dependencies
 - **NuGet Package Support**: Automatically discover and index documentation from NuGet cache
+- **Package Exploration**: Interactive exploration of packages with guided navigation
+- **Type Hierarchy Discovery**: Explore inheritance chains and interface implementations
 - **Version Tracking**: Track and display package versions and target frameworks
-- **Full-Text Search**: Query API documentation using Lucene.NET with advanced Lucene syntax
+- **Full-Text Search**: Query API documentation using Lucene.NET with advanced syntax
 - **Specialized Queries**: Find code examples, exceptions, and analyze method complexity
-- **Type Hierarchy**: Discover base types, derived types, and interfaces
 - **Cross-References**: Track relationships between types and members
 - **Multiple Output Formats**: Table (human), JSON (machine), Markdown (docs)
 - **Rich Metadata Extraction**: Code examples, parameter details, exception information
-- **Cross-Platform**: Works on Windows, Linux, and macOS
+- **Smart Index Management**: Consistent index location with environment variable support
+- **Cross-Platform**: Works on Windows, Linux, and macOS via Spectre.IO
 - **MCP Ready**: Designed for integration with Model Context Protocol
 
 ## Installation
@@ -22,16 +24,40 @@ ApiLens is a .NET 9 CLI application that indexes and queries .NET XML API docume
 ```bash
 # Clone the repository
 git clone https://github.com/endjin/ApiLens.git
-cd apilens
+cd ApiLens
 
 # Build the application
 dotnet build ./Solutions/ApiLens.Cli/ApiLens.Cli.csproj --configuration Release
 
 # Run the CLI
 dotnet run --project ./Solutions/ApiLens.Cli -- --help
+
+# Or build and use the executable directly
+./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens --help
 ```
 
 ## Quick Start
+
+### 🚀 Recommended Workflow
+
+```bash
+# 1. Analyze your solution (automatically discovers and indexes all packages)
+apilens analyze ./MySolution.sln
+
+# 2. Explore a specific package interactively
+apilens explore Newtonsoft.Json
+
+# 3. Query for specific APIs
+apilens query JsonSerializer
+
+# 4. Discover type hierarchies
+apilens hierarchy JObject --show-members
+
+# 5. Find code examples
+apilens examples "async await"
+```
+
+### Demo Scripts
 
 Check out the demo scripts in the `Demos/` folder for hands-on examples:
 
@@ -45,481 +71,348 @@ pwsh ./Demos/core/analyze-demo.ps1
 # NuGet package indexing demo  
 pwsh ./Demos/nuget/nuget-basic.ps1
 
+# Enhanced drill-down demo
+pwsh ./Demos/advanced/enhanced-drilldown-demo.ps1
+
 # Test all demos
 cd Demos && pwsh ./test-all.ps1
 ```
 
-**Note**: All demo scripts create their temporary files under the `/.tmp/` directory:
-- Indexes: `/.tmp/indexes/`
-- Sample documentation: `/.tmp/docs/`
+## Index Management
 
-This keeps demo artifacts separate from your project files and makes cleanup easy.
+ApiLens uses a smart index location strategy:
 
-See [Demos/README.md](Demos/README.md) for a complete list of demonstration scripts.
+1. **Explicit path**: Use `--index /path/to/index` to specify a custom location
+2. **Environment variable**: Set `APILENS_INDEX=/path/to/index` for a persistent location
+3. **Default**: Uses `~/.apilens/index` in your home directory
 
-## Usage
-
-### Indexing Documentation
-
-Index a single XML file:
 ```bash
-apilens index ./MyLibrary.xml
+# Use custom index location
+apilens index ./docs --index /my/custom/index
+
+# Set environment variable for consistent location
+export APILENS_INDEX=/shared/apilens-index
+apilens index ./docs  # Uses /shared/apilens-index
+
+# Default location (no configuration needed)
+apilens index ./docs  # Uses ~/.apilens/index
 ```
 
-Index all XML files in a directory:
+## Core Commands
+
+### 📦 analyze - Project/Solution Analysis (Recommended Starting Point)
+
+Analyzes .NET projects or solutions to discover and index all their dependencies:
+
 ```bash
-apilens index ./docs
-```
-
-Clean and rebuild index:
-```bash
-apilens index ./docs --clean
-```
-
-Use custom index location:
-```bash
-apilens index ./docs --index ./index/custom-index
-```
-
-**Note**: By convention, all indexes are stored under the `./index/` directory. Demo scripts use `/.tmp/indexes/` to keep them separate.
-
-### Project and Solution Analysis
-
-ApiLens can analyze .NET projects and solutions to discover and index their dependencies:
-
-Analyze a single project:
-```bash
-apilens analyze ./MyProject.csproj
-```
-
-Analyze a solution:
-```bash
+# Analyze a solution
 apilens analyze ./MySolution.sln
-```
 
-Include transitive dependencies:
-```bash
-apilens analyze ./MyProject.csproj --include-transitive --use-assets
-```
+# Analyze a project with transitive dependencies
+apilens analyze ./MyProject.csproj --include-transitive
 
-Clean and rebuild index:
-```bash
-apilens analyze ./MyProject.csproj --clean --index ./my-index
-```
+# Use project.assets.json for exact versions
+apilens analyze ./MyProject.csproj --use-assets
 
-Get analysis results as JSON:
-```bash
+# Clean rebuild of index
+apilens analyze ./MySolution.sln --clean
+
+# Get JSON output for automation
 apilens analyze ./MyProject.csproj --format json
 ```
 
-Get markdown report:
+### 🔍 explore - Interactive Package Exploration
+
+Best starting point for understanding a new package:
+
 ```bash
-apilens analyze ./MyProject.csproj --format markdown
+# Explore a package structure
+apilens explore Newtonsoft.Json
+
+# Show complexity metrics
+apilens explore Serilog --show-complexity
+
+# Get JSON output for processing
+apilens explore System.Text.Json --format json
 ```
 
-### NuGet Package Indexing
+Shows:
+- Package statistics and documentation coverage
+- Main namespaces with type counts
+- Entry point types (Create, Parse, Load methods)
+- Key interfaces
+- Most complex types
+- Suggested next exploration steps
 
-ApiLens can automatically discover and index documentation from your NuGet package cache:
+### 📚 index - Index XML Documentation
 
-List packages with documentation:
+Index XML documentation files into a searchable database:
+
 ```bash
-apilens nuget --list
+# Index a directory
+apilens index ./docs
+
+# Index with clean rebuild
+apilens index ./docs --clean
+
+# Index specific pattern
+apilens index ./packages --pattern "**/*.xml"
+
+# Use custom index location
+apilens index ./docs --index ./my-index
 ```
 
-Index specific packages:
+### 🔎 query - Search API Documentation
+
+Powerful search with multiple query types:
+
 ```bash
-apilens nuget --filter "newtonsoft.*"
+# Search by name (default)
+apilens query StringBuilder
+
+# Full-text search in documentation
+apilens query "thread safety" --type content
+
+# Search for methods with parameter filtering
+apilens query Parse --type method --min-params 1 --max-params 2
+
+# Search by namespace
+apilens query "System.Collections.Generic" --type namespace
+
+# Wildcard searches
+apilens query "List*"          # Matches List, ListItem, etc.
+apilens query "*Exception"     # All exception types
+
+# Boolean searches (operators must be uppercase)
+apilens query "async AND await" --type content
+apilens query "collection OR list" --type content
+
+# Phrase searches
+apilens query "\"extension method\"" --type content
 ```
 
-Index only latest versions:
+### 🏗️ hierarchy - Explore Type Relationships
+
+Discover inheritance chains and interface implementations:
+
 ```bash
-apilens nuget --latest-only
+# Basic hierarchy
+apilens hierarchy List
+
+# Show all members
+apilens hierarchy Dictionary --show-members
+
+# Include inherited members
+apilens hierarchy Exception --show-members --show-inherited
+
+# JSON output for processing
+apilens hierarchy IEnumerable --format json
 ```
 
-Index all packages with documentation:
-```bash
-apilens nuget
-```
+### 📝 examples - Find Code Examples
 
-### Querying the Index
-
-Search by name:
-```bash
-apilens query String
-```
-
-Search in content/documentation:
-```bash
-apilens query "collection" --type content
-```
-
-Search by namespace:
-```bash
-apilens query "System.Collections" --type namespace
-```
-
-Get by exact ID (requires full internal ID):
-```bash
-# First, find the full ID using regular search
-apilens query String --format json | ConvertFrom-Json | Select-Object -First 1 -ExpandProperty id
-# Then use the full ID (format: MemberName|Assembly|Hash)
-apilens query "T:System.String|mscorlib|abc123..." --type id
-```
-
-Search by assembly:
-```bash
-apilens query "System.Runtime" --type assembly
-```
-
-### Specialized Query Commands
-
-ApiLens provides specialized commands for targeted searches:
-
-#### Code Examples Command
-Find methods with code examples or search within example code:
+Find and search within code examples:
 
 ```bash
-# List all methods with code examples
+# List all methods with examples
 apilens examples
 
-# Search for specific patterns in code examples
-apilens examples "async" --max 20
-apilens examples "parser.ParseFile"
-apilens examples "catch" --format json
+# Search for specific patterns
+apilens examples "async await"
+apilens examples "using statement"
+apilens examples "LINQ"
 
-# Get structured example data for LLM processing
-apilens examples --format json --max 5
+# Get structured data
+apilens examples --format json --max 10
 ```
 
-#### Exceptions Command
-Find methods that throw specific exceptions with advanced fuzzy search support:
+### ⚠️ exceptions - Find Exception Information
+
+Discover what exceptions methods can throw:
 
 ```bash
-# Find methods throwing ArgumentNullException (partial name without namespace)
-apilens exceptions "ArgumentNullException"
+# Simple exception search
+apilens exceptions IOException
 
-# Search with full type name for exact match
-apilens exceptions "System.ArgumentNullException"
+# Wildcard patterns
+apilens exceptions "*Validation*"
+apilens exceptions "Argument*"
 
-# Wildcard searches (Note: Leading wildcards not supported)
-apilens exceptions "System.Argument*"      # All System.Argument exceptions
-apilens exceptions "Invalid*Exception"     # All exceptions starting with Invalid
+# Get detailed information
+apilens exceptions ArgumentNullException --details
 
-# Get detailed exception information
-apilens exceptions "IOException" --details --format markdown
-
-# Search for custom exceptions
-apilens exceptions "ValidationException" --max 50
+# JSON output for processing
+apilens exceptions "*Exception" --format json --max 20
 ```
 
-**Exception Search Features:**
-- **Partial name matching**: Search without namespace (e.g., "ArgumentNullException" finds "System.ArgumentNullException")
-- **Automatic namespace resolution**: Common .NET namespaces are tried automatically (System, System.IO, System.Collections, etc.)
-- **Wildcard support**: Use `*` and `?` for pattern matching (leading wildcards supported, may impact performance)
-- **Smart fallback**: Multiple search strategies ensure you find what you're looking for
-- **Deduplication**: Results are automatically deduplicated across search strategies
+### 📊 complexity - Analyze Method Complexity
 
-#### Complexity Command
-Analyze method complexity and parameter counts:
+Find methods by parameter count and complexity:
 
 ```bash
-# Find methods with many parameters
+# Find simple methods
+apilens complexity --max-params 1
+
+# Find complex signatures
 apilens complexity --min-params 5
 
 # Analyze complexity with statistics
 apilens complexity --min-complexity 10 --stats
 
-# Find methods within parameter range
-apilens complexity --min-params 2 --max-params 4 --sort params
-
-# Get complexity analysis in JSON format
-apilens complexity --format json --stats
+# Find methods in parameter range
+apilens complexity --min-params 2 --max-params 4
 ```
 
-#### Stats Command
-Display index statistics and metadata:
+### 👥 members - List Type Members
+
+Show all members of a specific type:
 
 ```bash
-# Show index statistics
+# List members of a type
+apilens members String
+
+# Show with summaries
+apilens members List --show-summary
+
+# Deduplicate across versions
+apilens members Dictionary --distinct
+
+# JSON output
+apilens members IEnumerable --format json
+```
+
+### 📋 list-types - Browse Available Types
+
+Browse and list types from packages, namespaces, or assemblies:
+
+```bash
+# List types in a package
+apilens list-types --package "Newtonsoft.Json"
+
+# Filter by namespace
+apilens list-types --namespace "System.Collections.*"
+
+# Combine filters
+apilens list-types --package "Microsoft.*" --namespace "*.Logging"
+
+# Include all members, not just types
+apilens list-types --package "Serilog" --include-members
+```
+
+### 📦 nuget - Index NuGet Cache
+
+Automatically discover and index packages from NuGet cache:
+
+```bash
+# List available packages
+apilens nuget --list
+
+# Index specific packages
+apilens nuget --filter "Microsoft.*"
+
+# Index only latest versions
+apilens nuget --latest-only
+
+# Clean rebuild
+apilens nuget --clean --filter "System.*"
+```
+
+### 📈 stats - Index Statistics
+
+Display index statistics and documentation quality metrics:
+
+```bash
+# Basic statistics
 apilens stats
 
-# Get statistics in JSON format
-apilens stats --format json
+# Include documentation metrics
+apilens stats --doc-metrics
 
-# Get statistics in Markdown format
-apilens stats --format markdown
+# JSON output for monitoring
+apilens stats --format json
 ```
 
-### Advanced Query Syntax
+## Advanced Features
 
-ApiLens supports full Lucene query syntax for content searches:
+### Query Filters and Options
+
+Most query commands support advanced filtering:
 
 ```bash
-# Wildcard searches
-apilens query "string*" --type content    # Matches string, strings, stringify
-apilens query "utilit?" --type content    # Matches utility, utilities
+# Filter by member type
+apilens query "Parse" --member-type Method
 
-# Fuzzy searches
-apilens query "tokenze~" --type content   # Finds tokenize, tokenizes, etc.
+# Filter by namespace (wildcards supported)
+apilens query "*" --namespace-filter "System.Text.*"
 
-# Boolean operators (must be uppercase)
-apilens query "string AND manipulation" --type content
-apilens query "thread OR async" --type content
-apilens query "collection NOT list" --type content
+# Filter by assembly
+apilens query "*" --assembly-filter "mscorlib"
 
-# Phrase searches
-apilens query "\"extension methods\"" --type content
-apilens query "\"strongly typed\"" --type content
+# Combine multiple filters
+apilens query "Create" --member-type Method --namespace-filter "System.*" --min-params 0 --max-params 2
+
+# Sort and limit results
+apilens query "Exception" --max 50 --quality-first
 ```
 
 ### Output Formats
 
 All commands support multiple output formats:
 
-Table format (default - human readable):
 ```bash
+# Table format (default - human readable)
 apilens query String
-apilens examples "async"
-apilens exceptions "ArgumentNullException"
-```
 
-JSON format (machine processing, LLM integration):
-```bash
+# JSON format (for automation and LLM integration)
 apilens query String --format json
-apilens examples "async" --format json
-apilens complexity --format json --stats
+
+# Markdown format (for documentation)
+apilens query String --format markdown
 ```
 
-Markdown format (documentation generation):
+### Lucene Query Syntax
+
+Full Lucene syntax support for content searches:
+
 ```bash
-apilens query String --format markdown
-apilens exceptions "IOException" --format markdown --details
-apilens complexity --format markdown --stats
+# Wildcards
+apilens query "str?ng*" --type content    # ? = single char, * = multiple
+
+# Fuzzy search
+apilens query "thred~" --type content     # Finds thread, threads, etc.
+
+# Proximity search
+apilens query "\"async method\"~5" --type content  # Words within 5 positions
+
+# Field-specific searches (advanced)
+apilens query "summary:thread" --type content
+apilens query "remarks:performance" --type content
 ```
 
 ## MCP Integration
 
-ApiLens is designed to be exposed as an MCP tool for LLMs. The JSON output format provides structured data that's easy for LLMs to parse and understand.
+ApiLens is designed for Model Context Protocol integration, providing structured JSON output for LLM consumption.
 
-### MCP Tool Specification
-
-```json
-{
-  "name": "apilens",
-  "description": "Query .NET API documentation with specialized search capabilities",
-  "version": "1.0.0",
-  "commands": {
-    "search": {
-      "description": "Search for .NET types, methods, and documentation",
-      "parameters": {
-        "query": {
-          "type": "string",
-          "description": "Search query (supports Lucene syntax for content searches)",
-          "required": true
-        },
-        "type": {
-          "type": "string",
-          "enum": ["name", "content", "namespace", "id", "assembly"],
-          "description": "Type of search to perform",
-          "default": "name"
-        },
-        "max": {
-          "type": "integer",
-          "description": "Maximum results to return",
-          "default": 10
-        },
-        "format": {
-          "type": "string",
-          "enum": ["table", "json", "markdown"],
-          "description": "Output format",
-          "default": "json"
-        }
-      }
-    },
-    "examples": {
-      "description": "Find code examples or search within example code",
-      "parameters": {
-        "pattern": {
-          "type": "string",
-          "description": "Pattern to search for in code examples (optional)",
-          "required": false
-        },
-        "max": {
-          "type": "integer",
-          "description": "Maximum results to return",
-          "default": 10
-        },
-        "format": {
-          "type": "string",
-          "enum": ["table", "json", "markdown"],
-          "description": "Output format",
-          "default": "json"
-        }
-      }
-    },
-    "exceptions": {
-      "description": "Find methods that throw specific exceptions",
-      "parameters": {
-        "exception_type": {
-          "type": "string",
-          "description": "Exception type to search for (e.g., ArgumentNullException)",
-          "required": true
-        },
-        "details": {
-          "type": "boolean",
-          "description": "Show detailed exception information",
-          "default": false
-        },
-        "max": {
-          "type": "integer",
-          "description": "Maximum results to return",
-          "default": 10
-        },
-        "format": {
-          "type": "string",
-          "enum": ["table", "json", "markdown"],
-          "description": "Output format",
-          "default": "json"
-        }
-      }
-    },
-    "complexity": {
-      "description": "Analyze method complexity and parameter counts",
-      "parameters": {
-        "min_complexity": {
-          "type": "integer",
-          "description": "Minimum complexity threshold"
-        },
-        "min_params": {
-          "type": "integer",
-          "description": "Minimum parameter count"
-        },
-        "max_params": {
-          "type": "integer",
-          "description": "Maximum parameter count"
-        },
-        "stats": {
-          "type": "boolean",
-          "description": "Include statistical analysis",
-          "default": false
-        },
-        "sort": {
-          "type": "string",
-          "enum": ["complexity", "params"],
-          "description": "Sort results by complexity or parameter count",
-          "default": "complexity"
-        },
-        "max": {
-          "type": "integer",
-          "description": "Maximum results to return",
-          "default": 20
-        },
-        "format": {
-          "type": "string",
-          "enum": ["table", "json", "markdown"],
-          "description": "Output format",
-          "default": "json"
-        }
-      }
-    },
-    "stats": {
-      "description": "Display index statistics and metadata",
-      "parameters": {
-        "format": {
-          "type": "string",
-          "enum": ["table", "json", "markdown"],
-          "description": "Output format",
-          "default": "table"
-        }
-      }
-    },
-    "analyze": {
-      "description": "Analyze .NET projects or solutions to discover and index dependencies",
-      "parameters": {
-        "path": {
-          "type": "string",
-          "description": "Path to .csproj, .fsproj, .vbproj, or .sln file",
-          "required": true
-        },
-        "index_path": {
-          "type": "string",
-          "description": "Index directory path (default: ./.index)"
-        },
-        "include_transitive": {
-          "type": "boolean",
-          "description": "Include transitive dependencies",
-          "default": false
-        },
-        "use_assets": {
-          "type": "boolean",
-          "description": "Parse project.assets.json for resolved versions",
-          "default": false
-        },
-        "clean": {
-          "type": "boolean",
-          "description": "Clean the index before analyzing",
-          "default": false
-        },
-        "format": {
-          "type": "string",
-          "enum": ["table", "json", "markdown"],
-          "description": "Output format",
-          "default": "table"
-        }
-      }
-    }
-  }
-}
-```
-
-### Example MCP Usage
+### Example LLM Integration Scenarios
 
 ```bash
-# Project and solution analysis
-apilens analyze ./MyProject.csproj --format json
-apilens analyze ./MySolution.sln --include-transitive --format json
-apilens analyze ./MyLib.csproj --use-assets --clean --format json
+# Understanding API usage
+apilens examples "HttpClient" --format json
+apilens query "HttpClient" --type content --format json
 
-# Basic API search
-apilens query "string" --format json --max 20
-apilens query "T:System.String" --type id --format json
-apilens query "System.Collections.Generic" --type namespace --format json
+# Error handling guidance
+apilens exceptions "IOException" --details --format json
+apilens examples "try catch" --format json
 
-# Specialized searches for LLM integration
-apilens examples "async" --format json --max 10
-apilens exceptions "ArgumentNullException" --format json
-apilens complexity --min-params 3 --format json --stats
+# API complexity analysis
+apilens complexity --max-params 2 --format json    # Simple APIs
+apilens complexity --min-params 5 --format json    # Complex APIs
 
-# Advanced content searches with Lucene syntax
-apilens query "thread* AND safe" --type content --format json
-apilens query "collection OR list" --type content --format json --max 15
-
-# Index statistics and metadata
-apilens stats --format json
+# Package exploration workflow
+apilens analyze ./project.csproj --format json
+apilens explore "PackageName" --format json
+apilens hierarchy "MainType" --show-members --format json
 ```
-
-### Real-World LLM Integration Scenarios
-
-1. **Understanding API Usage Patterns**:
-   ```bash
-   # LLM discovers how to use a specific API
-   apilens examples "HttpClient" --format json
-   apilens query "HttpClient" --type content --format json
-   ```
-
-2. **Error Handling Guidance**:
-   ```bash
-   # LLM finds what exceptions to handle
-   apilens exceptions "IOException" --details --format json
-   apilens examples "try catch" --format json
-   ```
-
-3. **API Complexity Analysis**:
-   ```bash
-   # LLM identifies simple vs complex APIs
-   apilens complexity --max-params 2 --format json    # Simple APIs
-   apilens complexity --min-params 5 --format json    # Complex APIs
-   ```
 
 ## Architecture
 
@@ -528,23 +421,19 @@ The solution is organized under the `Solutions/` directory:
 - **ApiLens.Core**: Domain models, parsing, and Lucene.NET integration
 - **ApiLens.Cli**: Spectre.Console-based command-line interface
 - **Test Projects**: Comprehensive unit tests with TDD approach
-  - ApiLens.Core.Tests
-  - ApiLens.Cli.Tests
-  - ApiLens.Benchmarks
+  - ApiLens.Core.Tests (510+ tests)
+  - ApiLens.Cli.Tests (224+ tests)
 
 ### Key Components
 
 1. **XmlDocumentParser**: Parses .NET XML documentation files
-2. **LuceneIndexManager**: Manages the Lucene.NET search index
-3. **QueryEngine**: High-level search API
-4. **TypeHierarchyResolver**: Discovers type relationships
-5. **RelatedTypeResolver**: Finds all types related to a member
+2. **LuceneIndexManager**: Manages the Lucene.NET search index with performance optimizations
+3. **QueryEngine**: High-level search API with specialized query methods
+4. **IndexPathResolver**: Smart index location management
+5. **TypeHierarchyResolver**: Discovers type relationships
 6. **NuGetCacheScanner**: Discovers and indexes packages from NuGet cache
 7. **ProjectAnalysisService**: Analyzes .NET projects and solutions
-8. **SolutionParserService**: Parses .sln files to extract project references
-9. **ProjectParserService**: Parses project files for package references
-10. **AssetFileParserService**: Parses project.assets.json for resolved dependencies
-11. **Specialized Commands**: Examples, Exceptions, Complexity, and Analyze commands
+8. **Specialized Commands**: Examples, Exceptions, Complexity, Explore, etc.
 
 ## Development
 
@@ -562,6 +451,9 @@ dotnet build ./Solutions/ApiLens.sln
 
 # Build just the CLI application
 dotnet build ./Solutions/ApiLens.Cli/ApiLens.Cli.csproj
+
+# Build in Release mode
+dotnet build ./Solutions/ApiLens.sln --configuration Release
 ```
 
 ### Running Tests
@@ -570,87 +462,51 @@ dotnet build ./Solutions/ApiLens.Cli/ApiLens.Cli.csproj
 # Run all tests
 dotnet test ./Solutions/ApiLens.sln
 
-# Run tests excluding integration tests
-dotnet test ./Solutions/ApiLens.sln --filter "TestCategory!=Integration"
+# Run with coverage
+dotnet test ./Solutions/ApiLens.sln --collect:"XPlat Code Coverage"
 
 # Run specific test project
 dotnet test ./Solutions/ApiLens.Core.Tests/ApiLens.Core.Tests.csproj
 ```
 
-### Code Coverage
-
-The project uses dotnet-coverage for code coverage measurement. Current coverage thresholds:
-- Line coverage: 75%
-- Branch coverage: 60%
-
-The project maintains comprehensive test coverage with over 490 tests across all projects.
-
-#### Running Coverage Locally
-
-```bash
-# Windows PowerShell
-./run-coverage.ps1
-
-# Linux/macOS
-./run-coverage.sh
-```
-
-This will:
-1. Run all unit tests with coverage collection
-2. Generate an HTML coverage report in `coverage-report/`
-3. Display coverage summary in the console
-4. Check if coverage meets the required thresholds
-
-#### Coverage Tools
-
-The project includes the following coverage tools:
-- **dotnet-coverage**: Collects code coverage data
-- **ReportGenerator**: Generates coverage reports in various formats
-- **Coverlet**: Cross-platform coverage collection
-
-#### Viewing Coverage Reports
-
-After running coverage, open `coverage-report/index.html` in your browser to see detailed coverage information including:
-- Line-by-line coverage highlighting
-- Branch coverage details
-- Per-assembly and per-class metrics
-- Historical coverage trends (when using CI)
-
 ### Code Style
 
 The project follows strict TDD principles with:
 - Test-first development (every feature starts with a failing test)
-- Immutable data structures (using records and ImmutableArray)
+- Immutable data structures (records and ImmutableArray)
 - Functional programming patterns
 - Comprehensive XML documentation
-- Modern C# features (collection expressions, pattern matching)
+- Modern C# 13 features (collection expressions, pattern matching)
 - No underscore prefixes for private fields (using `this.` qualification)
-
-See `.editorconfig` for detailed code style settings.
+- Spectre.IO for all filesystem operations (no System.IO)
 
 ## Project Structure
 
 ```
-apilens/
+ApiLens/
 ├── Solutions/                    # Main solution files
 │   ├── ApiLens.sln              # Solution file
 │   ├── ApiLens.Core/            # Core library
-│   ├── ApiLens.Core.Tests/      # Core tests
+│   ├── ApiLens.Core.Tests/      # Core tests (510+ tests)
 │   ├── ApiLens.Cli/             # CLI application
-│   ├── ApiLens.Cli.Tests/       # CLI tests
-│   └── ApiLens.Benchmarks/      # Performance benchmarks
+│   └── ApiLens.Cli.Tests/       # CLI tests (224+ tests)
 ├── Demos/                        # Demo scripts
 │   ├── core/                    # Basic demos
 │   ├── nuget/                   # NuGet demos
 │   ├── advanced/                # Advanced demos
 │   └── test-all.ps1             # Test runner
-├── index/                        # Default index location (gitignored)
-├── .tmp/                         # Temporary files and demo data (gitignored)
-│   ├── indexes/                  # Demo script indexes
-│   └── docs/                     # Demo sample documentation
-├── coverage-report/              # Coverage reports (gitignored)
+├── .devcontainer/               # Dev container configuration
 └── README.md                     # This file
 ```
+
+## Recent Improvements
+
+- **Smart Index Management**: Index location now uses environment variables and home directory defaults
+- **Enhanced Package Exploration**: New `explore` command for interactive package discovery
+- **Improved Demo Scripts**: All demos updated with consistent path resolution
+- **Better Error Messages**: Helpful suggestions when queries return no results
+- **Performance Optimizations**: Cached readers, object pooling, parallel processing
+- **Cross-Platform Support**: Full Spectre.IO integration for filesystem operations
 
 ## License
 
