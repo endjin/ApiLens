@@ -1,123 +1,67 @@
-# ApiLens CLI
+# ApiLens
 
 A .NET global tool for indexing and querying .NET XML API documentation using Lucene.NET.
 
 ## Installation
 
 ```bash
-dotnet tool install --global apilens
+dotnet tool install --global ApiLens
 ```
 
 ## Quick Start
 
 ```bash
-# Index documentation
-apilens index ./docs
+# Analyze your solution (indexes all dependencies)
+apilens analyze ./MySolution.sln
 
-# Search for a type
-apilens query String
+# Explore a package interactively
+apilens explore Newtonsoft.Json
 
-# Find methods throwing exceptions
-apilens exceptions ArgumentNullException
+# Search for APIs
+apilens query JsonSerializer
 
 # Find code examples
-apilens examples async
+apilens examples "async await"
+
+# Discover type hierarchies
+apilens hierarchy Exception --show-members
 ```
 
-## Features
+## Key Features
 
-- **Index XML Documentation**: Parse and index .NET XML documentation files
-- **NuGet Package Support**: Automatically discover and index documentation from NuGet cache
-- **Full-Text Search**: Query API documentation using Lucene.NET
-- **Specialized Queries**: Find code examples, exceptions, and analyze method complexity
-- **Multiple Output Formats**: Table (human), JSON (machine), Markdown (docs)
-- **MCP Ready**: Designed for integration with Model Context Protocol
+- **Solution Analysis**: Analyzes .NET projects/solutions and indexes all dependencies
+- **NuGet Support**: Auto-discovers and indexes packages from NuGet cache
+- **Smart Indexing**: Consistent index location with environment variable support
+- **Rich Queries**: Full-text search, wildcards, type hierarchies, complexity analysis
+- **Multiple Formats**: Table (human), JSON (machine), Markdown (docs)
+- **MCP Ready**: Designed for LLM integration via Model Context Protocol
 
-## Commands
+## Core Commands
 
-### Index Command
-Index XML documentation files or directories:
-```bash
-apilens index <path> [options]
-```
+- `analyze` - Analyze and index project/solution dependencies
+- `explore` - Interactive package exploration
+- `index` - Index XML documentation files
+- `query` - Search API documentation
+- `hierarchy` - Explore type relationships
+- `examples` - Find code examples
+- `exceptions` - Find exception information
+- `complexity` - Analyze method complexity
+- `members` - List type members
+- `list-types` - Browse available types
+- `nuget` - Index NuGet cache
+- `stats` - Display index statistics
 
-### NuGet Command
-Index documentation from NuGet packages:
-```bash
-apilens nuget [options]
-  --list              List packages with documentation
-  --filter <pattern>  Filter packages by pattern
-  --latest-only       Index only latest versions
-```
+## Index Management
 
-### Query Command
-Search the indexed documentation:
-```bash
-apilens query <search-term> [options]
-  --type <type>       Search type: name, content, namespace, id, assembly
-  --max <count>       Maximum results (default: 10)
-  --format <format>   Output format: table, json, markdown
-```
-
-### Exceptions Command
-Find methods that throw specific exceptions:
-```bash
-apilens exceptions <exception-type> [options]
-  --details           Show detailed information
-  --max <count>       Maximum results (default: 10)
-  --format <format>   Output format: table, json, markdown
-```
-
-### Examples Command
-Find methods with code examples:
-```bash
-apilens examples [pattern] [options]
-  --max <count>       Maximum results (default: 10)
-  --format <format>   Output format: table, json, markdown
-```
-
-### Complexity Command
-Analyze method complexity:
-```bash
-apilens complexity [options]
-  --min-params <n>    Minimum parameter count
-  --max-params <n>    Maximum parameter count
-  --min-complexity <n> Minimum complexity
-  --stats             Show statistics
-  --sort <by>         Sort by: complexity, params
-  --format <format>   Output format: table, json, markdown
-```
-
-### Stats Command
-Display index statistics:
-```bash
-apilens stats [options]
-  --format <format>   Output format: table, json, markdown
-```
-
-## Advanced Search
-
-ApiLens supports Lucene query syntax for content searches:
-
-- **Wildcards**: `string*`, `utilit?`
-- **Fuzzy**: `tokenze~`
-- **Boolean**: `string AND manipulation`, `thread OR async`
-- **Phrases**: `"extension methods"`
-
-## MCP Integration
-
-ApiLens is designed for Model Context Protocol integration. Use JSON output format for structured data:
-
-```bash
-apilens query String --format json
-apilens examples async --format json --max 10
-apilens exceptions IOException --format json
-```
+ApiLens stores its index in a consistent location:
+- Custom: `--index /path/to/index`
+- Environment: `APILENS_INDEX=/path/to/index`
+- Default: `~/.apilens/index`
 
 ## Documentation
 
-For more information, visit: https://github.com/endjin/ApiLens
+Full documentation and source code: https://github.com/endjin/ApiLens
 
 ## License
 
-Licensed under the Apache License, Version 2.0
+Apache 2.0

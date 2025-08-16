@@ -19,7 +19,43 @@ ApiLens is a .NET 9 CLI application that indexes and queries .NET XML API docume
 - **Cross-Platform**: Works on Windows, Linux, and macOS via Spectre.IO
 - **MCP Ready**: Designed for integration with Model Context Protocol
 
+## Prerequisites
+
+- **.NET 9 SDK** or later - [Download from Microsoft](https://dotnet.microsoft.com/download/dotnet/9.0)
+- **PowerShell Core** (optional, for running demo scripts) - [Install PowerShell](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell)
+
 ## Installation
+
+### Install as .NET Global Tool (Recommended)
+
+ApiLens is available as a .NET global tool, making it easy to install and use from anywhere:
+
+```bash
+# Install the global tool
+dotnet tool install --global ApiLens
+
+# Verify installation
+apilens --version
+
+# Get help
+apilens --help
+```
+
+To update to the latest version:
+
+```bash
+dotnet tool update --global ApiLens
+```
+
+To uninstall:
+
+```bash
+dotnet tool uninstall --global ApiLens
+```
+
+### Run Locally (Development)
+
+For development or to run the latest source code:
 
 ```bash
 # Clone the repository
