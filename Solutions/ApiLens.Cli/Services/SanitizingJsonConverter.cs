@@ -69,10 +69,10 @@ public class SanitizingJsonConverterFactory : JsonConverterFactory
                     continue;
 
                 var propertyValue = property.GetValue(value);
-                
+
                 // Convert property name to camelCase if needed
                 string propertyName = options.PropertyNamingPolicy?.ConvertName(property.Name) ?? property.Name;
-                
+
                 if (propertyValue == null)
                 {
                     writer.WriteNull(propertyName);
@@ -99,14 +99,14 @@ public class SanitizingJsonConverterFactory : JsonConverterFactory
                 {
                     // For other properties, use default serialization with sanitization
                     writer.WritePropertyName(propertyName);
-                    
+
                     // Create new options with our converter to handle nested objects
                     var newOptions = new JsonSerializerOptions(options);
                     if (!newOptions.Converters.Any(c => c is SanitizingJsonConverterFactory))
                     {
                         newOptions.Converters.Add(new SanitizingJsonConverterFactory());
                     }
-                    
+
                     JsonSerializer.Serialize(writer, propertyValue, property.PropertyType, newOptions);
                 }
             }
@@ -117,27 +117,27 @@ public class SanitizingJsonConverterFactory : JsonConverterFactory
         private bool IsCollection(Type type)
         {
             if (type.IsArray) return true;
-            
+
             // Check for IEnumerable but not string
-            if (type != typeof(string) && type.GetInterfaces().Any(i => 
+            if (type != typeof(string) && type.GetInterfaces().Any(i =>
                 i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>)))
             {
                 return true;
             }
-            
+
             // Check for ImmutableArray
             if (type.IsGenericType && type.Name.StartsWith("ImmutableArray"))
             {
                 return true;
             }
-            
+
             return false;
         }
 
         private void WriteCollection(Utf8JsonWriter writer, object collection, JsonSerializerOptions options)
         {
             writer.WriteStartArray();
-            
+
             if (collection is System.Collections.IEnumerable enumerable)
             {
                 foreach (var item in enumerable)
@@ -164,7 +164,7 @@ public class SanitizingJsonConverterFactory : JsonConverterFactory
                     }
                 }
             }
-            
+
             writer.WriteEndArray();
         }
     }

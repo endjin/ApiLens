@@ -10,7 +10,7 @@ public class DocumentBuilder : IDocumentBuilder
     {
         if (string.IsNullOrEmpty(input))
             return input ?? string.Empty;
-        
+
         // Replace control characters that can break JSON and other formats
         return input.Replace("\n", " ")
                    .Replace("\r", " ")
@@ -200,7 +200,7 @@ public class DocumentBuilder : IDocumentBuilder
         {
             doc.Add(new TextField("returns", SanitizeForStorage(memberInfo.Returns), Field.Store.YES));
         }
-        
+
         // Add return type for methods
         if (!string.IsNullOrWhiteSpace(memberInfo.ReturnType))
         {
@@ -212,7 +212,7 @@ public class DocumentBuilder : IDocumentBuilder
         {
             doc.Add(new TextField("seeAlso", SanitizeForStorage(memberInfo.SeeAlso), Field.Store.YES));
         }
-        
+
         // Add method modifiers
         if (memberInfo.MemberType == MemberType.Method)
         {
@@ -427,11 +427,11 @@ public class DocumentBuilder : IDocumentBuilder
     {
         // Handle method signatures with parameters
         // E.g., "Namespace.Type.Method(Param1,Param2)" -> "Namespace.Type"
-        
+
         // First, remove parameter list if present
         int parenIndex = fullName.IndexOf('(');
         string nameWithoutParams = parenIndex > 0 ? fullName[..parenIndex] : fullName;
-        
+
         // For generic methods, remove generic parameters
         // E.g., "Namespace.Type.Method`2" -> "Namespace.Type.Method"
         int backtickIndex = nameWithoutParams.LastIndexOf('`');
@@ -439,7 +439,7 @@ public class DocumentBuilder : IDocumentBuilder
         {
             nameWithoutParams = nameWithoutParams[..backtickIndex];
         }
-        
+
         // Now extract the declaring type (everything before last dot)
         int lastDot = nameWithoutParams.LastIndexOf('.');
         return lastDot > 0 ? nameWithoutParams[..lastDot] : string.Empty;

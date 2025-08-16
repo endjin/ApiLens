@@ -1,9 +1,9 @@
 using ApiLens.Cli.Commands;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Querying;
 using Spectre.Console;
 using Spectre.Console.Testing;
-
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]
@@ -13,13 +13,16 @@ public sealed class QueryCommandTests : IDisposable
     private ILuceneIndexManagerFactory indexManagerFactory = null!;
     private IQueryEngineFactory queryEngineFactory = null!;
     private TestConsole console = null!;
+    private IIndexPathResolver indexPathResolver = null!;
 
     [TestInitialize]
     public void Setup()
     {
         indexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
-        command = new QueryCommand(indexManagerFactory, queryEngineFactory);
+        indexPathResolver = Substitute.For<IIndexPathResolver>();
+        indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
+        command = new QueryCommand(indexManagerFactory, queryEngineFactory, indexPathResolver);
         console = new TestConsole();
         AnsiConsole.Console = console;
     }
@@ -135,7 +138,7 @@ public sealed class QueryCommandTests : IDisposable
             Namespace = "TestNamespace",
             TargetFramework = "net8.0"
         };
-        
+
         var member2 = new ApiLens.Core.Models.MemberInfo
         {
             Id = "T:TestType",

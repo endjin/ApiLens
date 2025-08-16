@@ -19,16 +19,20 @@ public class MembersCommand : Command<MembersCommand.Settings>
     };
 
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
+    private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
 
     public MembersCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
+        IIndexPathResolver indexPathResolver,
         IQueryEngineFactory queryEngineFactory)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
+        ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
 
         this.indexManagerFactory = indexManagerFactory;
+        this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
     }
 
@@ -36,7 +40,11 @@ public class MembersCommand : Command<MembersCommand.Settings>
     {
         try
         {
-            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
+            // Resolve the actual index path
+            string resolvedIndexPath = indexPathResolver.ResolveIndexPath(settings.IndexPath);
+
+            // Create index manager
+            using ILuceneIndexManager indexManager = indexManagerFactory.Create(resolvedIndexPath);
             using IQueryEngine queryEngine = queryEngineFactory.Create(indexManager);
 
             MetadataService metadataService = new();
@@ -44,8 +52,8 @@ public class MembersCommand : Command<MembersCommand.Settings>
 
             // First, find the type to get its full name
             var typeResults = queryEngine.SearchByName(settings.TypeName, 10);
-            var targetType = typeResults.FirstOrDefault(m => 
-                m.MemberType == MemberType.Type && 
+            var targetType = typeResults.FirstOrDefault(m =>
+                m.MemberType == MemberType.Type &&
                 (m.Name.Equals(settings.TypeName, StringComparison.OrdinalIgnoreCase) ||
                  m.FullName.Equals(settings.TypeName, StringComparison.OrdinalIgnoreCase)));
 
@@ -54,7 +62,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
                 // Try searching with wildcards if exact match fails
                 typeResults = queryEngine.SearchWithFilters($"*{settings.TypeName}*", MemberType.Type, null, null, 10);
                 targetType = typeResults.FirstOrDefault();
-                
+
                 if (targetType == null)
                 {
                     if (settings.Format == OutputFormat.Json)
@@ -74,13 +82,13 @@ public class MembersCommand : Command<MembersCommand.Settings>
             // Now find all members of this type
             // Use declaringType field for accurate member retrieval
             var allMembers = queryEngine.SearchByDeclaringType(targetType.FullName, settings.MaxResults);
-            
+
             // If no results, try with GetTypeMembers as fallback for backward compatibility
             if (allMembers.Count == 0)
             {
                 allMembers = queryEngine.GetTypeMembers(targetType.FullName, settings.MaxResults);
             }
-            
+
             // Apply deduplication if requested
             if (settings.Distinct)
             {
@@ -134,7 +142,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
         };
     }
 
-    private static void OutputJson(List<MemberInfo> members, MemberInfo? targetType, 
+    private static void OutputJson(List<MemberInfo> members, MemberInfo? targetType,
         ILuceneIndexManager indexManager, MetadataService metadataService, Settings settings)
     {
         var response = new
@@ -155,19 +163,19 @@ public class MembersCommand : Command<MembersCommand.Settings>
                         m.TargetFramework
                     }).ToList()
                 ),
-            Metadata = metadataService.BuildMetadata(members, indexManager, 
+            Metadata = metadataService.BuildMetadata(members, indexManager,
                 settings.TypeName, "members")
         };
 
         string json = JsonSerializer.Serialize(response, JsonOptions);
-        
+
         var originalWidth = AnsiConsole.Profile.Width;
         AnsiConsole.Profile.Width = int.MaxValue;
         AnsiConsole.WriteLine(json);
         AnsiConsole.Profile.Width = originalWidth;
     }
 
-    private static void OutputTable(MemberInfo targetType, 
+    private static void OutputTable(MemberInfo targetType,
         IEnumerable<IGrouping<MemberType, MemberInfo>> groupedMembers, Settings settings)
     {
         AnsiConsole.Write(new Rule($"[bold yellow]{Markup.Escape(targetType.FullName)}[/]")
@@ -195,10 +203,10 @@ public class MembersCommand : Command<MembersCommand.Settings>
             };
 
             AnsiConsole.MarkupLine($"[bold cyan]{memberTypePlural}[/] ({group.Count()})");
-            
+
             var table = new Table();
             table.AddColumn("Name");
-            
+
             if (group.Key == MemberType.Method)
             {
                 table.AddColumn("Parameters");
@@ -208,7 +216,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
             {
                 table.AddColumn("Type");
             }
-            
+
             if (settings.ShowSummary)
             {
                 table.AddColumn("Summary");
@@ -217,7 +225,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
             foreach (var member in group.Take(settings.MaxPerType))
             {
                 var row = new List<string> { Markup.Escape(FormatMemberName(member)) };
-                
+
                 if (group.Key == MemberType.Method)
                 {
                     row.Add(Markup.Escape(FormatParameters(member)));
@@ -229,25 +237,25 @@ public class MembersCommand : Command<MembersCommand.Settings>
                     var type = ExtractTypeFromMember(member);
                     row.Add(Markup.Escape(type));
                 }
-                
+
                 if (settings.ShowSummary && !string.IsNullOrWhiteSpace(member.Summary))
                 {
-                    var summary = member.Summary.Length > 100 
-                        ? member.Summary[..97] + "..." 
+                    var summary = member.Summary.Length > 100
+                        ? member.Summary[..97] + "..."
                         : member.Summary;
                     row.Add(Markup.Escape(summary));
                 }
-                
+
                 table.AddRow(row.ToArray());
             }
 
             AnsiConsole.Write(table);
-            
+
             if (group.Count() > settings.MaxPerType)
             {
                 AnsiConsole.MarkupLine($"[dim]  ... and {group.Count() - settings.MaxPerType} more[/]");
             }
-            
+
             AnsiConsole.WriteLine();
         }
 
@@ -260,7 +268,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
     {
         AnsiConsole.WriteLine($"# {targetType.FullName}");
         AnsiConsole.WriteLine();
-        
+
         if (!string.IsNullOrWhiteSpace(targetType.Summary))
         {
             AnsiConsole.WriteLine(targetType.Summary);
@@ -284,20 +292,20 @@ public class MembersCommand : Command<MembersCommand.Settings>
             foreach (var member in group.Take(settings.MaxPerType))
             {
                 AnsiConsole.WriteLine($"### {FormatMemberName(member)}");
-                
+
                 if (group.Key == MemberType.Method)
                 {
                     AnsiConsole.WriteLine($"- **Parameters**: {FormatParameters(member)}");
                     AnsiConsole.WriteLine($"- **Returns**: {member.ReturnType ?? ExtractTypeFromMember(member)}");
                 }
-                
+
                 if (!string.IsNullOrWhiteSpace(member.Summary))
                 {
                     AnsiConsole.WriteLine();
                     AnsiConsole.WriteLine("**Summary:**");
                     AnsiConsole.WriteLine(member.Summary);
                 }
-                
+
                 AnsiConsole.WriteLine();
             }
         }
@@ -307,7 +315,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
     {
         // Use the Name property directly as it's now properly extracted
         var name = member.Name;
-        
+
         // Add modifiers for methods
         if (member.MemberType == MemberType.Method)
         {
@@ -315,11 +323,11 @@ public class MembersCommand : Command<MembersCommand.Settings>
             if (member.IsStatic) modifiers.Add("[static]");
             if (member.IsAsync) modifiers.Add("[async]");
             if (member.IsExtension) modifiers.Add("[ext]");
-            
+
             if (modifiers.Any())
                 return $"{string.Join(" ", modifiers)} {name}";
         }
-        
+
         return name;
     }
 
@@ -327,8 +335,8 @@ public class MembersCommand : Command<MembersCommand.Settings>
     {
         if (member.Parameters.Length == 0)
             return "()";
-        
-        var paramStrings = member.Parameters.Select(p => 
+
+        var paramStrings = member.Parameters.Select(p =>
         {
             var type = !string.IsNullOrWhiteSpace(p.Type) ? p.Type : "object";
             return $"{GenericTypeFormatter.FormatTypeName(type)} {p.Name}";
@@ -341,7 +349,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
         // Use the ReturnType property if available
         if (!string.IsNullOrWhiteSpace(member.ReturnType))
             return member.ReturnType;
-            
+
         // For properties and fields, try to extract from Returns description
         if (!string.IsNullOrWhiteSpace(member.Returns))
         {
@@ -350,7 +358,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
             if (words.Length > 0 && char.IsUpper(words[0][0]))
                 return words[0].TrimEnd('.', ',');
         }
-        
+
         // Fallback
         return member.MemberType == MemberType.Method ? "void" : "object";
     }

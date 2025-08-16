@@ -1,9 +1,9 @@
 using ApiLens.Cli.Commands;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
 using Spectre.Console.Cli;
-
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]
@@ -15,6 +15,7 @@ public sealed class StatsCommandTests
     private ILuceneIndexManager indexManager = null!;
     private IQueryEngine queryEngine = null!;
     private CommandContext context = null!;
+    private IIndexPathResolver indexPathResolver = null!;
 
     [TestInitialize]
     public void TestInitialize()
@@ -23,7 +24,9 @@ public sealed class StatsCommandTests
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
         indexManager = Substitute.For<ILuceneIndexManager>();
         queryEngine = Substitute.For<IQueryEngine>();
-        command = new StatsCommand(indexManagerFactory, queryEngineFactory);
+        indexPathResolver = Substitute.For<IIndexPathResolver>();
+        indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
+        command = new StatsCommand(indexManagerFactory, indexPathResolver, queryEngineFactory);
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
 
@@ -132,7 +135,7 @@ public sealed class StatsCommandTests
     public void Constructor_WithNullFactory_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new StatsCommand(null!, queryEngineFactory))
+        Should.Throw<ArgumentNullException>(() => new StatsCommand(null!, indexPathResolver, queryEngineFactory))
             .ParamName.ShouldBe("indexManagerFactory");
     }
 

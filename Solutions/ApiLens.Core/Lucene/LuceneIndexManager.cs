@@ -285,13 +285,13 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                 {
                     membersInFile.Add(member);
                 }
-                
+
                 // Link property types to their getter methods
                 if (membersInFile.Count > 0)
                 {
                     XmlDocumentParser.LinkPropertyTypes(membersInFile);
                 }
-                
+
                 // Now index all the members with proper type information
                 foreach (var member in membersInFile)
                 {

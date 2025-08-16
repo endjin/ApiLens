@@ -10,15 +10,19 @@ namespace ApiLens.Cli.Commands;
 public class StatsCommand : Command<StatsCommand.Settings>
 {
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
+    private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
 
     public StatsCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
+        IIndexPathResolver indexPathResolver,
         IQueryEngineFactory queryEngineFactory)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
+        ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
         this.indexManagerFactory = indexManagerFactory;
+        this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
     }
 
@@ -27,14 +31,18 @@ public class StatsCommand : Command<StatsCommand.Settings>
         try
         {
             // Create index manager with the specified path
-            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
+            // Resolve the actual index path
+            string resolvedIndexPath = indexPathResolver.ResolveIndexPath(settings.IndexPath);
+
+            // Create index manager
+            using ILuceneIndexManager indexManager = indexManagerFactory.Create(resolvedIndexPath);
 
             MetadataService metadataService = new();
             metadataService.StartTiming();
 
             // Get index statistics
             IndexStatistics? stats = indexManager.GetIndexStatistics();
-            
+
             // Calculate documentation quality metrics if requested
             DocumentationMetrics? docMetrics = null;
             if (settings.IncludeDocumentationMetrics && stats != null)
@@ -53,7 +61,7 @@ public class StatsCommand : Command<StatsCommand.Settings>
                         Metadata = metadataService.BuildMetadata(indexManager)
                     };
                     string errorJson = JsonSerializer.Serialize(errorResponse, GetJsonOptions());
-                    
+
                     // Temporarily set unlimited width to prevent JSON wrapping
                     var originalWidth = AnsiConsole.Profile.Width;
                     AnsiConsole.Profile.Width = int.MaxValue;
@@ -115,22 +123,22 @@ public class StatsCommand : Command<StatsCommand.Settings>
         {
             AnsiConsole.WriteLine();
             AnsiConsole.Write(new Rule("[bold yellow]Documentation Quality Metrics[/]"));
-            
+
             Table docTable = new();
             docTable.AddColumn("Metric");
             docTable.AddColumn("Value");
-            
+
             docTable.AddRow("Total Members", docMetrics.TotalMembers.ToString("N0"));
             docTable.AddRow("Documented Members", $"{docMetrics.DocumentedMembers:N0} ({docMetrics.DocumentationCoverage:P1})");
             docTable.AddRow("Well-Documented", $"{docMetrics.WellDocumentedMembers:N0} ({docMetrics.WellDocumentedPercentage:P1})");
             docTable.AddRow("With Examples", $"{docMetrics.MembersWithExamples:N0} ({docMetrics.ExampleCoverage:P1})");
             docTable.AddRow("Average Score", $"{docMetrics.AverageDocScore:F1}/100");
-            
+
             if (docMetrics.PoorlyDocumentedTypes.Any())
             {
                 docTable.AddRow("[dim]Needs Attention[/]", string.Join(", ", docMetrics.PoorlyDocumentedTypes.Take(3)));
             }
-            
+
             AnsiConsole.Write(docTable);
         }
     }
@@ -138,7 +146,7 @@ public class StatsCommand : Command<StatsCommand.Settings>
     private static void OutputJson(IndexStatistics stats, DocumentationMetrics? docMetrics, ILuceneIndexManager indexManager,
         MetadataService metadataService)
     {
-        object statsData = docMetrics != null ? 
+        object statsData = docMetrics != null ?
             new
             {
                 stats.IndexPath,
@@ -182,7 +190,7 @@ public class StatsCommand : Command<StatsCommand.Settings>
         };
 
         string json = JsonSerializer.Serialize(response, GetJsonOptions());
-        
+
         // Temporarily set unlimited width to prevent JSON wrapping
         var originalWidth = AnsiConsole.Profile.Width;
         AnsiConsole.Profile.Width = int.MaxValue;
@@ -237,7 +245,7 @@ public class StatsCommand : Command<StatsCommand.Settings>
         // Sample a reasonable number of documents for analysis
         int sampleSize = Math.Min(stats.DocumentCount, 1000);
         var allMembers = queryEngine.SearchByContent("*", sampleSize);
-        
+
         // Find poorly documented public types
         var publicTypes = allMembers
             .Where(m => m.MemberType == MemberType.Type && m.DocumentationScore < 40)
@@ -245,7 +253,7 @@ public class StatsCommand : Command<StatsCommand.Settings>
             .Take(10)
             .Select(m => m.Name)
             .ToList();
-        
+
         var metrics = new DocumentationMetrics
         {
             TotalMembers = stats.DocumentCount,
@@ -255,7 +263,7 @@ public class StatsCommand : Command<StatsCommand.Settings>
             AverageDocScore = allMembers.Any() ? allMembers.Average(m => m.DocumentationScore) : 0,
             PoorlyDocumentedTypes = publicTypes
         };
-        
+
         return metrics;
     }
 
@@ -267,7 +275,7 @@ public class StatsCommand : Command<StatsCommand.Settings>
         public int MembersWithExamples { get; init; }
         public double AverageDocScore { get; init; }
         public List<string> PoorlyDocumentedTypes { get; init; } = [];
-        
+
         public double DocumentationCoverage => TotalMembers > 0 ? (double)DocumentedMembers / TotalMembers : 0;
         public double WellDocumentedPercentage => TotalMembers > 0 ? (double)WellDocumentedMembers / TotalMembers : 0;
         public double ExampleCoverage => TotalMembers > 0 ? (double)MembersWithExamples / TotalMembers : 0;

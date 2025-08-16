@@ -18,6 +18,7 @@ public class IndexCommandTests
     private IDocumentBuilder mockDocumentBuilder = null!;
     private IFileSystemService mockFileSystem = null!;
     private IFileHashHelper mockFileHashHelper = null!;
+    private IIndexPathResolver mockIndexPathResolver = null!;
     private ILuceneIndexManagerFactory mockIndexManagerFactory = null!;
     private ILuceneIndexManager mockIndexManager = null!;
     private FakeFileSystem? fakeFileSystem;
@@ -34,8 +35,11 @@ public class IndexCommandTests
         mockDocumentBuilder = Substitute.For<IDocumentBuilder>();
         mockFileSystem = Substitute.For<IFileSystemService>();
         mockFileHashHelper = Substitute.For<IFileHashHelper>();
+        mockIndexPathResolver = Substitute.For<IIndexPathResolver>();
         mockIndexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         mockIndexManager = Substitute.For<ILuceneIndexManager>();
+
+        mockIndexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
 
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
 
@@ -99,7 +103,7 @@ public class IndexCommandTests
         mockFileHashHelper.ComputeFileHashAsync(Arg.Any<string>())
             .Returns(Task.FromResult("testhash123"));
 
-        command = new IndexCommand(mockIndexManagerFactory, mockFileSystem, mockFileHashHelper);
+        command = new IndexCommand(mockIndexManagerFactory, mockFileSystem, mockFileHashHelper, mockIndexPathResolver);
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
     }
@@ -112,7 +116,7 @@ public class IndexCommandTests
         fakeFileHashHelper = new FileHashHelper(fakeFileSystemService);
 
         // Recreate command with fake file system
-        command = new IndexCommand(mockIndexManagerFactory, fakeFileSystemService, fakeFileHashHelper);
+        command = new IndexCommand(mockIndexManagerFactory, fakeFileSystemService, fakeFileHashHelper, mockIndexPathResolver);
     }
 
     [TestMethod]
@@ -187,7 +191,7 @@ public class IndexCommandTests
     public void Constructor_WithNullParser_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new IndexCommand(null!, mockFileSystem, mockFileHashHelper))
+        Should.Throw<ArgumentNullException>(() => new IndexCommand(null!, mockFileSystem, mockFileHashHelper, mockIndexPathResolver))
             .ParamName.ShouldBe("indexManagerFactory");
     }
 
@@ -195,7 +199,7 @@ public class IndexCommandTests
     public void Constructor_WithNullDocumentBuilder_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new IndexCommand(mockIndexManagerFactory, null!, mockFileHashHelper))
+        Should.Throw<ArgumentNullException>(() => new IndexCommand(mockIndexManagerFactory, null!, mockFileHashHelper, mockIndexPathResolver))
             .ParamName.ShouldBe("fileSystem");
     }
 
@@ -205,7 +209,7 @@ public class IndexCommandTests
         // Act & Assert
         // This test is no longer needed as we only have 2 parameters now
         // Act & Assert
-        Should.NotThrow(() => new IndexCommand(mockIndexManagerFactory, mockFileSystem, mockFileHashHelper));
+        Should.NotThrow(() => new IndexCommand(mockIndexManagerFactory, mockFileSystem, mockFileHashHelper, mockIndexPathResolver));
     }
 
     [TestMethod]
@@ -214,7 +218,7 @@ public class IndexCommandTests
         // Act & Assert
         // This test is no longer needed as we only have 2 parameters now
         // Act & Assert  
-        Should.NotThrow(() => new IndexCommand(mockIndexManagerFactory, mockFileSystem, mockFileHashHelper));
+        Should.NotThrow(() => new IndexCommand(mockIndexManagerFactory, mockFileSystem, mockFileHashHelper, mockIndexPathResolver));
     }
 
     [TestMethod]

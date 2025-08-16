@@ -2,7 +2,6 @@ using ApiLens.Cli.Commands;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Parsing;
 using ApiLens.Core.Services;
-
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]

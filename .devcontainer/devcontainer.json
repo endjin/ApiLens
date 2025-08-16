@@ -11,7 +11,7 @@
 			"nonFreePackages": "true"
 	}
 	},
-"postCreateCommand": "sudo chsh vscode -s \"$(which pwsh)\" && npm install -g @anthropic-ai/claude-code && sudo dotnet workload update && claude --dangerously-skip-permissions",
+	"postCreateCommand": "pwsh_path=$(find /usr/share/powershell -name pwsh -type f | grep -E 'tools/net[0-9]+\\.[0-9]+/any/pwsh$' | head -1) && [ -n \"$pwsh_path\" ] && sudo chmod +x \"$pwsh_path\" && sudo ln -sf \"$pwsh_path\" /usr/bin/pwsh && sudo chsh vscode -s \"$(which pwsh)\" && npm install -g @anthropic-ai/claude-code && sudo dotnet workload update && claude --dangerously-skip-permissions",
 	"customizations": {
 		"vscode": {
 			"settings": { 
@@ -31,6 +31,6 @@
 		}
 	},
 	"remoteEnv": {
-		"PERPLEXITY_API_KEY": "${localEnv:PERPLEXITY_API_KEY}",
+		"PERPLEXITY_API_KEY": "${localEnv:PERPLEXITY_API_KEY}"
 	}
 }

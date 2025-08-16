@@ -103,7 +103,7 @@ public class FrameworkVersionComparerTests
         // Assert
         result1.ShouldBeLessThan(0); // net10.0 should come before net9.0
         result2.ShouldBeLessThan(0); // net15.0 should come before net10.0
-        
+
         // Note: net100.0 vs net99.0 would require numeric parsing which is not
         // currently implemented as it's not needed for real-world scenarios
     }

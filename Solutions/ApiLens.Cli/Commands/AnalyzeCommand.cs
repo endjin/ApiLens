@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
@@ -16,22 +17,26 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
     private readonly INuGetCacheScanner nugetScanner;
     private readonly ILuceneIndexManagerFactory indexFactory;
     private readonly IFileSystemService fileSystem;
+    private readonly IIndexPathResolver indexPathResolver;
 
     public AnalyzeCommand(
         IProjectAnalysisService projectAnalysis,
         INuGetCacheScanner nugetScanner,
         ILuceneIndexManagerFactory indexFactory,
-        IFileSystemService fileSystem)
+        IFileSystemService fileSystem,
+        IIndexPathResolver indexPathResolver)
     {
         ArgumentNullException.ThrowIfNull(projectAnalysis);
         ArgumentNullException.ThrowIfNull(nugetScanner);
         ArgumentNullException.ThrowIfNull(indexFactory);
         ArgumentNullException.ThrowIfNull(fileSystem);
+        ArgumentNullException.ThrowIfNull(indexPathResolver);
 
         this.projectAnalysis = projectAnalysis;
         this.nugetScanner = nugetScanner;
         this.indexFactory = indexFactory;
         this.fileSystem = fileSystem;
+        this.indexPathResolver = indexPathResolver;
     }
 
     public class Settings : CommandSettings
@@ -41,7 +46,7 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         public string Path { get; set; } = string.Empty;
 
         [CommandOption("-i|--index <PATH>")]
-        [Description("Index directory path (default: ./.index)")]
+        [Description("Index directory path (default: ~/.apilens/index or APILENS_INDEX env var)")]
         public string? IndexPath { get; set; }
 
         [CommandOption("--include-transitive")]
@@ -116,7 +121,7 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
             }
 
             // Index the packages
-            string indexPath = settings.IndexPath ?? GetDefaultIndexPath();
+            string indexPath = indexPathResolver.ResolveIndexPath(settings.IndexPath);
             await IndexPackages(packagesToIndex, indexPath, settings.CleanIndex);
 
             // Display results
@@ -225,6 +230,7 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         string indexPath,
         bool cleanIndex)
     {
+        // Index path is already resolved by the caller
         using ILuceneIndexManager indexManager = indexFactory.Create(indexPath);
 
         if (cleanIndex)
@@ -301,7 +307,7 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
                     Frameworks = analysisResult.Frameworks,
                     ElapsedSeconds = elapsed.TotalSeconds
                 }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-                
+
                 // Temporarily set unlimited width to prevent JSON wrapping
                 var originalWidth = AnsiConsole.Profile.Width;
                 AnsiConsole.Profile.Width = int.MaxValue;
@@ -352,10 +358,7 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         AnsiConsole.MarkupLine($"[dim]Analysis completed in {elapsed.TotalSeconds:F2} seconds[/]");
     }
 
-    private string GetDefaultIndexPath()
-    {
-        return IOPath.Combine(Directory.GetCurrentDirectory(), ".index");
-    }
+    // GetDefaultIndexPath method removed - now using IIndexPathResolver
 
     private string? ExtractTargetFramework(string xmlPath)
     {

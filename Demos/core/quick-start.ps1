@@ -82,7 +82,9 @@ New-Item -ItemType Directory -Path $demoDir -Force | Out-Null
 </doc>
 '@ | Set-Content "$demoDir/DemoLib.xml"
 
-$apilens = "./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+# Get the repository root (two levels up from Demos/core/)
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
 if ($IsWindows) { $apilens += ".exe" }
 
 # Index the files

@@ -89,7 +89,7 @@ public class SuggestionService
     public static List<string> GetExampleQueries(QueryType queryType, string originalQuery)
     {
         List<string> examples = [];
-        
+
         if (string.IsNullOrWhiteSpace(originalQuery))
         {
             return examples;
@@ -101,20 +101,20 @@ public class SuggestionService
                 examples.Add($"apilens query \"{originalQuery}*\" --type name");
                 examples.Add($"apilens query \"{originalQuery}\" --type content");
                 break;
-            
+
             case QueryType.Namespace:
-                string namespacePart = originalQuery.Contains('.') 
-                    ? originalQuery[..originalQuery.LastIndexOf('.')] 
+                string namespacePart = originalQuery.Contains('.')
+                    ? originalQuery[..originalQuery.LastIndexOf('.')]
                     : originalQuery;
                 examples.Add($"apilens query \"{namespacePart}*\" --type namespace");
                 examples.Add($"apilens list-types --namespace \"{originalQuery}*\"");
                 break;
-            
+
             case QueryType.Assembly:
                 examples.Add($"apilens query \"*{originalQuery}*\" --type assembly");
                 examples.Add($"apilens list-types --assembly \"{originalQuery}*\"");
                 break;
-            
+
             case QueryType.Content:
                 examples.Add($"apilens query \"{originalQuery}~\" --type content");
                 examples.Add($"apilens query \"{originalQuery} OR {originalQuery}s\" --type content");

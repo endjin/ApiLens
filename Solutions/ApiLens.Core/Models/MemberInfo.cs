@@ -22,7 +22,7 @@ public record MemberInfo
     public string? Returns { get; init; }
     public string? ReturnType { get; init; }
     public string? SeeAlso { get; init; }
-    
+
     // Method modifiers (for methods only)
     public bool IsStatic { get; init; }
     public bool IsAsync { get; init; }

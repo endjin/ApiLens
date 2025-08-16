@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace ApiLens.Cli.Services;
@@ -55,7 +54,7 @@ public static partial class JsonSanitizer
         }
 
         Type type = obj.GetType();
-        
+
         // Handle collections
         if (obj is System.Collections.IEnumerable enumerable && obj is not string)
         {

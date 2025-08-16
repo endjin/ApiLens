@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Helpers;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
@@ -12,19 +13,23 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IFileSystemService fileSystem;
     private readonly IFileHashHelper fileHashHelper;
+    private readonly IIndexPathResolver indexPathResolver;
 
     public IndexCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
         IFileSystemService fileSystem,
-        IFileHashHelper fileHashHelper)
+        IFileHashHelper fileHashHelper,
+        IIndexPathResolver indexPathResolver)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(fileHashHelper);
+        ArgumentNullException.ThrowIfNull(indexPathResolver);
 
         this.indexManagerFactory = indexManagerFactory;
         this.fileSystem = fileSystem;
         this.fileHashHelper = fileHashHelper;
+        this.indexPathResolver = indexPathResolver;
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
@@ -48,8 +53,11 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
 
             AnsiConsole.MarkupLine($"[green]Found {xmlFiles.Count} XML file(s) to index.[/]");
 
+            // Resolve the actual index path
+            string resolvedIndexPath = indexPathResolver.ResolveIndexPath(settings.IndexPath);
+
             // Create index manager
-            using ILuceneIndexManager indexManager = indexManagerFactory.Create(settings.IndexPath);
+            using ILuceneIndexManager indexManager = indexManagerFactory.Create(resolvedIndexPath);
 
             List<string> filesToIndex;
 
@@ -215,7 +223,7 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
 
                     // Display results
                     AnsiConsole.WriteLine();
-                    DisplayResults(result, indexManager, settings.IndexPath);
+                    DisplayResults(result, indexManager, resolvedIndexPath);
                 });
 
             return 0;

@@ -1,10 +1,10 @@
 using ApiLens.Cli.Commands;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
 using Spectre.Console;
 using Spectre.Console.Testing;
-
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]
@@ -16,19 +16,22 @@ public class ListTypesCommandTests : IDisposable
     private TestConsole console = null!;
     private ILuceneIndexManager mockIndexManager = null!;
     private IQueryEngine mockQueryEngine = null!;
+    private IIndexPathResolver indexPathResolver = null!;
 
     [TestInitialize]
     public void Setup()
     {
         indexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
-        command = new ListTypesCommand(indexManagerFactory, queryEngineFactory);
+        indexPathResolver = Substitute.For<IIndexPathResolver>();
+        indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
+        command = new ListTypesCommand(indexManagerFactory, indexPathResolver, queryEngineFactory);
         console = new TestConsole();
         AnsiConsole.Console = console;
 
         mockIndexManager = Substitute.For<ILuceneIndexManager>();
         mockQueryEngine = Substitute.For<IQueryEngine>();
-        
+
         indexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
         queryEngineFactory.Create(mockIndexManager).Returns(mockQueryEngine);
     }
@@ -81,7 +84,7 @@ public class ListTypesCommandTests : IDisposable
         var type1Net8 = CreateMemberInfo("Type1", "net8.0", "TestPackage");
         var type1Net9 = CreateMemberInfo("Type1", "net9.0", "TestPackage");
         var type2 = CreateMemberInfo("Type2", "net9.0", "TestPackage");
-        
+
         mockQueryEngine.ListTypesFromPackage("TestPackage", 100)
             .Returns(new List<MemberInfo> { type1Net8, type1Net9, type2 });
 
@@ -109,7 +112,7 @@ public class ListTypesCommandTests : IDisposable
         // Arrange
         var type1Net8 = CreateMemberInfo("Type1", "net8.0", "TestPackage");
         var type1Net9 = CreateMemberInfo("Type1", "net9.0", "TestPackage");
-        
+
         mockQueryEngine.ListTypesFromPackage("TestPackage", 100)
             .Returns(new List<MemberInfo> { type1Net8, type1Net9 });
 
@@ -139,7 +142,7 @@ public class ListTypesCommandTests : IDisposable
             CreateMemberInfo("Type1", "net9.0", null, "TestNamespace"),
             CreateMemberInfo("Type2", "net9.0", null, "TestNamespace")
         };
-        
+
         mockQueryEngine.SearchByNamespace("TestNamespace", 1000)
             .Returns(types);
 
@@ -168,7 +171,7 @@ public class ListTypesCommandTests : IDisposable
             CreateMemberInfo("Type1", "net9.0"),
             CreateMemberInfo("Type2", "net9.0")
         };
-        
+
         mockQueryEngine.ListTypesFromAssembly("TestAssembly", 100)
             .Returns(types);
 
@@ -193,7 +196,7 @@ public class ListTypesCommandTests : IDisposable
     {
         // Arrange
         var type = CreateMemberInfo("TestType", "net9.0", "TestPackage");
-        
+
         mockQueryEngine.ListTypesFromPackage("TestPackage", 100)
             .Returns(new List<MemberInfo> { type });
 
@@ -221,7 +224,7 @@ public class ListTypesCommandTests : IDisposable
         // Arrange
         var type1 = CreateMemberInfo("Type1", "net9.0", "Package1", "Namespace1");
         var type2 = CreateMemberInfo("Type2", "net9.0", "Package2", "Namespace2");
-        
+
         mockQueryEngine.SearchByNamespacePattern("Test.*", 1000)
             .Returns(new List<MemberInfo> { type1, type2 });
 
@@ -257,7 +260,7 @@ public class ListTypesCommandTests : IDisposable
             Namespace = "TestNamespace",
             PackageId = "TestPackage"
         };
-        
+
         mockQueryEngine.SearchByPackage("TestPackage", 100)
             .Returns(new List<MemberInfo> { type, method });
 
@@ -279,7 +282,7 @@ public class ListTypesCommandTests : IDisposable
         output.ShouldContain("Found 2 members");
     }
 
-    private static MemberInfo CreateMemberInfo(string name, string? framework = "net9.0", 
+    private static MemberInfo CreateMemberInfo(string name, string? framework = "net9.0",
         string? packageId = null, string? namespaceName = null)
     {
         return new MemberInfo

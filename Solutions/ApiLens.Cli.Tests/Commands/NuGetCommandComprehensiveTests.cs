@@ -1,10 +1,10 @@
 using ApiLens.Cli.Commands;
+using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
 using Spectre.Console;
 using Spectre.Console.Testing;
-
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]
@@ -17,6 +17,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
     private ILuceneIndexManager mockIndexManager = null!;
     private NuGetCommand command = null!;
     private TestConsole console = null!;
+    private IIndexPathResolver indexPathResolver = null!;
 
     [TestInitialize]
     public void Initialize()
@@ -26,9 +27,11 @@ public class NuGetCommandComprehensiveTests : IDisposable
         mockDeduplicationService = Substitute.For<IPackageDeduplicationService>();
         mockIndexManagerFactory = Substitute.For<ILuceneIndexManagerFactory>();
         mockIndexManager = Substitute.For<ILuceneIndexManager>();
+        indexPathResolver = Substitute.For<IIndexPathResolver>();
+        indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
 
-        command = new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, mockIndexManagerFactory);
+        command = new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, mockIndexManagerFactory, indexPathResolver);
         console = new TestConsole();
         AnsiConsole.Console = console;
     }
@@ -537,7 +540,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
             PackagesToIndex = packagesToIndex,
             PackageIdsToDelete = packageIdsToDelete ?? new HashSet<string>(),
             SkippedPackages = skippedPackages,
-            Stats = new DeduplicationStats
+            Stats = new Core.Services.DeduplicationStats
             {
                 TotalScannedPackages = packagesToIndex.Count + skippedPackages,
                 UniqueXmlFiles = packagesToIndex.Count > 0 ? packagesToIndex.Select(p => p.XmlDocumentationPath).Distinct().Count() : 0,
