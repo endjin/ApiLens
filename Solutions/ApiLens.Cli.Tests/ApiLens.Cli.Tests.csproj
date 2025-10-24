@@ -25,7 +25,7 @@
     <PackageReference Include="NSubstitute" Version="5.3.0" />
     <PackageReference Include="Spectre.Console" Version="0.50.0" />
     <PackageReference Include="Spectre.Console.Cli" Version="0.50.0" />
-    <PackageReference Include="Spectre.IO" Version="0.19.0" />
+    <PackageReference Include="Spectre.IO" Version="0.21.0" />
     <PackageReference Include="Spectre.IO.Testing" Version="0.19.0" />
     <PackageReference Include="Spectre.Console.Testing" Version="0.50.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4">
