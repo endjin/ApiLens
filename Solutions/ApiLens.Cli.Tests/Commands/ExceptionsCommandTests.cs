@@ -107,7 +107,7 @@ public class ExceptionsCommandTests
         queryEngine.GetByExceptionType("System.ArgumentNullException", 30).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -127,7 +127,7 @@ public class ExceptionsCommandTests
         queryEngine.GetByExceptionType("System.CustomException", 10).Returns([]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -144,7 +144,7 @@ public class ExceptionsCommandTests
             .Do(_ => throw new InvalidOperationException("Index error"));
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -160,7 +160,7 @@ public class ExceptionsCommandTests
         queryEngine.GetByExceptionType("System.Exception", 10).Returns([]);
 
         // Act
-        command.Execute(context, settings);
+        command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         indexManager.Received(1).Dispose();
@@ -191,7 +191,7 @@ public class ExceptionsCommandTests
             .Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -221,7 +221,7 @@ public class ExceptionsCommandTests
             .Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -255,7 +255,7 @@ public class ExceptionsCommandTests
         queryEngine.GetByExceptionType("System.Exception", 10).Returns(members);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -283,7 +283,7 @@ public class ExceptionsCommandTests
             .Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -304,7 +304,7 @@ public class ExceptionsCommandTests
             .Returns([]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -334,7 +334,7 @@ public class ExceptionsCommandTests
             .Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -354,7 +354,7 @@ public class ExceptionsCommandTests
         queryEngine.GetByExceptionType(string.Empty, 10).Returns([]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);

@@ -97,7 +97,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act - First run
-        await command.ExecuteAsync(null!, settings);
+        await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Arrange - Second run with empty files tracked
         Dictionary<string, HashSet<(string, string)>> indexedPackages = new()
@@ -128,7 +128,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         SetupDeduplicationService(new List<NuGetPackageInfo>(), skippedPackages: packages.Count, emptyXmlFilesSkipped: 2);
 
         // Act - Second run
-        await command.ExecuteAsync(null!, settings);
+        await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert
         string output = console.Output;
@@ -196,7 +196,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
-        await command.ExecuteAsync(null!, settings);
+        await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert - Should only index 1 XML file, not 4
         await mockIndexManager.Received(1).IndexXmlFilesAsync(
@@ -285,7 +285,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
-        await command.ExecuteAsync(null!, settings);
+        await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert - Should index 3 files: 1 shared + 2 unique (existing is skipped)
         await mockIndexManager.Received(1).IndexXmlFilesAsync(
@@ -344,7 +344,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
-        await command.ExecuteAsync(null!, settings);
+        await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert - Should delete old versions
         mockIndexManager.Received(1).DeleteDocumentsByPackageIds(
@@ -393,7 +393,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
-        await command.ExecuteAsync(null!, settings);
+        await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert - Should index the preview version
         await mockIndexManager.Received(1).IndexXmlFilesAsync(
@@ -457,7 +457,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
-        await command.ExecuteAsync(null!, settings);
+        await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert - Should only index package2 (package1 is already indexed despite different path format)
         await mockIndexManager.Received(1).IndexXmlFilesAsync(
@@ -485,7 +485,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         NuGetCommand.Settings settings = new() { IndexPath = "./index", LatestOnly = true };
 
         // Act
-        int result = await command.ExecuteAsync(null!, settings);
+        int result = await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert
         console.Output.ShouldNotContain("Error:");
@@ -504,7 +504,7 @@ public class NuGetCommandComprehensiveTests : IDisposable
         NuGetCommand.Settings settings = new() { IndexPath = "./index" };
 
         // Act
-        int result = await command.ExecuteAsync(null!, settings);
+        int result = await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);

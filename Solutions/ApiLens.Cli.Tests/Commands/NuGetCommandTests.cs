@@ -123,7 +123,7 @@ public sealed class NuGetCommandTests : IDisposable
             .Returns(Task.FromResult(ImmutableArray.Create(packages)));
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         console.Output.ShouldNotContain("Error:");
@@ -175,7 +175,7 @@ public sealed class NuGetCommandTests : IDisposable
         mockFileSystem.DirectoryExists(cachePath).Returns(false);
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -196,7 +196,7 @@ public sealed class NuGetCommandTests : IDisposable
             .Returns(Task.FromResult(ImmutableArray<NuGetPackageInfo>.Empty));
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -242,7 +242,7 @@ public sealed class NuGetCommandTests : IDisposable
         mockDeduplicationService.SetupPassThroughDeduplication(filteredPackages);
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -313,7 +313,7 @@ public sealed class NuGetCommandTests : IDisposable
             });
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         console.Output.ShouldNotContain("Error:");
@@ -335,7 +335,7 @@ public sealed class NuGetCommandTests : IDisposable
             .Do(x => throw new InvalidOperationException("Scan error"));
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -359,7 +359,7 @@ public sealed class NuGetCommandTests : IDisposable
             .Returns(Task.FromResult(ImmutableArray<NuGetPackageInfo>.Empty));
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         console.Output.ShouldNotContain("Error:");
@@ -409,7 +409,7 @@ public sealed class NuGetCommandTests : IDisposable
             .Returns(Task.FromResult(ImmutableArray.Create(packages)));
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -433,7 +433,7 @@ public sealed class NuGetCommandTests : IDisposable
             .Returns(Task.FromResult(ImmutableArray<NuGetPackageInfo>.Empty));
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -496,7 +496,7 @@ public sealed class NuGetCommandTests : IDisposable
             .Returns(Task.FromResult(ImmutableArray<NuGetPackageInfo>.Empty));
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -523,7 +523,7 @@ public sealed class NuGetCommandTests : IDisposable
             .Returns(Task.FromResult(ImmutableArray<NuGetPackageInfo>.Empty));
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -546,7 +546,7 @@ public sealed class NuGetCommandTests : IDisposable
         };
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);

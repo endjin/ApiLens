@@ -40,7 +40,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
         this.indexPathResolver = indexPathResolver;
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         Stopwatch commandStopwatch = Stopwatch.StartNew();
 

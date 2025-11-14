@@ -38,7 +38,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         this.queryEngineFactory = queryEngineFactory;
     }
 
-    public override int Execute(CommandContext context, Settings settings)
+    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         try
         {

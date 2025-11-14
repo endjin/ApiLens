@@ -94,7 +94,7 @@ public sealed class QueryCommandTests : IDisposable
         };
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -163,7 +163,7 @@ public sealed class QueryCommandTests : IDisposable
         };
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);

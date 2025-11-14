@@ -81,17 +81,17 @@ public class SearchWithFiltersTests : IDisposable
         List<MemberInfo> results = queryEngine!.SearchWithFilters("Parse", null, null, null, 20);
 
         // Assert
-        Assert.IsTrue(results.Count > 0, $"Expected results but got {results.Count}");
+        Assert.IsNotEmpty(results, $"Expected results but got {results.Count}");
         Assert.IsTrue(results.All(r => r.Name.Contains("Parse", StringComparison.OrdinalIgnoreCase)));
 
         // Should find ParseInt, ParseDouble, TryParse, JsonParser, XmlParser, ParseException
         List<string> names = [.. results.Select(r => r.Name)];
-        Assert.IsTrue(names.Contains("ParseInt"));
-        Assert.IsTrue(names.Contains("ParseDouble"));
-        Assert.IsTrue(names.Contains("TryParse"));
-        Assert.IsTrue(names.Contains("JsonParser"));
-        Assert.IsTrue(names.Contains("XmlParser"));
-        Assert.IsTrue(names.Contains("ParseException"));
+        Assert.Contains("ParseInt", names);
+        Assert.Contains("ParseDouble", names);
+        Assert.Contains("TryParse", names);
+        Assert.Contains("JsonParser", names);
+        Assert.Contains("XmlParser", names);
+        Assert.Contains("ParseException", names);
     }
 
     [TestMethod]
@@ -101,16 +101,16 @@ public class SearchWithFiltersTests : IDisposable
         List<MemberInfo> methods = queryEngine!.SearchWithFilters("Parse", MemberType.Method, null, null, 20);
 
         // Assert
-        Assert.IsTrue(methods.Count > 0);
+        Assert.IsNotEmpty(methods);
         Assert.IsTrue(methods.All(r => r.MemberType == MemberType.Method));
         Assert.IsTrue(methods.All(r => r.Name.Contains("Parse", StringComparison.OrdinalIgnoreCase)));
 
         // Should find ParseInt, ParseDouble, TryParse but not JsonParser (Type)
         List<string> methodNames = [.. methods.Select(r => r.Name)];
-        Assert.IsTrue(methodNames.Contains("ParseInt"));
-        Assert.IsTrue(methodNames.Contains("ParseDouble"));
-        Assert.IsTrue(methodNames.Contains("TryParse"));
-        Assert.IsFalse(methodNames.Contains("JsonParser"));
+        Assert.Contains("ParseInt", methodNames);
+        Assert.Contains("ParseDouble", methodNames);
+        Assert.Contains("TryParse", methodNames);
+        Assert.DoesNotContain("JsonParser", methodNames);
     }
 
     [TestMethod]
@@ -120,7 +120,7 @@ public class SearchWithFiltersTests : IDisposable
         List<MemberInfo> results = queryEngine!.SearchWithFilters("Serialize", null, "Newtonsoft.Json", null, 20);
 
         // Assert
-        Assert.IsTrue(results.Count > 0);
+        Assert.IsNotEmpty(results);
         Assert.IsTrue(results.All(r => r.Namespace == "Newtonsoft.Json"));
         Assert.IsTrue(results.All(r => r.Name.Contains("Serialize", StringComparison.OrdinalIgnoreCase)));
 
@@ -135,7 +135,7 @@ public class SearchWithFiltersTests : IDisposable
         List<MemberInfo> results = queryEngine!.SearchWithFilters("Token", null, "Newtonsoft.*", null, 20);
 
         // Assert
-        Assert.IsTrue(results.Count > 0);
+        Assert.IsNotEmpty(results);
         Assert.IsTrue(results.All(r => r.Namespace.StartsWith("Newtonsoft.")));
 
         List<string> names = [.. results.Select(r => r.Name)];
@@ -149,11 +149,11 @@ public class SearchWithFiltersTests : IDisposable
         List<MemberInfo> results = queryEngine!.SearchWithFilters("Json", null, null, "Newtonsoft.Json", 20);
 
         // Assert
-        Assert.IsTrue(results.Count > 0);
+        Assert.IsNotEmpty(results);
         Assert.IsTrue(results.All(r => r.Assembly == "Newtonsoft.Json"));
 
         List<string> names = [.. results.Select(r => r.Name)];
-        Assert.IsTrue(names.Contains("JsonParser"));
+        Assert.Contains("JsonParser", names);
     }
 
     [TestMethod]
@@ -163,7 +163,7 @@ public class SearchWithFiltersTests : IDisposable
         List<MemberInfo> results = queryEngine!.SearchWithFilters("Exception", MemberType.Type, "System", "System.Core", 20);
 
         // Assert
-        Assert.IsTrue(results.Count > 0);
+        Assert.IsNotEmpty(results);
         Assert.IsTrue(results.All(r => r.MemberType == MemberType.Type));
         Assert.IsTrue(results.All(r => r.Namespace == "System"));
         Assert.IsTrue(results.All(r => r.Assembly == "System.Core"));
@@ -180,14 +180,14 @@ public class SearchWithFiltersTests : IDisposable
         List<MemberInfo> results = queryEngine!.SearchWithFilters("*Exception", MemberType.Type, null, null, 20);
 
         // Assert
-        Assert.IsTrue(results.Count > 0);
+        Assert.IsNotEmpty(results);
         Assert.IsTrue(results.All(r => r.Name.EndsWith("Exception")));
         Assert.IsTrue(results.All(r => r.MemberType == MemberType.Type));
 
         List<string> names = [.. results.Select(r => r.Name)];
-        Assert.IsTrue(names.Contains("ParseException"));
-        Assert.IsTrue(names.Contains("IOException"));
-        Assert.IsTrue(names.Contains("ArgumentException"));
+        Assert.Contains("ParseException", names);
+        Assert.Contains("IOException", names);
+        Assert.Contains("ArgumentException", names);
     }
 
     [TestMethod]
@@ -197,11 +197,11 @@ public class SearchWithFiltersTests : IDisposable
         List<MemberInfo> results = queryEngine!.SearchWithFilters("Count", MemberType.Property, null, null, 20);
 
         // Assert
-        Assert.IsTrue(results.Count > 0);
+        Assert.IsNotEmpty(results);
         Assert.IsTrue(results.All(r => r.MemberType == MemberType.Property));
 
         List<string> names = [.. results.Select(r => r.Name)];
-        Assert.IsTrue(names.Contains("Count"));
+        Assert.Contains("Count", names);
     }
 
     [TestMethod]
@@ -211,7 +211,7 @@ public class SearchWithFiltersTests : IDisposable
         List<MemberInfo> results = queryEngine!.SearchWithFilters("*Json*", null, "Newtonsoft.*", null, 20);
 
         // Assert
-        Assert.IsTrue(results.Count > 0);
+        Assert.IsNotEmpty(results);
         Assert.IsTrue(results.All(r => r.Name.Contains("Json", StringComparison.OrdinalIgnoreCase)));
         Assert.IsTrue(results.All(r => r.Namespace.StartsWith("Newtonsoft.")));
     }

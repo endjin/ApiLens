@@ -81,7 +81,7 @@ public class MembersCommandTests : IDisposable
         };
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -116,7 +116,7 @@ public class MembersCommandTests : IDisposable
         };
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -142,7 +142,7 @@ public class MembersCommandTests : IDisposable
         };
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -171,7 +171,7 @@ public class MembersCommandTests : IDisposable
         };
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -204,7 +204,7 @@ public class MembersCommandTests : IDisposable
         };
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);

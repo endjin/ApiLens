@@ -36,7 +36,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
         this.indexPathResolver = indexPathResolver;
     }
 
-    public override int Execute(CommandContext context, Settings settings)
+    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         try
         {

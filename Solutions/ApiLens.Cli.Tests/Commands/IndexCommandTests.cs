@@ -163,7 +163,7 @@ public class IndexCommandTests
         mockFileSystem.DirectoryExists("/missing/path").Returns(false);
 
         // Act
-        int result = await command.ExecuteAsync(null!, settings);
+        int result = await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -251,7 +251,7 @@ public class IndexCommandTests
         mockFileSystem.DirectoryExists("/non/existent/path").Returns(false);
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -407,7 +407,7 @@ public class IndexCommandTests
         });
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -429,7 +429,7 @@ public class IndexCommandTests
         mockFileSystem.GetFiles("/empty/directory", "*.xml", false).Returns([]);
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -465,7 +465,7 @@ public class IndexCommandTests
         });
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -488,7 +488,7 @@ public class IndexCommandTests
         mockFileSystem.GetFiles("/docs", "*.xml", true).Returns(["/docs/sub/api.xml", "/docs/lib.xml"]);
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -523,7 +523,7 @@ public class IndexCommandTests
         });
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -545,7 +545,7 @@ public class IndexCommandTests
         mockFileSystem.GetFiles(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>()).Returns([]);
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -565,7 +565,7 @@ public class IndexCommandTests
         mockFileSystem.GetFiles(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>()).Returns([]);
 
         // Act
-        await command.ExecuteAsync(context, settings);
+        await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         mockIndexManager.Received(1).Dispose();
@@ -605,7 +605,7 @@ public class IndexCommandTests
         };
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert - The command runs but can't load the fake file
         result.ShouldBe(0); // Returns success even if no files processed
@@ -652,7 +652,7 @@ public class IndexCommandTests
         mockParser.ParseMembers(Arg.Any<XDocument>(), Arg.Any<string>()).Returns([]);
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -677,7 +677,7 @@ public class IndexCommandTests
         };
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0); // IndexCommand returns 0 when no XML files found, not an error
@@ -697,7 +697,7 @@ public class IndexCommandTests
         };
 
         // Act
-        int result = await command.ExecuteAsync(context, settings);
+        int result = await command.ExecuteAsync(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);

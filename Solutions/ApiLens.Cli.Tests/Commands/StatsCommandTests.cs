@@ -122,7 +122,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -152,7 +152,7 @@ public sealed class StatsCommandTests
         indexManager.GetIndexStatistics().Returns((IndexStatistics?)null);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -172,7 +172,7 @@ public sealed class StatsCommandTests
             .Do(x => throw new InvalidOperationException("Index corrupted"));
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -201,7 +201,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -230,7 +230,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -258,7 +258,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -286,7 +286,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -310,7 +310,7 @@ public sealed class StatsCommandTests
         StatsCommand.Settings settings = new();
 
         // Act
-        command.Execute(context, settings);
+        command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         indexManager.Received(1).Dispose();
@@ -326,7 +326,7 @@ public sealed class StatsCommandTests
             .Do(x => throw new InvalidOperationException("Test error"));
 
         // Act
-        command.Execute(context, settings);
+        command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         indexManager.Received(1).Dispose();
@@ -354,7 +354,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -387,7 +387,7 @@ public sealed class StatsCommandTests
             };
 
             // Act
-            int result = command.Execute(context, settings);
+            int result = command.Execute(context, settings, CancellationToken.None);
 
             // Assert
             result.ShouldBe(0);
@@ -416,7 +416,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -444,7 +444,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        command.Execute(context, settings);
+        command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         indexManagerFactory.Received(1).Create(customPath);

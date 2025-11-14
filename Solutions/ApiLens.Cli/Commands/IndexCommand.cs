@@ -32,7 +32,7 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
         this.indexPathResolver = indexPathResolver;
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         if (!fileSystem.FileExists(settings.Path) && !fileSystem.DirectoryExists(settings.Path))
         {

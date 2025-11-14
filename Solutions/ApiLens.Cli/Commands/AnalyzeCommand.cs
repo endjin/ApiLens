@@ -66,7 +66,7 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         public bool CleanIndex { get; set; }
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
 

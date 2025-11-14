@@ -36,7 +36,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
         this.queryEngineFactory = queryEngineFactory;
     }
 
-    public override int Execute(CommandContext context, Settings settings)
+    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         try
         {

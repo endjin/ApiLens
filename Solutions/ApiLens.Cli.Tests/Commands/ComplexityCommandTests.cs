@@ -99,7 +99,7 @@ public class ComplexityCommandTests
         ComplexityCommand.Settings settings = new();
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -124,7 +124,7 @@ public class ComplexityCommandTests
         queryEngine.GetComplexMethods(10, 50).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -147,7 +147,7 @@ public class ComplexityCommandTests
         queryEngine.GetByParameterCount(2, 5, 30).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -169,7 +169,7 @@ public class ComplexityCommandTests
         queryEngine.GetByParameterCount(3, int.MaxValue, 20).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -191,7 +191,7 @@ public class ComplexityCommandTests
         queryEngine.GetByParameterCount(0, 5, 20).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -209,7 +209,7 @@ public class ComplexityCommandTests
             .Do(x => throw new InvalidOperationException("Index error"));
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -225,7 +225,7 @@ public class ComplexityCommandTests
         queryEngine.GetComplexMethods(5, 20).Returns([]);
 
         // Act
-        command.Execute(context, settings);
+        command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         indexManager.Received(1).Dispose();
@@ -253,7 +253,7 @@ public class ComplexityCommandTests
         queryEngine.GetComplexMethods(5, 20).Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -280,7 +280,7 @@ public class ComplexityCommandTests
         queryEngine.GetComplexMethods(5, 20).Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -318,7 +318,7 @@ public class ComplexityCommandTests
         queryEngine.GetComplexMethods(5, 20).Returns(members);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -355,7 +355,7 @@ public class ComplexityCommandTests
         queryEngine.GetComplexMethods(1, 20).Returns(members);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -393,7 +393,7 @@ public class ComplexityCommandTests
         queryEngine.GetByParameterCount(1, int.MaxValue, 20).Returns(members);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);

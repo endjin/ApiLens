@@ -96,7 +96,7 @@ public class ExamplesCommandTests
         queryEngine.GetMethodsWithExamples(20).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -124,7 +124,7 @@ public class ExamplesCommandTests
         queryEngine.SearchByCodeExample("async", 30).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -147,7 +147,7 @@ public class ExamplesCommandTests
         queryEngine.GetMethodsWithExamples(10).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -165,7 +165,7 @@ public class ExamplesCommandTests
         queryEngine.SearchByCodeExample("nonexistent", 10).Returns([]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -182,7 +182,7 @@ public class ExamplesCommandTests
             .Do(_ => throw new InvalidOperationException("Index error"));
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -198,7 +198,7 @@ public class ExamplesCommandTests
         queryEngine.GetMethodsWithExamples(10).Returns([]);
 
         // Act
-        command.Execute(context, settings);
+        command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         indexManager.Received(1).Dispose();
@@ -228,7 +228,7 @@ public class ExamplesCommandTests
         queryEngine.GetMethodsWithExamples(10).Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -257,7 +257,7 @@ public class ExamplesCommandTests
         queryEngine.GetMethodsWithExamples(10).Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -290,7 +290,7 @@ public class ExamplesCommandTests
         queryEngine.GetMethodsWithExamples(10).Returns(members);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -313,7 +313,7 @@ public class ExamplesCommandTests
         queryEngine.GetMethodsWithExamples(10).Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -333,7 +333,7 @@ public class ExamplesCommandTests
         queryEngine.SearchByCodeExample("nonexistent", 10).Returns([]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -363,7 +363,7 @@ public class ExamplesCommandTests
         queryEngine.SearchByCodeExample("Task.Run", 5).Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);

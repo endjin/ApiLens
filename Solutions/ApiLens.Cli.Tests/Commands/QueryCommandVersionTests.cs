@@ -73,7 +73,7 @@ public class QueryCommandVersionTests
         AnsiConsole.Console = console;
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -102,7 +102,7 @@ public class QueryCommandVersionTests
         AnsiConsole.Console = console;
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -132,7 +132,7 @@ public class QueryCommandVersionTests
         AnsiConsole.Console = console;
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -159,7 +159,7 @@ public class QueryCommandVersionTests
         AnsiConsole.Console = console;
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);

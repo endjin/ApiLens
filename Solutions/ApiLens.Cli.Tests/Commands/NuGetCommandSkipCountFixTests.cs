@@ -102,7 +102,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
         };
 
         // Act
-        int result = await command.ExecuteAsync(null!, settings);
+        int result = await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -166,7 +166,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
         };
 
         // Act
-        int result = await command.ExecuteAsync(null!, settings);
+        int result = await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -260,7 +260,7 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
         };
 
         // Act
-        int result = await command.ExecuteAsync(null!, settings);
+        int result = await command.ExecuteAsync(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
