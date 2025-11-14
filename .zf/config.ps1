@@ -81,58 +81,46 @@ task RunTestsWithDotNetCoverage {
     if (-not $dotnetCoverageExe) {
         Write-Build Yellow "dotnet-coverage tool not found. Installing..."
         exec { dotnet tool install --global dotnet-coverage }
-        $dotnetCoverageExe = Get-Command dotnet-coverage
     }
 
     # Setup coverage output file
-    $coverageFile = Join-Path $CoverageDir "coverage.cobertura.xml"
+    $coverageOutput = Join-Path $CoverageDir "coverage.cobertura.xml"
+    Remove-Item $coverageOutput -ErrorAction Ignore -Force
 
-    # Build dotnet test arguments with .NET 10 compatible syntax
-    # .NET 10 with Microsoft.Testing.Platform requires --solution flag
-    $dotnetTestArgs = @(
+    # Build dotnet-coverage arguments (matching original ZeroFailed pattern)
+    # .NET 10 fix: include --solution flag in the coverage args
+    $dotnetCoverageArgs = @(
+        "collect"
+        "-o", $coverageOutput
+        "-f", "cobertura"
+        "dotnet"
         "test"
         "--solution"
-        $SolutionToBuild
-        "--configuration"
-        $Configuration
+    )
+
+    # Build dotnet test arguments
+    $dotnetTestArgs = @(
+        "--configuration", $Configuration
         "--no-build"
         "--no-restore"
-        "--verbosity"
-        "normal"
+        "--verbosity", "normal"
     )
 
     Write-Build Green "Running tests with code coverage..."
     Write-Build Gray "  Solution: $SolutionToBuild"
-    Write-Build Gray "  Coverage output: $coverageFile"
+    Write-Build Gray "  Coverage output: $coverageOutput"
 
-    # Run tests with code coverage using dotnet-coverage
-    $dotnetCoverageArgs = @(
-        "collect"
-        "--output-format"
-        "cobertura"
-        "--output"
-        $coverageFile
-    )
-
-    # Add include filter for assemblies if specified
-    if ($IncludeAssembliesInCodeCoverage) {
-        $dotnetCoverageArgs += "--include-assemblies"
-        $dotnetCoverageArgs += $IncludeAssembliesInCodeCoverage
-    }
-
-    $dotnetCoverageArgs += "--"
-    $dotnetCoverageArgs += "dotnet"
-    $dotnetCoverageArgs += $dotnetTestArgs
-
+    # Run using original ZeroFailed invocation pattern:
+    # dotnet-coverage collect -o file.xml -f cobertura dotnet test --solution /path/to.sln --configuration Release ...
     exec {
-        & dotnet-coverage @dotnetCoverageArgs
+        & dotnet-coverage @dotnetCoverageArgs $SolutionToBuild @dotnetTestArgs
     }
 
     # Verify coverage file was created
-    if (Test-Path $coverageFile) {
-        $fileSize = (Get-Item $coverageFile).Length
-        Write-Build Green "Code coverage report generated: $coverageFile ($fileSize bytes)"
+    if (Test-Path $coverageOutput) {
+        $fileSize = (Get-Item $coverageOutput).Length
+        Write-Build Green "Code coverage report generated: $coverageOutput ($fileSize bytes)"
     } else {
-        Write-Build Yellow "Warning: Code coverage file not found at $coverageFile"
+        Write-Build Yellow "Warning: Code coverage file not found at $coverageOutput"
     }
 }
