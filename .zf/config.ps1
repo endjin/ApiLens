@@ -118,6 +118,22 @@ task RunTestsWithDotNetCoverage {
         & dotnet-coverage @dotnetCoverageArgs $SolutionToBuild @dotnetTestArgs
     }
 
+    # Rename auto-generated TRX files to match GitHub Actions reporter pattern
+    $trxFiles = Get-ChildItem -Path $CoverageDir -Filter "*.trx" -File | Sort-Object LastWriteTime
+    if ($trxFiles.Count -gt 0) {
+        Write-Build Cyan "Renaming $($trxFiles.Count) TRX file(s) to match test-results_*.trx pattern..."
+        $counter = 1
+        foreach ($trxFile in $trxFiles) {
+            $newName = "test-results_$counter.trx"
+            $newPath = Join-Path $CoverageDir $newName
+            Move-Item -Path $trxFile.FullName -Destination $newPath -Force
+            Write-Build Gray "  Renamed: $($trxFile.Name) -> $newName"
+            $counter++
+        }
+    } else {
+        Write-Build Yellow "Warning: No TRX files found in $CoverageDir"
+    }
+
     # Verify coverage file was created
     if (Test-Path $coverageOutput) {
         $fileSize = (Get-Item $coverageOutput).Length
