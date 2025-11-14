@@ -1,0 +1,13 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Tests/">
+    <Project Path="ApiLens.Cli.Tests/ApiLens.Cli.Tests.csproj" />
+    <Project Path="ApiLens.Core.Tests/ApiLens.Core.Tests.csproj" />
+  </Folder>
+  <Project Path="ApiLens.Cli/ApiLens.Cli.csproj" />
+  <Project Path="ApiLens.Core/ApiLens.Core.csproj" />
+</Solution>

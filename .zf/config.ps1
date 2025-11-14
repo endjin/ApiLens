@@ -31,7 +31,7 @@ $SkipPackage = $false
 #
 # Build process configuration
 #
-$SolutionToBuild = (Resolve-Path (Join-Path $here ".\Solutions\ApiLens.sln")).Path
+$SolutionToBuild = (Resolve-Path (Join-Path $here ".\Solutions\ApiLens.slnx")).Path
 $ProjectsToPublish = @()
 $NuSpecFilesToPackage = @()
 $NugetPublishSource = property ZF_NUGET_PUBLISH_SOURCE "$here/_local-nuget-feed"
@@ -63,3 +63,82 @@ task . FullBuild
 # task PrePublish {}
 # task PostPublish {}
 # task RunLast {}
+
+#
+# Task Overrides for .NET 10 Compatibility
+#
+
+# Override RunTestsWithDotNetCoverage to support .NET 10 Microsoft.Testing.Platform
+# .NET 10 requires '--solution' flag instead of positional solution argument
+task RunTestsWithDotNetCoverage {
+    if ($SkipTest) {
+        Write-Build Yellow "Skipping tests (SkipTest = true)"
+        return
+    }
+
+    # Ensure dotnet-coverage tool is available
+    $dotnetCoverageExe = Get-Command dotnet-coverage -ErrorAction SilentlyContinue
+    if (-not $dotnetCoverageExe) {
+        Write-Build Yellow "dotnet-coverage tool not found. Installing..."
+        exec { dotnet tool install --global dotnet-coverage }
+    }
+
+    # Setup coverage output file
+    $coverageOutput = Join-Path $CoverageDir "coverage.cobertura.xml"
+    Remove-Item $coverageOutput -ErrorAction Ignore -Force
+
+    # Build dotnet-coverage arguments (matching original ZeroFailed pattern)
+    # .NET 10 fix: include --solution flag in the coverage args
+    $dotnetCoverageArgs = @(
+        "collect"
+        "-o", $coverageOutput
+        "-f", "cobertura"
+        "dotnet"
+        "test"
+        "--solution"
+    )
+
+    # Build dotnet test arguments
+    $dotnetTestArgs = @(
+        "--configuration", $Configuration
+        "--no-build"
+        "--no-restore"
+        "--verbosity", "normal"
+        "--results-directory", $CoverageDir
+        "--report-trx"
+    )
+
+    Write-Build Green "Running tests with code coverage..."
+    Write-Build Gray "  Solution: $SolutionToBuild"
+    Write-Build Gray "  Coverage output: $coverageOutput"
+
+    # Run using original ZeroFailed invocation pattern:
+    # dotnet-coverage collect -o file.xml -f cobertura dotnet test --solution /path/to.sln --configuration Release ...
+    exec {
+        & dotnet-coverage @dotnetCoverageArgs $SolutionToBuild @dotnetTestArgs
+    }
+
+    # Rename auto-generated TRX files to match GitHub Actions reporter pattern
+    $trxFiles = Get-ChildItem -Path $CoverageDir -Filter "*.trx" -File | Sort-Object LastWriteTime
+    if ($trxFiles.Count -gt 0) {
+        Write-Build Cyan "Renaming $($trxFiles.Count) TRX file(s) to match test-results_*.trx pattern..."
+        $counter = 1
+        foreach ($trxFile in $trxFiles) {
+            $newName = "test-results_$counter.trx"
+            $newPath = Join-Path $CoverageDir $newName
+            Move-Item -Path $trxFile.FullName -Destination $newPath -Force
+            Write-Build Gray "  Renamed: $($trxFile.Name) -> $newName"
+            $counter++
+        }
+    } else {
+        Write-Build Yellow "Warning: No TRX files found in $CoverageDir"
+    }
+
+    # Verify coverage file was created
+    if (Test-Path $coverageOutput) {
+        $fileSize = (Get-Item $coverageOutput).Length
+        Write-Build Green "Code coverage report generated: $coverageOutput ($fileSize bytes)"
+    } else {
+        Write-Build Yellow "Warning: Code coverage file not found at $coverageOutput"
+    }
+}

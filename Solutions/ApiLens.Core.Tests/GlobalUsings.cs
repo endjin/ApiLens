@@ -1,0 +1,5 @@
+global using NSubstitute;
+global using Shouldly;
+global using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+[assembly: Parallelize(Workers = 0, Scope = ExecutionScope.MethodLevel)]

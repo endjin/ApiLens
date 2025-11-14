@@ -3,11 +3,13 @@ using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 using Spectre.Console.Cli;
+using Spectre.Console.Testing;
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]
-public sealed class StatsCommandTests
+public sealed class StatsCommandTests : IDisposable
 {
     private StatsCommand command = null!;
     private ILuceneIndexManagerFactory indexManagerFactory = null!;
@@ -16,6 +18,7 @@ public sealed class StatsCommandTests
     private IQueryEngine queryEngine = null!;
     private CommandContext context = null!;
     private IIndexPathResolver indexPathResolver = null!;
+    private TestConsole console = null!;
 
     [TestInitialize]
     public void TestInitialize()
@@ -26,12 +29,28 @@ public sealed class StatsCommandTests
         queryEngine = Substitute.For<IQueryEngine>();
         indexPathResolver = Substitute.For<IIndexPathResolver>();
         indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
-        command = new StatsCommand(indexManagerFactory, indexPathResolver, queryEngineFactory);
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
 
         indexManagerFactory.Create(Arg.Any<string>()).Returns(indexManager);
         queryEngineFactory.Create(Arg.Any<ILuceneIndexManager>()).Returns(queryEngine);
+
+        console = new TestConsole();
+        console.Profile.Width = 120;
+        console.Profile.Height = 40;
+
+        command = new StatsCommand(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
+    }
+
+    [TestCleanup]
+    public void Cleanup()
+    {
+        console?.Dispose();
+    }
+
+    public void Dispose()
+    {
+        console?.Dispose();
     }
 
     [TestMethod]
@@ -122,7 +141,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(null!, settings);
+        int result = command.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -135,7 +154,7 @@ public sealed class StatsCommandTests
     public void Constructor_WithNullFactory_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new StatsCommand(null!, indexPathResolver, queryEngineFactory))
+        Should.Throw<ArgumentNullException>(() => new StatsCommand(null!, indexPathResolver, queryEngineFactory, console))
             .ParamName.ShouldBe("indexManagerFactory");
     }
 
@@ -152,7 +171,7 @@ public sealed class StatsCommandTests
         indexManager.GetIndexStatistics().Returns((IndexStatistics?)null);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -172,7 +191,7 @@ public sealed class StatsCommandTests
             .Do(x => throw new InvalidOperationException("Index corrupted"));
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -201,7 +220,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -230,7 +249,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -258,7 +277,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -286,7 +305,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -310,7 +329,7 @@ public sealed class StatsCommandTests
         StatsCommand.Settings settings = new();
 
         // Act
-        command.Execute(context, settings);
+        command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         indexManager.Received(1).Dispose();
@@ -326,7 +345,7 @@ public sealed class StatsCommandTests
             .Do(x => throw new InvalidOperationException("Test error"));
 
         // Act
-        command.Execute(context, settings);
+        command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         indexManager.Received(1).Dispose();
@@ -354,7 +373,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -387,7 +406,7 @@ public sealed class StatsCommandTests
             };
 
             // Act
-            int result = command.Execute(context, settings);
+            int result = command.Execute(context, settings, CancellationToken.None);
 
             // Assert
             result.ShouldBe(0);
@@ -416,7 +435,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -444,7 +463,7 @@ public sealed class StatsCommandTests
         };
 
         // Act
-        command.Execute(context, settings);
+        command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         indexManagerFactory.Received(1).Create(customPath);

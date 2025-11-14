@@ -4,6 +4,7 @@ using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 
 namespace ApiLens.Cli.Commands;
 
@@ -23,22 +24,26 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
+    private readonly IAnsiConsole console;
 
     public ExploreCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
         IIndexPathResolver indexPathResolver,
-        IQueryEngineFactory queryEngineFactory)
+        IQueryEngineFactory queryEngineFactory,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
+        ArgumentNullException.ThrowIfNull(console);
 
         this.indexManagerFactory = indexManagerFactory;
         this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
+        this.console = console;
     }
 
-    public override int Execute(CommandContext context, Settings settings)
+    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         try
         {
@@ -57,7 +62,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
 
             if (packageTypes.Count == 0)
             {
-                AnsiConsole.MarkupLine($"[yellow]Package '{settings.PackageName}' not found or has no indexed types.[/]");
+                console.MarkupLine($"[yellow]Package '{settings.PackageName}' not found or has no indexed types.[/]");
 
                 // Suggest similar packages
                 var allPackages = queryEngine.SearchByPackage("*", 100)
@@ -70,11 +75,11 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
 
                 if (allPackages.Any())
                 {
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine("[dim]Did you mean one of these packages?[/]");
+                    console.WriteLine();
+                    console.MarkupLine("[dim]Did you mean one of these packages?[/]");
                     foreach (var pkg in allPackages)
                     {
-                        AnsiConsole.MarkupLine($"  [dim]- {Markup.Escape(pkg ?? "Unknown")}[/]");
+                        console.MarkupLine($"  [dim]- {Markup.Escape(pkg ?? "Unknown")}[/]");
                     }
                 }
                 return 0;
@@ -98,7 +103,7 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         }
         catch (InvalidOperationException ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+            console.MarkupLine($"[red]Error:[/] {ex.Message}");
             return 1;
         }
     }
@@ -184,8 +189,8 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         {
             Justification = Justify.Left
         };
-        AnsiConsole.Write(rule);
-        AnsiConsole.WriteLine();
+        console.Write(rule);
+        console.WriteLine();
 
         // Overview statistics
         var overviewTable = new Table()
@@ -201,13 +206,13 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         overviewTable.AddRow("Documentation Coverage", $"{analysis.DocumentationCoverage:P0}");
         overviewTable.AddRow("Methods with Examples", analysis.MethodsWithExamples.ToString());
 
-        AnsiConsole.Write(overviewTable);
-        AnsiConsole.WriteLine();
+        console.Write(overviewTable);
+        console.WriteLine();
 
         // Key namespaces
         if (analysis.Namespaces.Any())
         {
-            AnsiConsole.Write(new Rule("[bold]Namespaces[/]") { Justification = Justify.Left });
+            console.Write(new Rule("[bold]Namespaces[/]") { Justification = Justify.Left });
 
             var namespaceTable = new Table()
             {
@@ -233,43 +238,43 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
                 );
             }
 
-            AnsiConsole.Write(namespaceTable);
-            AnsiConsole.WriteLine();
+            console.Write(namespaceTable);
+            console.WriteLine();
         }
 
         // Entry point types
         if (analysis.EntryPointTypes.Any())
         {
-            AnsiConsole.Write(new Rule("[bold]Entry Point Types[/] [dim](Good starting points)[/]") { Justification = Justify.Left });
+            console.Write(new Rule("[bold]Entry Point Types[/] [dim](Good starting points)[/]") { Justification = Justify.Left });
 
             foreach (var type in analysis.EntryPointTypes.Take(settings.MaxEntryPoints))
             {
-                AnsiConsole.MarkupLine($"  [green]→[/] [bold]{Markup.Escape(type.Name)}[/]");
+                console.MarkupLine($"  [green]→[/] [bold]{Markup.Escape(type.Name)}[/]");
                 if (!string.IsNullOrWhiteSpace(type.Summary))
                 {
                     var summary = type.Summary.Length > 100 ? type.Summary.Substring(0, 100) + "..." : type.Summary;
-                    AnsiConsole.MarkupLine($"    [dim]{Markup.Escape(summary)}[/]");
+                    console.MarkupLine($"    [dim]{Markup.Escape(summary)}[/]");
                 }
             }
-            AnsiConsole.WriteLine();
+            console.WriteLine();
         }
 
         // Main interfaces
         if (analysis.Interfaces.Any())
         {
-            AnsiConsole.Write(new Rule("[bold]Key Interfaces[/]") { Justification = Justify.Left });
+            console.Write(new Rule("[bold]Key Interfaces[/]") { Justification = Justify.Left });
 
             foreach (var iface in analysis.Interfaces.OrderBy(i => i.Name).Take(settings.MaxInterfaces))
             {
-                AnsiConsole.MarkupLine($"  [blue]◊[/] {Markup.Escape(iface.Name)}");
+                console.MarkupLine($"  [blue]◊[/] {Markup.Escape(iface.Name)}");
             }
-            AnsiConsole.WriteLine();
+            console.WriteLine();
         }
 
         // Complex types (might need attention)
         if (settings.ShowComplexity && analysis.MostComplexTypes.Any())
         {
-            AnsiConsole.Write(new Rule("[bold]Most Complex Types[/] [dim](By member count)[/]") { Justification = Justify.Left });
+            console.Write(new Rule("[bold]Most Complex Types[/] [dim](By member count)[/]") { Justification = Justify.Left });
 
             var complexTable = new Table()
             {
@@ -286,32 +291,32 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
                 );
             }
 
-            AnsiConsole.Write(complexTable);
-            AnsiConsole.WriteLine();
+            console.Write(complexTable);
+            console.WriteLine();
         }
 
         // Suggested next steps
-        AnsiConsole.Write(new Rule("[bold]Suggested Next Steps[/]") { Justification = Justify.Left });
-        AnsiConsole.WriteLine();
+        console.Write(new Rule("[bold]Suggested Next Steps[/]") { Justification = Justify.Left });
+        console.WriteLine();
 
         if (analysis.EntryPointTypes.Any())
         {
             var firstEntry = analysis.EntryPointTypes.First();
-            AnsiConsole.MarkupLine($"1. Explore the main type: [cyan]apilens hierarchy \"{firstEntry.Name}\" --show-members[/]");
+            console.MarkupLine($"1. Explore the main type: [cyan]apilens hierarchy \"{firstEntry.Name}\" --show-members[/]");
         }
 
         if (analysis.Namespaces.Any())
         {
             var mainNamespace = analysis.Namespaces.OrderByDescending(n => n.TypeCount).First();
-            AnsiConsole.MarkupLine($"2. Browse namespace types: [cyan]apilens list-types --namespace \"{mainNamespace.Name}\"[/]");
+            console.MarkupLine($"2. Browse namespace types: [cyan]apilens list-types --namespace \"{mainNamespace.Name}\"[/]");
         }
 
-        AnsiConsole.MarkupLine($"3. Search for examples: [cyan]apilens examples --max 10[/]");
+        console.MarkupLine($"3. Search for examples: [cyan]apilens examples --max 10[/]");
 
         if (analysis.Interfaces.Any())
         {
             var firstInterface = analysis.Interfaces.First();
-            AnsiConsole.MarkupLine($"4. Find implementations: [cyan]apilens hierarchy \"{firstInterface.Name}\"[/]");
+            console.MarkupLine($"4. Find implementations: [cyan]apilens hierarchy \"{firstInterface.Name}\"[/]");
         }
     }
 
@@ -367,10 +372,10 @@ public class ExploreCommand : Command<ExploreCommand.Settings>
         string json = JsonSerializer.Serialize(response, JsonOptions);
 
         // Temporarily set unlimited width to prevent JSON wrapping
-        var originalWidth = AnsiConsole.Profile.Width;
-        AnsiConsole.Profile.Width = int.MaxValue;
-        AnsiConsole.WriteLine(json);
-        AnsiConsole.Profile.Width = originalWidth;
+        var originalWidth = console.Profile.Width;
+        console.Profile.Width = int.MaxValue;
+        console.WriteLine(json);
+        console.Profile.Width = originalWidth;
     }
 
     private class PackageAnalysis

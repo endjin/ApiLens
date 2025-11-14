@@ -5,6 +5,7 @@ using ApiLens.Core.Helpers;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
+using Spectre.Console;
 
 namespace ApiLens.Cli.Commands;
 
@@ -14,29 +15,33 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
     private readonly IFileSystemService fileSystem;
     private readonly IFileHashHelper fileHashHelper;
     private readonly IIndexPathResolver indexPathResolver;
+    private readonly IAnsiConsole console;
 
     public IndexCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
         IFileSystemService fileSystem,
         IFileHashHelper fileHashHelper,
-        IIndexPathResolver indexPathResolver)
+        IIndexPathResolver indexPathResolver,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(fileHashHelper);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
+        ArgumentNullException.ThrowIfNull(console);
 
         this.indexManagerFactory = indexManagerFactory;
         this.fileSystem = fileSystem;
         this.fileHashHelper = fileHashHelper;
         this.indexPathResolver = indexPathResolver;
+        this.console = console;
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         if (!fileSystem.FileExists(settings.Path) && !fileSystem.DirectoryExists(settings.Path))
         {
-            AnsiConsole.MarkupLine($"[red]Error:[/] Path '{settings.Path}' does not exist.");
+            console.MarkupLine($"[red]Error:[/] Path '{settings.Path}' does not exist.");
             return 1;
         }
 
@@ -47,11 +52,11 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
 
             if (xmlFiles.Count == 0)
             {
-                AnsiConsole.MarkupLine("[yellow]No XML files found to index.[/]");
+                console.MarkupLine("[yellow]No XML files found to index.[/]");
                 return 0;
             }
 
-            AnsiConsole.MarkupLine($"[green]Found {xmlFiles.Count} XML file(s) to index.[/]");
+            console.MarkupLine($"[green]Found {xmlFiles.Count} XML file(s) to index.[/]");
 
             // Resolve the actual index path
             string resolvedIndexPath = indexPathResolver.ResolveIndexPath(settings.IndexPath);
@@ -63,7 +68,7 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
 
             if (settings.Clean)
             {
-                AnsiConsole.MarkupLine("[yellow]Cleaning index...[/]");
+                console.MarkupLine("[yellow]Cleaning index...[/]");
                 indexManager.DeleteAll();
                 await indexManager.CommitAsync();
                 filesToIndex = xmlFiles;
@@ -73,7 +78,7 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
                 // Get existing packages from index for change detection
                 Dictionary<string, HashSet<string>> indexedPackages = [];
 
-                await AnsiConsole.Status()
+                await console.Status()
                     .StartAsync("Analyzing index for change detection...", async ctx =>
                     {
                         ctx.Spinner(Spinner.Known.Star);
@@ -87,7 +92,7 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
                 HashSet<string> assembliesToUpdate = [];
                 int skippedFiles = 0;
 
-                await AnsiConsole.Status()
+                await console.Status()
                     .StartAsync("Computing file hashes for change detection...", async ctx =>
                     {
                         ctx.Spinner(Spinner.Known.Star);
@@ -152,29 +157,29 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
 
                 // Report what we're doing
                 int totalInIndex = indexedPackages.Sum(kvp => kvp.Value.Count);
-                AnsiConsole.MarkupLine(
+                console.MarkupLine(
                     $"[dim]Index contains {totalInIndex:N0} file versions across {indexedPackages.Count:N0} assemblies.[/]");
 
                 if (skippedFiles > 0)
                 {
-                    AnsiConsole.MarkupLine(
+                    console.MarkupLine(
                         $"[green]Skipping {skippedFiles:N0} file(s) already up-to-date in index.[/]");
                 }
 
                 if (filesToIndex.Count == 0)
                 {
-                    AnsiConsole.MarkupLine("[yellow]All files are already up-to-date. Nothing to index.[/]");
+                    console.MarkupLine("[yellow]All files are already up-to-date. Nothing to index.[/]");
                     return 0;
                 }
 
-                AnsiConsole.MarkupLine($"[green]Found {filesToIndex.Count:N0} file(s) to index (new or updated).[/]");
+                console.MarkupLine($"[green]Found {filesToIndex.Count:N0} file(s) to index (new or updated).[/]");
 
                 // Clean up old versions if needed
                 if (assembliesToUpdate.Count > 0)
                 {
                     int documentsBeforeCleanup = indexManager.GetTotalDocuments();
 
-                    await AnsiConsole.Status()
+                    await console.Status()
                         .StartAsync($"Removing old versions from {assembliesToUpdate.Count:N0} assemblies...",
                             async ctx =>
                             {
@@ -193,14 +198,14 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
 
                     if (documentsRemoved > 0)
                     {
-                        AnsiConsole.MarkupLine(
+                        console.MarkupLine(
                             $"[green]Removed {documentsRemoved:N0} API members from old versions.[/]");
                     }
                 }
             }
 
             // Create progress display
-            await AnsiConsole.Progress()
+            await console.Progress()
                 .AutoClear(false)
                 .Columns(
                     new TaskDescriptionColumn(),
@@ -222,7 +227,7 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
                     task.StopTask();
 
                     // Display results
-                    AnsiConsole.WriteLine();
+                    console.WriteLine();
                     DisplayResults(result, indexManager, resolvedIndexPath);
                 });
 
@@ -230,24 +235,24 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
         }
         catch (InvalidOperationException ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error during indexing:[/] {ex.Message}");
+            console.MarkupLine($"[red]Error during indexing:[/] {ex.Message}");
             return 1;
         }
 #pragma warning disable CA1031 // Do not catch general exception types
         catch (Exception ex)
 #pragma warning restore CA1031 // Do not catch general exception types
         {
-            AnsiConsole.MarkupLine($"[red]Unexpected error:[/] {ex.Message}");
+            console.MarkupLine($"[red]Unexpected error:[/] {ex.Message}");
             if (settings.Verbose)
             {
-                AnsiConsole.WriteException(ex);
+                console.WriteException(ex);
             }
 
             return 1;
         }
     }
 
-    private static void DisplayResults(IndexingResult result, ILuceneIndexManager indexManager, string indexPath)
+    private void DisplayResults(IndexingResult result, ILuceneIndexManager indexManager, string indexPath)
     {
         Table table = new Table()
             .Border(TableBorder.Rounded)
@@ -287,21 +292,21 @@ public class IndexCommand : AsyncCommand<IndexCommand.Settings>
             table.AddRow("Index Location", stats.IndexPath);
         }
 
-        AnsiConsole.Write(table);
+        console.Write(table);
 
         // Display errors if any
         if (result.Errors.Length > 0)
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[red]Errors encountered ({result.Errors.Length}):[/]");
+            console.WriteLine();
+            console.MarkupLine($"[red]Errors encountered ({result.Errors.Length}):[/]");
             foreach (string error in result.Errors.Take(10))
             {
-                AnsiConsole.MarkupLine($"  [red]•[/] {error}");
+                console.MarkupLine($"  [red]•[/] {error}");
             }
 
             if (result.Errors.Length > 10)
             {
-                AnsiConsole.MarkupLine($"  [dim]... and {result.Errors.Length - 10} more[/]");
+                console.MarkupLine($"  [dim]... and {result.Errors.Length - 10} more[/]");
             }
         }
     }

@@ -1,36 +1,91 @@
 {
-	"name": "C# (.NET)",
-	"image": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+	"name": ".NET 10 Dev Container",
+	"image": "mcr.microsoft.com/dotnet/sdk:10.0-noble",
 	"features": {
-		"ghcr.io/devcontainers/features/node:1": {},
-		"ghcr.io/devcontainers/features/powershell:1": {},
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "lts"
+		},
+		"ghcr.io/devcontainers/features/powershell:1": {
+			"version": "latest"
+		},
 		"ghcr.io/devcontainers/features/common-utils:2": {
-			"installZsh": "true",
+			"installZsh": true,
 			"username": "vscode",
-			"upgradePackages": "false",
-			"nonFreePackages": "true"
-	}
+			"upgradePackages": false,
+			"nonFreePackages": true
+		},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {
+			"version": "latest",
+			"moby": true,
+			"dockerDashComposeVersion": "v2"
+		},
+		"ghcr.io/devcontainers/features/git:1": {
+			"version": "latest",
+			"ppa": false
+		}
 	},
-	"postCreateCommand": "pwsh_path=$(find /usr/share/powershell -name pwsh -type f | grep -E 'tools/net[0-9]+\\.[0-9]+/any/pwsh$' | head -1) && [ -n \"$pwsh_path\" ] && sudo chmod +x \"$pwsh_path\" && sudo ln -sf \"$pwsh_path\" /usr/bin/pwsh && sudo chsh vscode -s \"$(which pwsh)\" && npm install -g @anthropic-ai/claude-code && sudo dotnet workload update && claude --dangerously-skip-permissions",
+	"postCreateCommand": "bash .devcontainer/setup.sh",
+	"postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
 	"customizations": {
 		"vscode": {
-			"settings": { 
-			"remote.extensionKind": {
-					"RooVeterinaryInc.roo-cline": [
-						"workspace"
-					]
-			},
-			"terminal.integrated.defaultProfile.linux": "pwsh"
+			"settings": {
+				"remote.extensionKind": {},
+				"terminal.integrated.defaultProfile.linux": "pwsh",
+				"terminal.integrated.profiles.linux": {
+					"bash": {
+						"path": "/bin/bash",
+						"icon": "terminal-bash"
+					},
+					"zsh": {
+						"path": "/usr/bin/zsh",
+						"icon": "terminal-linux"
+					},
+					"pwsh": {
+						"path": "/usr/bin/pwsh",
+						"icon": "terminal-powershell"
+					}
+				},
+				"dotnet.defaultSolution": "Solutions/Endjin.FreeAgent.Extensions.slnx",
+				"files.exclude": {
+					"**/bin": true,
+					"**/obj": true
+				},
+				"omnisharp.enableRoslynAnalyzers": true,
+				"omnisharp.enableEditorConfigSupport": true
 			},
 			"extensions": [
-				"RooVeterinaryInc.roo-cline",
 				"ms-vscode.powershell",
 				"anthropic.claude-code",
-				"ms-dotnettools.csdevkit"
+				"ms-dotnettools.csdevkit",
+				"ms-dotnettools.csharp",
+				"ms-azuretools.vscode-docker",
+				"editorconfig.editorconfig",
+				"streetsidesoftware.code-spell-checker"
 			]
 		}
 	},
 	"remoteEnv": {
-		"PERPLEXITY_API_KEY": "${localEnv:PERPLEXITY_API_KEY}"
+		"IS_SANDBOX": "1",
+		"DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+		"DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1"
+	},
+	"mounts": [
+		"source=${localWorkspaceFolder}/Artefacts,target=/workspaces/,type=bind,consistency=cached"
+	],
+	"forwardPorts": [5432, 5000, 5001],
+	"portsAttributes": {
+		"5000": {
+			"label": "HTTP",
+			"onAutoForward": "notify"
+		},
+		"5001": {
+			"label": "HTTPS",
+			"onAutoForward": "notify"
+		}
+	},
+	"hostRequirements": {
+		"cpus": 2,
+		"memory": "4gb",
+		"storage": "16gb"
 	}
 }

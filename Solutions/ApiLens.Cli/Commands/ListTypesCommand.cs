@@ -5,6 +5,7 @@ using ApiLens.Core.Formatting;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 
 namespace ApiLens.Cli.Commands;
 
@@ -21,22 +22,26 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
+    private readonly IAnsiConsole console;
 
     public ListTypesCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
         IIndexPathResolver indexPathResolver,
-        IQueryEngineFactory queryEngineFactory)
+        IQueryEngineFactory queryEngineFactory,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
+        ArgumentNullException.ThrowIfNull(console);
 
         this.indexManagerFactory = indexManagerFactory;
         this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
+        this.console = console;
     }
 
-    public override int Execute(CommandContext context, Settings settings)
+    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         try
         {
@@ -66,14 +71,14 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
                     string errorJson = JsonSerializer.Serialize(errorResponse, JsonOptions);
 
                     // Temporarily set unlimited width to prevent JSON wrapping
-                    var originalWidth = AnsiConsole.Profile.Width;
-                    AnsiConsole.Profile.Width = int.MaxValue;
-                    AnsiConsole.WriteLine(errorJson);
-                    AnsiConsole.Profile.Width = originalWidth;
+                    var originalWidth = console.Profile.Width;
+                    console.Profile.Width = int.MaxValue;
+                    console.WriteLine(errorJson);
+                    console.Profile.Width = originalWidth;
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine("[red]Error:[/] At least one filter (--assembly, --package, or --namespace) must be specified.");
+                    console.MarkupLine("[red]Error:[/] At least one filter (--assembly, --package, or --namespace) must be specified.");
                 }
                 return 1;
             }
@@ -96,7 +101,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine("[yellow]No types found matching the specified filters.[/]");
+                    console.MarkupLine("[yellow]No types found matching the specified filters.[/]");
                 }
                 return 0;
             }
@@ -117,13 +122,13 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
                     break;
                 case OutputFormat.Table:
                     OutputTable(groupedResults, settings);
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine($"[green]Found {results.Count} {(settings.IncludeMembers ? "members" : "types")}[/]");
+                    console.WriteLine();
+                    console.MarkupLine($"[green]Found {results.Count} {(settings.IncludeMembers ? "members" : "types")}[/]");
                     break;
                 case OutputFormat.Markdown:
                     OutputMarkdown(groupedResults, settings);
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine($"[green]Found {results.Count} {(settings.IncludeMembers ? "members" : "types")}[/]");
+                    console.WriteLine();
+                    console.MarkupLine($"[green]Found {results.Count} {(settings.IncludeMembers ? "members" : "types")}[/]");
                     break;
             }
 
@@ -131,7 +136,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         }
         catch (InvalidOperationException ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+            console.MarkupLine($"[red]Error:[/] {ex.Message}");
             return 1;
         }
     }
@@ -239,7 +244,7 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         return results;
     }
 
-    private static void OutputJson(List<MemberInfo> results, ILuceneIndexManager indexManager,
+    private void OutputJson(List<MemberInfo> results, ILuceneIndexManager indexManager,
         MetadataService metadataService, Settings settings)
     {
         List<string> filters = [];
@@ -276,18 +281,18 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         string json = JsonSerializer.Serialize(response, JsonOptions);
 
         // Temporarily set unlimited width to prevent JSON wrapping
-        var originalWidth = AnsiConsole.Profile.Width;
-        AnsiConsole.Profile.Width = int.MaxValue;
-        AnsiConsole.WriteLine(json);
-        AnsiConsole.Profile.Width = originalWidth;
+        var originalWidth = console.Profile.Width;
+        console.Profile.Width = int.MaxValue;
+        console.WriteLine(json);
+        console.Profile.Width = originalWidth;
     }
 
-    private static void OutputTable(IEnumerable<IGrouping<string, MemberInfo>> groupedResults, Settings settings)
+    private void OutputTable(IEnumerable<IGrouping<string, MemberInfo>> groupedResults, Settings settings)
     {
         foreach (IGrouping<string, MemberInfo> group in groupedResults)
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.Write(new Rule($"[bold yellow]{group.Key}[/]"));
+            console.WriteLine();
+            console.Write(new Rule($"[bold yellow]{group.Key}[/]"));
 
             Table table = new();
             table.AddColumn("Type");
@@ -316,41 +321,41 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
                 table.AddRow(row.ToArray());
             }
 
-            AnsiConsole.Write(table);
+            console.Write(table);
         }
     }
 
-    private static void OutputMarkdown(IEnumerable<IGrouping<string, MemberInfo>> groupedResults, Settings settings)
+    private void OutputMarkdown(IEnumerable<IGrouping<string, MemberInfo>> groupedResults, Settings settings)
     {
-        AnsiConsole.WriteLine("# Type Listing Results");
-        AnsiConsole.WriteLine();
+        console.WriteLine("# Type Listing Results");
+        console.WriteLine();
 
         foreach (IGrouping<string, MemberInfo> group in groupedResults)
         {
-            AnsiConsole.WriteLine($"## {group.Key}");
-            AnsiConsole.WriteLine();
+            console.WriteLine($"## {group.Key}");
+            console.WriteLine();
 
             foreach (MemberInfo member in group.OrderBy(m => m.Namespace).ThenBy(m => m.Name))
             {
-                AnsiConsole.WriteLine($"### {GenericTypeFormatter.FormatFullName(member.FullName)}");
-                AnsiConsole.WriteLine();
-                AnsiConsole.WriteLine($"- **Type**: {member.MemberType}");
-                AnsiConsole.WriteLine($"- **Namespace**: {member.Namespace}");
-                AnsiConsole.WriteLine($"- **Assembly**: {member.Assembly}");
+                console.WriteLine($"### {GenericTypeFormatter.FormatFullName(member.FullName)}");
+                console.WriteLine();
+                console.WriteLine($"- **Type**: {member.MemberType}");
+                console.WriteLine($"- **Namespace**: {member.Namespace}");
+                console.WriteLine($"- **Assembly**: {member.Assembly}");
 
                 if (!string.IsNullOrWhiteSpace(member.PackageId))
                 {
-                    AnsiConsole.WriteLine($"- **Package**: {member.PackageId} v{member.PackageVersion ?? "Unknown"}");
+                    console.WriteLine($"- **Package**: {member.PackageId} v{member.PackageVersion ?? "Unknown"}");
                 }
 
                 if (!string.IsNullOrWhiteSpace(member.Summary))
                 {
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.WriteLine("**Summary:**");
-                    AnsiConsole.WriteLine(member.Summary);
+                    console.WriteLine();
+                    console.WriteLine("**Summary:**");
+                    console.WriteLine(member.Summary);
                 }
 
-                AnsiConsole.WriteLine();
+                console.WriteLine();
             }
         }
     }

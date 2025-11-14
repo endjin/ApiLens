@@ -3,12 +3,14 @@ using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 using Spectre.Console.Cli;
+using Spectre.Console.Testing;
 
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]
-public class ExceptionsCommandTests
+public class ExceptionsCommandTests : IDisposable
 {
     private ILuceneIndexManagerFactory indexManagerFactory = null!;
     private IQueryEngineFactory queryEngineFactory = null!;
@@ -16,6 +18,7 @@ public class ExceptionsCommandTests
     private ILuceneIndexManager indexManager = null!;
     private IQueryEngine queryEngine = null!;
     private CommandContext context = null!;
+    private TestConsole console = null!;
 
     [TestInitialize]
     public void Initialize()
@@ -31,6 +34,21 @@ public class ExceptionsCommandTests
         indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
         indexManagerFactory.Create(Arg.Any<string>()).Returns(indexManager);
         queryEngineFactory.Create(indexManager).Returns(queryEngine);
+
+        console = new TestConsole();
+        console.Profile.Width = 120;
+        console.Profile.Height = 40;
+    }
+
+    [TestCleanup]
+    public void Cleanup()
+    {
+        console?.Dispose();
+    }
+
+    public void Dispose()
+    {
+        console?.Dispose();
     }
 
     private static MemberInfo CreateMemberInfoWithExceptions(string name, params ExceptionInfo[] exceptions)
@@ -89,7 +107,7 @@ public class ExceptionsCommandTests
     public void Execute_WithExceptionType_CallsGetByExceptionType()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.ArgumentNullException",
@@ -107,7 +125,7 @@ public class ExceptionsCommandTests
         queryEngine.GetByExceptionType("System.ArgumentNullException", 30).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -118,7 +136,7 @@ public class ExceptionsCommandTests
     public void Execute_WithNoResults_ReturnsSuccess()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.CustomException"
@@ -127,7 +145,7 @@ public class ExceptionsCommandTests
         queryEngine.GetByExceptionType("System.CustomException", 10).Returns([]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -137,14 +155,14 @@ public class ExceptionsCommandTests
     public void Execute_WithException_ReturnsErrorCode()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ExceptionsCommand.Settings settings = new() { ExceptionType = "System.Exception" };
 
         queryEngine.When(x => x.GetByExceptionType(Arg.Any<string>(), Arg.Any<int>()))
             .Do(_ => throw new InvalidOperationException("Index error"));
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -154,13 +172,13 @@ public class ExceptionsCommandTests
     public void Execute_DisposesResources()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ExceptionsCommand.Settings settings = new() { ExceptionType = "System.Exception" };
 
         queryEngine.GetByExceptionType("System.Exception", 10).Returns([]);
 
         // Act
-        command.Execute(context, settings);
+        command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         indexManager.Received(1).Dispose();
@@ -171,7 +189,7 @@ public class ExceptionsCommandTests
     public void Execute_WithJsonFormat_ProcessesResults()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.InvalidOperationException",
@@ -191,7 +209,7 @@ public class ExceptionsCommandTests
             .Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -201,7 +219,7 @@ public class ExceptionsCommandTests
     public void Execute_WithMarkdownFormat_ProcessesResults()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.ArgumentException",
@@ -221,7 +239,7 @@ public class ExceptionsCommandTests
             .Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -231,7 +249,7 @@ public class ExceptionsCommandTests
     public void Execute_WithTableFormat_ProcessesResults()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.Exception",
@@ -255,7 +273,7 @@ public class ExceptionsCommandTests
         queryEngine.GetByExceptionType("System.Exception", 10).Returns(members);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -265,7 +283,7 @@ public class ExceptionsCommandTests
     public void Execute_WithShowDetails_HandlesCorrectly()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.ArgumentNullException",
@@ -283,7 +301,7 @@ public class ExceptionsCommandTests
             .Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -293,7 +311,7 @@ public class ExceptionsCommandTests
     public void Execute_WithJsonFormatAndNoResults_ReturnsEmptyArray()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.NonExistentException",
@@ -304,7 +322,7 @@ public class ExceptionsCommandTests
             .Returns([]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -314,7 +332,7 @@ public class ExceptionsCommandTests
     public void Execute_WithFullyQualifiedExceptionType_Works()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = "System.Collections.Generic.KeyNotFoundException",
@@ -334,7 +352,7 @@ public class ExceptionsCommandTests
             .Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -345,7 +363,7 @@ public class ExceptionsCommandTests
     public void Execute_WithEmptyExceptionType_ReturnsSuccess()
     {
         // Arrange
-        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ExceptionsCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ExceptionsCommand.Settings settings = new()
         {
             ExceptionType = string.Empty
@@ -354,7 +372,7 @@ public class ExceptionsCommandTests
         queryEngine.GetByExceptionType(string.Empty, 10).Returns([]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);

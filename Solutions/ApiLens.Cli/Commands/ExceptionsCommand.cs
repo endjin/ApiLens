@@ -5,6 +5,7 @@ using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 
 namespace ApiLens.Cli.Commands;
 
@@ -21,22 +22,26 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
+    private readonly IAnsiConsole console;
 
     public ExceptionsCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
         IIndexPathResolver indexPathResolver,
-        IQueryEngineFactory queryEngineFactory)
+        IQueryEngineFactory queryEngineFactory,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
+        ArgumentNullException.ThrowIfNull(console);
 
         this.indexManagerFactory = indexManagerFactory;
         this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
+        this.console = console;
     }
 
-    public override int Execute(CommandContext context, Settings settings)
+    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         try
         {
@@ -61,7 +66,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[yellow]No methods found that throw {settings.ExceptionType}.[/]");
+                    console.MarkupLine($"[yellow]No methods found that throw {settings.ExceptionType}.[/]");
                 }
 
                 return 0;
@@ -85,12 +90,12 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         }
         catch (InvalidOperationException ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error searching for exceptions:[/] {ex.Message}");
+            console.MarkupLine($"[red]Error searching for exceptions:[/] {ex.Message}");
             return 1;
         }
     }
 
-    private static void OutputJson(List<MemberInfo> results, string exceptionType,
+    private void OutputJson(List<MemberInfo> results, string exceptionType,
         ILuceneIndexManager indexManager, MetadataService metadataService)
     {
         var output = results.SelectMany(member =>
@@ -125,23 +130,23 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         string json = JsonSerializer.Serialize(response, JsonOptions);
 
         // Temporarily set unlimited width to prevent JSON wrapping
-        var originalWidth = AnsiConsole.Profile.Width;
-        AnsiConsole.Profile.Width = int.MaxValue;
-        AnsiConsole.WriteLine(json);
-        AnsiConsole.Profile.Width = originalWidth;
+        var originalWidth = console.Profile.Width;
+        console.Profile.Width = int.MaxValue;
+        console.WriteLine(json);
+        console.Profile.Width = originalWidth;
     }
 
-    private static void OutputMarkdown(List<MemberInfo> results, string exceptionType, bool showDetails)
+    private void OutputMarkdown(List<MemberInfo> results, string exceptionType, bool showDetails)
     {
-        AnsiConsole.WriteLine($"# Methods Throwing {exceptionType}");
-        AnsiConsole.WriteLine();
-        AnsiConsole.WriteLine($"Found {results.Count} method(s) that throw {exceptionType}.");
-        AnsiConsole.WriteLine();
+        console.WriteLine($"# Methods Throwing {exceptionType}");
+        console.WriteLine();
+        console.WriteLine($"Found {results.Count} method(s) that throw {exceptionType}.");
+        console.WriteLine();
 
         if (!showDetails)
         {
-            AnsiConsole.WriteLine("| Member | Exception | Condition |");
-            AnsiConsole.WriteLine("|--------|-----------|-----------|");
+            console.WriteLine("| Member | Exception | Condition |");
+            console.WriteLine("|--------|-----------|-----------|");
 
             foreach (MemberInfo member in results)
             {
@@ -149,7 +154,7 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
                 {
                     if (ExceptionTypeMatches(exception.Type, exceptionType))
                     {
-                        AnsiConsole.WriteLine(
+                        console.WriteLine(
                             $"| {member.FullName} | {exception.Type} | {exception.Condition ?? "No condition specified"} |");
                     }
                 }
@@ -159,36 +164,36 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
         {
             foreach (MemberInfo member in results)
             {
-                AnsiConsole.WriteLine($"## {member.FullName}");
-                AnsiConsole.WriteLine();
+                console.WriteLine($"## {member.FullName}");
+                console.WriteLine();
 
                 if (!string.IsNullOrWhiteSpace(member.Summary))
                 {
-                    AnsiConsole.WriteLine(member.Summary);
-                    AnsiConsole.WriteLine();
+                    console.WriteLine(member.Summary);
+                    console.WriteLine();
                 }
 
-                AnsiConsole.WriteLine("**Exceptions:**");
+                console.WriteLine("**Exceptions:**");
                 foreach (ExceptionInfo exception in member.Exceptions)
                 {
-                    AnsiConsole.WriteLine($"- **{exception.Type}**");
+                    console.WriteLine($"- **{exception.Type}**");
                     if (!string.IsNullOrWhiteSpace(exception.Condition))
                     {
-                        AnsiConsole.WriteLine($"  - {exception.Condition}");
+                        console.WriteLine($"  - {exception.Condition}");
                     }
                 }
 
-                AnsiConsole.WriteLine();
-                AnsiConsole.WriteLine("---");
-                AnsiConsole.WriteLine();
+                console.WriteLine();
+                console.WriteLine("---");
+                console.WriteLine();
             }
         }
     }
 
-    private static void OutputTable(List<MemberInfo> results, string exceptionType, bool showDetails)
+    private void OutputTable(List<MemberInfo> results, string exceptionType, bool showDetails)
     {
-        AnsiConsole.MarkupLine($"[green]Found {results.Count} method(s) that throw {exceptionType}:[/]");
-        AnsiConsole.WriteLine();
+        console.MarkupLine($"[green]Found {results.Count} method(s) that throw {exceptionType}:[/]");
+        console.WriteLine();
 
         Table table = new();
         table.AddColumn("Member");
@@ -210,35 +215,35 @@ public class ExceptionsCommand : Command<ExceptionsCommand.Settings>
             }
         }
 
-        AnsiConsole.Write(table);
+        console.Write(table);
 
         // Show detailed information if requested
         if (showDetails)
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.Write(new Rule("[bold]Detailed Information[/]").RuleStyle("dim"));
-            AnsiConsole.WriteLine();
+            console.WriteLine();
+            console.Write(new Rule("[bold]Detailed Information[/]").RuleStyle("dim"));
+            console.WriteLine();
 
             foreach (MemberInfo member in results)
             {
-                AnsiConsole.MarkupLine($"[bold cyan]{member.FullName}[/]");
+                console.MarkupLine($"[bold cyan]{member.FullName}[/]");
 
                 if (!string.IsNullOrWhiteSpace(member.Summary))
                 {
-                    AnsiConsole.MarkupLine($"[dim]{member.Summary}[/]");
+                    console.MarkupLine($"[dim]{member.Summary}[/]");
                 }
 
-                AnsiConsole.MarkupLine("[yellow]Exceptions:[/]");
+                console.MarkupLine("[yellow]Exceptions:[/]");
                 foreach (ExceptionInfo exception in member.Exceptions)
                 {
-                    AnsiConsole.MarkupLine($"  • [red]{exception.Type}[/]");
+                    console.MarkupLine($"  • [red]{exception.Type}[/]");
                     if (!string.IsNullOrWhiteSpace(exception.Condition))
                     {
-                        AnsiConsole.MarkupLine($"    [dim]{exception.Condition}[/]");
+                        console.MarkupLine($"    [dim]{exception.Condition}[/]");
                     }
                 }
 
-                AnsiConsole.WriteLine();
+                console.WriteLine();
             }
         }
     }

@@ -4,6 +4,7 @@ using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 
 namespace ApiLens.Cli.Commands;
 
@@ -20,22 +21,26 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
+    private readonly IAnsiConsole console;
 
     public ExamplesCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
         IIndexPathResolver indexPathResolver,
-        IQueryEngineFactory queryEngineFactory)
+        IQueryEngineFactory queryEngineFactory,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
+        ArgumentNullException.ThrowIfNull(console);
 
         this.indexManagerFactory = indexManagerFactory;
         this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
+        this.console = console;
     }
 
-    public override int Execute(CommandContext context, Settings settings)
+    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         try
         {
@@ -76,7 +81,7 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
                     string message = searchPattern == null
                         ? "No methods with code examples found."
                         : $"No code examples found matching '{searchPattern}'.";
-                    AnsiConsole.MarkupLine($"[yellow]{message}[/]");
+                    console.MarkupLine($"[yellow]{message}[/]");
                 }
 
                 return 0;
@@ -100,12 +105,12 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
         }
         catch (InvalidOperationException ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error searching for code examples:[/] {ex.Message}");
+            console.MarkupLine($"[red]Error searching for code examples:[/] {ex.Message}");
             return 1;
         }
     }
 
-    private static void OutputJson(List<MemberInfo> results, string? searchPattern,
+    private void OutputJson(List<MemberInfo> results, string? searchPattern,
         ILuceneIndexManager indexManager, MetadataService metadataService)
     {
         var output = results.Select(member => new
@@ -145,82 +150,82 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
         string json = JsonSerializer.Serialize(response, JsonOptions);
 
         // Temporarily set unlimited width to prevent JSON wrapping
-        var originalWidth = AnsiConsole.Profile.Width;
-        AnsiConsole.Profile.Width = int.MaxValue;
-        AnsiConsole.WriteLine(json);
-        AnsiConsole.Profile.Width = originalWidth;
+        var originalWidth = console.Profile.Width;
+        console.Profile.Width = int.MaxValue;
+        console.WriteLine(json);
+        console.Profile.Width = originalWidth;
     }
 
-    private static void OutputMarkdown(List<MemberInfo> results, string? searchPattern)
+    private void OutputMarkdown(List<MemberInfo> results, string? searchPattern)
     {
-        AnsiConsole.WriteLine("# Code Examples");
-        AnsiConsole.WriteLine();
+        console.WriteLine("# Code Examples");
+        console.WriteLine();
 
         if (searchPattern != null)
         {
-            AnsiConsole.WriteLine($"Search pattern: `{searchPattern}`");
-            AnsiConsole.WriteLine();
+            console.WriteLine($"Search pattern: `{searchPattern}`");
+            console.WriteLine();
         }
 
-        AnsiConsole.WriteLine($"Found {results.Count} method(s) with code examples.");
-        AnsiConsole.WriteLine();
+        console.WriteLine($"Found {results.Count} method(s) with code examples.");
+        console.WriteLine();
 
         foreach (MemberInfo member in results)
         {
-            AnsiConsole.WriteLine($"## {member.FullName}");
-            AnsiConsole.WriteLine();
+            console.WriteLine($"## {member.FullName}");
+            console.WriteLine();
 
             if (!string.IsNullOrWhiteSpace(member.Summary))
             {
-                AnsiConsole.WriteLine(member.Summary);
-                AnsiConsole.WriteLine();
+                console.WriteLine(member.Summary);
+                console.WriteLine();
             }
 
             foreach (CodeExample example in member.CodeExamples)
             {
                 if (!string.IsNullOrWhiteSpace(example.Description))
                 {
-                    AnsiConsole.WriteLine($"**{example.Description}**");
-                    AnsiConsole.WriteLine();
+                    console.WriteLine($"**{example.Description}**");
+                    console.WriteLine();
                 }
 
-                AnsiConsole.WriteLine($"```{example.Language}");
-                AnsiConsole.WriteLine(example.Code);
-                AnsiConsole.WriteLine("```");
-                AnsiConsole.WriteLine();
+                console.WriteLine($"```{example.Language}");
+                console.WriteLine(example.Code);
+                console.WriteLine("```");
+                console.WriteLine();
             }
 
-            AnsiConsole.WriteLine("---");
-            AnsiConsole.WriteLine();
+            console.WriteLine("---");
+            console.WriteLine();
         }
     }
 
-    private static void OutputTable(List<MemberInfo> results, string? searchPattern)
+    private void OutputTable(List<MemberInfo> results, string? searchPattern)
     {
         string message = searchPattern == null
             ? $"Found {results.Count} method(s) with code examples:"
             : $"Found {results.Count} method(s) with code examples matching '{searchPattern}':";
-        AnsiConsole.MarkupLine($"[green]{message}[/]");
-        AnsiConsole.WriteLine();
+        console.MarkupLine($"[green]{message}[/]");
+        console.WriteLine();
 
         foreach (MemberInfo member in results)
         {
             // Display member info
-            AnsiConsole.MarkupLine($"[bold cyan]{member.FullName}[/]");
+            console.MarkupLine($"[bold cyan]{member.FullName}[/]");
 
             if (!string.IsNullOrWhiteSpace(member.Summary))
             {
-                AnsiConsole.MarkupLine($"[dim]{member.Summary}[/]");
+                console.MarkupLine($"[dim]{member.Summary}[/]");
             }
 
             // Display code examples
             foreach (CodeExample example in member.CodeExamples)
             {
-                AnsiConsole.WriteLine();
+                console.WriteLine();
 
                 if (!string.IsNullOrWhiteSpace(example.Description))
                 {
-                    AnsiConsole.MarkupLine($"[yellow]{example.Description}[/]");
+                    console.MarkupLine($"[yellow]{example.Description}[/]");
                 }
 
                 Panel codePanel = new Panel(Markup.Escape(example.Code))
@@ -228,12 +233,12 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
                     .BorderColor(Color.Green)
                     .Padding(1, 1);
 
-                AnsiConsole.Write(codePanel);
+                console.Write(codePanel);
             }
 
-            AnsiConsole.WriteLine();
-            AnsiConsole.Write(new Rule().RuleStyle("dim"));
-            AnsiConsole.WriteLine();
+            console.WriteLine();
+            console.Write(new Rule().RuleStyle("dim"));
+            console.WriteLine();
         }
     }
 

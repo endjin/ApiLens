@@ -6,6 +6,7 @@ using ApiLens.Core.Formatting;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 
 namespace ApiLens.Cli.Commands;
 
@@ -25,22 +26,26 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
+    private readonly IAnsiConsole console;
 
     public HierarchyCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
         IIndexPathResolver indexPathResolver,
-        IQueryEngineFactory queryEngineFactory)
+        IQueryEngineFactory queryEngineFactory,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
+        ArgumentNullException.ThrowIfNull(console);
 
         this.indexManagerFactory = indexManagerFactory;
         this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
+        this.console = console;
     }
 
-    public override int Execute(CommandContext context, Settings settings)
+    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         try
         {
@@ -63,7 +68,7 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
 
             if (targetType == null)
             {
-                AnsiConsole.MarkupLine($"[yellow]Type '{settings.TypeName}' not found.[/]");
+                console.MarkupLine($"[yellow]Type '{settings.TypeName}' not found.[/]");
 
                 // Provide suggestions
                 var suggestions = typeResults
@@ -74,11 +79,11 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
 
                 if (suggestions.Any())
                 {
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine("[dim]Did you mean one of these?[/]");
+                    console.WriteLine();
+                    console.MarkupLine("[dim]Did you mean one of these?[/]");
                     foreach (var suggestion in suggestions)
                     {
-                        AnsiConsole.MarkupLine($"  [dim]- {Markup.Escape(suggestion)}[/]");
+                        console.MarkupLine($"  [dim]- {Markup.Escape(suggestion)}[/]");
                     }
                 }
                 return 0;
@@ -105,7 +110,7 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
         }
         catch (InvalidOperationException ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+            console.MarkupLine($"[red]Error:[/] {ex.Message}");
             return 1;
         }
     }
@@ -165,7 +170,7 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
         };
     }
 
-    private static void OutputJson(TypeHierarchy hierarchy, MemberInfo targetType,
+    private void OutputJson(TypeHierarchy hierarchy, MemberInfo targetType,
         ILuceneIndexManager indexManager, MetadataService metadataService, Settings settings)
     {
         var metadata = metadataService.BuildMetadata(
@@ -187,67 +192,67 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
         string json = JsonSerializer.Serialize(response, JsonOptions);
 
         // Temporarily set unlimited width to prevent JSON wrapping
-        var originalWidth = AnsiConsole.Profile.Width;
-        AnsiConsole.Profile.Width = int.MaxValue;
-        AnsiConsole.WriteLine(json);
-        AnsiConsole.Profile.Width = originalWidth;
+        var originalWidth = console.Profile.Width;
+        console.Profile.Width = int.MaxValue;
+        console.WriteLine(json);
+        console.Profile.Width = originalWidth;
     }
 
-    private static void OutputTable(TypeHierarchy hierarchy, MemberInfo targetType, Settings settings)
+    private void OutputTable(TypeHierarchy hierarchy, MemberInfo targetType, Settings settings)
     {
         // Type information
-        AnsiConsole.Write(new Rule($"[bold yellow]{GenericTypeFormatter.FormatFullName(targetType.FullName)}[/]"));
-        AnsiConsole.WriteLine();
+        console.Write(new Rule($"[bold yellow]{GenericTypeFormatter.FormatFullName(targetType.FullName)}[/]"));
+        console.WriteLine();
 
         if (!string.IsNullOrWhiteSpace(targetType.Summary))
         {
-            AnsiConsole.MarkupLine("[dim]Summary:[/]");
-            AnsiConsole.WriteLine(targetType.Summary);
-            AnsiConsole.WriteLine();
+            console.MarkupLine("[dim]Summary:[/]");
+            console.WriteLine(targetType.Summary);
+            console.WriteLine();
         }
 
         // Base types
         if (hierarchy.BaseTypes.Any())
         {
-            AnsiConsole.MarkupLine("[bold]Base Types:[/]");
+            console.MarkupLine("[bold]Base Types:[/]");
             foreach (var baseType in hierarchy.BaseTypes)
             {
-                AnsiConsole.MarkupLine($"  ← {Markup.Escape(GenericTypeFormatter.FormatFullName(baseType.FullName))}");
+                console.MarkupLine($"  ← {Markup.Escape(GenericTypeFormatter.FormatFullName(baseType.FullName))}");
             }
-            AnsiConsole.WriteLine();
+            console.WriteLine();
         }
 
         // Interfaces
         if (hierarchy.Interfaces.Any())
         {
-            AnsiConsole.MarkupLine("[bold]Implements:[/]");
+            console.MarkupLine("[bold]Implements:[/]");
             foreach (var iface in hierarchy.Interfaces)
             {
-                AnsiConsole.MarkupLine($"  ◊ {Markup.Escape(GenericTypeFormatter.FormatFullName(iface.FullName))}");
+                console.MarkupLine($"  ◊ {Markup.Escape(GenericTypeFormatter.FormatFullName(iface.FullName))}");
             }
-            AnsiConsole.WriteLine();
+            console.WriteLine();
         }
 
         // Derived types
         if (hierarchy.DerivedTypes.Any())
         {
-            AnsiConsole.MarkupLine("[bold]Derived Types:[/]");
+            console.MarkupLine("[bold]Derived Types:[/]");
             foreach (var derived in hierarchy.DerivedTypes)
             {
-                AnsiConsole.MarkupLine($"  → {Markup.Escape(GenericTypeFormatter.FormatFullName(derived.FullName))}");
+                console.MarkupLine($"  → {Markup.Escape(GenericTypeFormatter.FormatFullName(derived.FullName))}");
             }
-            AnsiConsole.WriteLine();
+            console.WriteLine();
         }
 
         // Members
         if (settings.ShowMembers && hierarchy.Members.Any())
         {
-            AnsiConsole.MarkupLine("[bold]Members:[/]");
+            console.MarkupLine("[bold]Members:[/]");
 
             var memberGroups = hierarchy.Members.GroupBy(m => m.MemberType);
             foreach (var group in memberGroups.OrderBy(g => g.Key))
             {
-                AnsiConsole.MarkupLine($"  [dim]{group.Key}s:[/]");
+                console.MarkupLine($"  [dim]{group.Key}s:[/]");
                 foreach (var member in group.OrderBy(m => m.Name))
                 {
                     string memberDisplay = member.MemberType switch
@@ -258,82 +263,82 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
                         MemberType.Event => $"    • {member.Name}",
                         _ => $"    • {member.Name}"
                     };
-                    AnsiConsole.MarkupLine(Markup.Escape(memberDisplay));
+                    console.MarkupLine(Markup.Escape(memberDisplay));
                 }
             }
         }
     }
 
-    private static void OutputMarkdown(TypeHierarchy hierarchy, MemberInfo targetType, Settings settings)
+    private void OutputMarkdown(TypeHierarchy hierarchy, MemberInfo targetType, Settings settings)
     {
         // Type header
-        AnsiConsole.WriteLine($"# {GenericTypeFormatter.FormatFullName(targetType.FullName)}");
-        AnsiConsole.WriteLine();
+        console.WriteLine($"# {GenericTypeFormatter.FormatFullName(targetType.FullName)}");
+        console.WriteLine();
 
         if (!string.IsNullOrWhiteSpace(targetType.Summary))
         {
-            AnsiConsole.WriteLine(targetType.Summary);
-            AnsiConsole.WriteLine();
+            console.WriteLine(targetType.Summary);
+            console.WriteLine();
         }
 
         // Metadata
-        AnsiConsole.WriteLine("## Type Information");
-        AnsiConsole.WriteLine();
-        AnsiConsole.WriteLine($"- **Namespace**: {targetType.Namespace}");
-        AnsiConsole.WriteLine($"- **Assembly**: {targetType.Assembly}");
+        console.WriteLine("## Type Information");
+        console.WriteLine();
+        console.WriteLine($"- **Namespace**: {targetType.Namespace}");
+        console.WriteLine($"- **Assembly**: {targetType.Assembly}");
         if (!string.IsNullOrWhiteSpace(targetType.PackageId))
         {
-            AnsiConsole.WriteLine($"- **Package**: {targetType.PackageId} v{targetType.PackageVersion}");
+            console.WriteLine($"- **Package**: {targetType.PackageId} v{targetType.PackageVersion}");
         }
-        AnsiConsole.WriteLine();
+        console.WriteLine();
 
         // Base types
         if (hierarchy.BaseTypes.Any())
         {
-            AnsiConsole.WriteLine("## Inheritance Hierarchy");
-            AnsiConsole.WriteLine();
+            console.WriteLine("## Inheritance Hierarchy");
+            console.WriteLine();
             foreach (var baseType in hierarchy.BaseTypes)
             {
-                AnsiConsole.WriteLine($"- ← `{GenericTypeFormatter.FormatFullName(baseType.FullName)}`");
+                console.WriteLine($"- ← `{GenericTypeFormatter.FormatFullName(baseType.FullName)}`");
             }
-            AnsiConsole.WriteLine();
+            console.WriteLine();
         }
 
         // Interfaces
         if (hierarchy.Interfaces.Any())
         {
-            AnsiConsole.WriteLine("## Implemented Interfaces");
-            AnsiConsole.WriteLine();
+            console.WriteLine("## Implemented Interfaces");
+            console.WriteLine();
             foreach (var iface in hierarchy.Interfaces)
             {
-                AnsiConsole.WriteLine($"- `{GenericTypeFormatter.FormatFullName(iface.FullName)}`");
+                console.WriteLine($"- `{GenericTypeFormatter.FormatFullName(iface.FullName)}`");
             }
-            AnsiConsole.WriteLine();
+            console.WriteLine();
         }
 
         // Derived types
         if (hierarchy.DerivedTypes.Any())
         {
-            AnsiConsole.WriteLine("## Known Derived Types");
-            AnsiConsole.WriteLine();
+            console.WriteLine("## Known Derived Types");
+            console.WriteLine();
             foreach (var derived in hierarchy.DerivedTypes)
             {
-                AnsiConsole.WriteLine($"- → `{GenericTypeFormatter.FormatFullName(derived.FullName)}`");
+                console.WriteLine($"- → `{GenericTypeFormatter.FormatFullName(derived.FullName)}`");
             }
-            AnsiConsole.WriteLine();
+            console.WriteLine();
         }
 
         // Members
         if (settings.ShowMembers && hierarchy.Members.Any())
         {
-            AnsiConsole.WriteLine("## Members");
-            AnsiConsole.WriteLine();
+            console.WriteLine("## Members");
+            console.WriteLine();
 
             var memberGroups = hierarchy.Members.GroupBy(m => m.MemberType);
             foreach (var group in memberGroups.OrderBy(g => g.Key))
             {
-                AnsiConsole.WriteLine($"### {group.Key}s");
-                AnsiConsole.WriteLine();
+                console.WriteLine($"### {group.Key}s");
+                console.WriteLine();
 
                 foreach (var member in group.OrderBy(m => m.Name))
                 {
@@ -342,14 +347,14 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
                         MemberType.Method => $"- `{member.Name}()` - {member.Parameters.Length} parameter(s)",
                         _ => $"- `{member.Name}`"
                     };
-                    AnsiConsole.WriteLine(memberLine);
+                    console.WriteLine(memberLine);
 
                     if (!string.IsNullOrWhiteSpace(member.Summary))
                     {
-                        AnsiConsole.WriteLine($"  {member.Summary}");
+                        console.WriteLine($"  {member.Summary}");
                     }
                 }
-                AnsiConsole.WriteLine();
+                console.WriteLine();
             }
         }
     }

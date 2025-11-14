@@ -2,7 +2,6 @@ using ApiLens.Core.Helpers;
 using ApiLens.Core.Models;
 using ApiLens.Core.Parsing;
 using ApiLens.Core.Services;
-using ApiLens.Core.Tests.Helpers;
 
 namespace ApiLens.Core.Tests.Parsing;
 

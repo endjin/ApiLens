@@ -3,12 +3,14 @@ using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 using Spectre.Console.Cli;
+using Spectre.Console.Testing;
 
 namespace ApiLens.Cli.Tests.Commands;
 
 [TestClass]
-public class ComplexityCommandTests
+public class ComplexityCommandTests : IDisposable
 {
     private ILuceneIndexManagerFactory indexManagerFactory = null!;
     private IQueryEngineFactory queryEngineFactory = null!;
@@ -16,6 +18,7 @@ public class ComplexityCommandTests
     private ILuceneIndexManager indexManager = null!;
     private IQueryEngine queryEngine = null!;
     private CommandContext context = null!;
+    private TestConsole console = null!;
 
     [TestInitialize]
     public void Initialize()
@@ -31,6 +34,21 @@ public class ComplexityCommandTests
         indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
         indexManagerFactory.Create(Arg.Any<string>()).Returns(indexManager);
         queryEngineFactory.Create(indexManager).Returns(queryEngine);
+
+        console = new TestConsole();
+        console.Profile.Width = 120;
+        console.Profile.Height = 40;
+    }
+
+    [TestCleanup]
+    public void Cleanup()
+    {
+        console?.Dispose();
+    }
+
+    public void Dispose()
+    {
+        console?.Dispose();
     }
 
     private static MemberInfo CreateMemberInfo(string name, ComplexityMetrics? complexity = null)
@@ -95,11 +113,11 @@ public class ComplexityCommandTests
     public void Execute_WithNoParameters_ReturnsError()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new();
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -109,7 +127,7 @@ public class ComplexityCommandTests
     public void Execute_WithMinComplexity_CallsGetComplexMethods()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new()
         {
             MinComplexity = 10,
@@ -124,7 +142,7 @@ public class ComplexityCommandTests
         queryEngine.GetComplexMethods(10, 50).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -135,7 +153,7 @@ public class ComplexityCommandTests
     public void Execute_WithParameterRange_CallsGetByParameterCount()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new()
         {
             MinParams = 2,
@@ -147,7 +165,7 @@ public class ComplexityCommandTests
         queryEngine.GetByParameterCount(2, 5, 30).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -158,7 +176,7 @@ public class ComplexityCommandTests
     public void Execute_WithMinParamsOnly_CallsGetByParameterCount()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new()
         {
             MinParams = 3,
@@ -169,7 +187,7 @@ public class ComplexityCommandTests
         queryEngine.GetByParameterCount(3, int.MaxValue, 20).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -180,7 +198,7 @@ public class ComplexityCommandTests
     public void Execute_WithMaxParamsOnly_CallsGetByParameterCount()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new()
         {
             MaxParams = 5,
@@ -191,7 +209,7 @@ public class ComplexityCommandTests
         queryEngine.GetByParameterCount(0, 5, 20).Returns(expectedResults);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -202,14 +220,14 @@ public class ComplexityCommandTests
     public void Execute_WithException_ReturnsErrorCode()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new() { MinComplexity = 10 };
 
         queryEngine.When(x => x.GetComplexMethods(Arg.Any<int>(), Arg.Any<int>()))
             .Do(x => throw new InvalidOperationException("Index error"));
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(1);
@@ -219,13 +237,13 @@ public class ComplexityCommandTests
     public void Execute_DisposesResources()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new() { MinComplexity = 5 };
 
         queryEngine.GetComplexMethods(5, 20).Returns([]);
 
         // Act
-        command.Execute(context, settings);
+        command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         indexManager.Received(1).Dispose();
@@ -236,7 +254,7 @@ public class ComplexityCommandTests
     public void Execute_WithJsonFormat_ProcessesResults()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new()
         {
             MinComplexity = 5,
@@ -253,7 +271,7 @@ public class ComplexityCommandTests
         queryEngine.GetComplexMethods(5, 20).Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -263,7 +281,7 @@ public class ComplexityCommandTests
     public void Execute_WithMarkdownFormat_ProcessesResults()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new()
         {
             MinComplexity = 5,
@@ -280,7 +298,7 @@ public class ComplexityCommandTests
         queryEngine.GetComplexMethods(5, 20).Returns([memberInfo]);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -290,7 +308,7 @@ public class ComplexityCommandTests
     public void Execute_WithTableFormat_ProcessesResults()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new()
         {
             MinComplexity = 5,
@@ -318,7 +336,7 @@ public class ComplexityCommandTests
         queryEngine.GetComplexMethods(5, 20).Returns(members);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -328,7 +346,7 @@ public class ComplexityCommandTests
     public void Execute_SortsByComplexity_WhenSpecified()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new()
         {
             MinComplexity = 1,
@@ -355,7 +373,7 @@ public class ComplexityCommandTests
         queryEngine.GetComplexMethods(1, 20).Returns(members);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -366,7 +384,7 @@ public class ComplexityCommandTests
     public void Execute_SortsByParameters_WhenSpecified()
     {
         // Arrange
-        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory);
+        ComplexityCommand command = new(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
         ComplexityCommand.Settings settings = new()
         {
             MinParams = 1,
@@ -393,7 +411,7 @@ public class ComplexityCommandTests
         queryEngine.GetByParameterCount(1, int.MaxValue, 20).Returns(members);
 
         // Act
-        int result = command.Execute(context, settings);
+        int result = command.Execute(context, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);

@@ -4,6 +4,7 @@ using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 
 namespace ApiLens.Cli.Commands;
 
@@ -20,22 +21,26 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
+    private readonly IAnsiConsole console;
 
     public ComplexityCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
         IIndexPathResolver indexPathResolver,
-        IQueryEngineFactory queryEngineFactory)
+        IQueryEngineFactory queryEngineFactory,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
+        ArgumentNullException.ThrowIfNull(console);
 
         this.indexManagerFactory = indexManagerFactory;
         this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
+        this.console = console;
     }
 
-    public override int Execute(CommandContext context, Settings settings)
+    public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         try
         {
@@ -74,7 +79,7 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
             {
                 if (settings.Format != OutputFormat.Json)
                 {
-                    AnsiConsole.MarkupLine(
+                    console.MarkupLine(
                         "[yellow]Please specify --min-complexity, --min-params, or --max-params.[/]");
                 }
                 else
@@ -88,10 +93,10 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
                     string errorJson = JsonSerializer.Serialize(errorResponse, JsonOptions);
 
                     // Temporarily set unlimited width to prevent JSON wrapping
-                    var originalWidth = AnsiConsole.Profile.Width;
-                    AnsiConsole.Profile.Width = int.MaxValue;
-                    AnsiConsole.WriteLine(errorJson);
-                    AnsiConsole.Profile.Width = originalWidth;
+                    var originalWidth = console.Profile.Width;
+                    console.Profile.Width = int.MaxValue;
+                    console.WriteLine(errorJson);
+                    console.Profile.Width = originalWidth;
                 }
 
                 return 1;
@@ -105,7 +110,7 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine("[yellow]No methods found matching the criteria.[/]");
+                    console.MarkupLine("[yellow]No methods found matching the criteria.[/]");
                 }
 
                 return 0;
@@ -137,12 +142,12 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
         }
         catch (InvalidOperationException ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error analyzing complexity:[/] {ex.Message}");
+            console.MarkupLine($"[red]Error analyzing complexity:[/] {ex.Message}");
             return 1;
         }
     }
 
-    private static void OutputJson(List<MemberInfo> results, string criteria, bool showStats,
+    private void OutputJson(List<MemberInfo> results, string criteria, bool showStats,
         ILuceneIndexManager indexManager, MetadataService metadataService)
     {
         List<ComplexityMetrics> metrics = [.. results
@@ -201,36 +206,36 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
         string json = JsonSerializer.Serialize(response, JsonOptions);
 
         // Temporarily set unlimited width to prevent JSON wrapping
-        var originalWidth = AnsiConsole.Profile.Width;
-        AnsiConsole.Profile.Width = int.MaxValue;
-        AnsiConsole.WriteLine(json);
-        AnsiConsole.Profile.Width = originalWidth;
+        var originalWidth = console.Profile.Width;
+        console.Profile.Width = int.MaxValue;
+        console.WriteLine(json);
+        console.Profile.Width = originalWidth;
     }
 
-    private static void OutputMarkdown(List<MemberInfo> results, string criteria, bool showStats)
+    private void OutputMarkdown(List<MemberInfo> results, string criteria, bool showStats)
     {
-        AnsiConsole.WriteLine("# Complexity Analysis");
-        AnsiConsole.WriteLine();
-        AnsiConsole.WriteLine($"Criteria: {criteria}");
-        AnsiConsole.WriteLine();
-        AnsiConsole.WriteLine($"Found {results.Count} method(s).");
-        AnsiConsole.WriteLine();
+        console.WriteLine("# Complexity Analysis");
+        console.WriteLine();
+        console.WriteLine($"Criteria: {criteria}");
+        console.WriteLine();
+        console.WriteLine($"Found {results.Count} method(s).");
+        console.WriteLine();
 
-        AnsiConsole.WriteLine("| Method | Parameters | Complexity | Doc Lines |");
-        AnsiConsole.WriteLine("|--------|------------|------------|-----------|");
+        console.WriteLine("| Method | Parameters | Complexity | Doc Lines |");
+        console.WriteLine("|--------|------------|------------|-----------|");
 
         foreach (MemberInfo member in results)
         {
             ComplexityMetrics? metrics = member.Complexity;
-            AnsiConsole.WriteLine(
+            console.WriteLine(
                 $"| {member.FullName} | {metrics?.ParameterCount ?? 0} | {metrics?.CyclomaticComplexity ?? 0} | {metrics?.DocumentationLineCount ?? 0} |");
         }
 
         if (showStats && results.Any(r => r.Complexity != null))
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.WriteLine("## Statistics");
-            AnsiConsole.WriteLine();
+            console.WriteLine();
+            console.WriteLine("## Statistics");
+            console.WriteLine();
 
             List<ComplexityMetrics> metrics = [.. results
                 .Where(r => r.Complexity != null)
@@ -238,21 +243,21 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
 
             if (metrics.Count > 0)
             {
-                AnsiConsole.WriteLine("| Metric | Value |");
-                AnsiConsole.WriteLine("|--------|-------|");
-                AnsiConsole.WriteLine($"| Average Parameters | {metrics.Average(m => m.ParameterCount):F1} |");
-                AnsiConsole.WriteLine($"| Max Parameters | {metrics.Max(m => m.ParameterCount)} |");
-                AnsiConsole.WriteLine($"| Average Complexity | {metrics.Average(m => m.CyclomaticComplexity):F1} |");
-                AnsiConsole.WriteLine($"| Max Complexity | {metrics.Max(m => m.CyclomaticComplexity)} |");
-                AnsiConsole.WriteLine($"| Average Doc Lines | {metrics.Average(m => m.DocumentationLineCount):F1} |");
+                console.WriteLine("| Metric | Value |");
+                console.WriteLine("|--------|-------|");
+                console.WriteLine($"| Average Parameters | {metrics.Average(m => m.ParameterCount):F1} |");
+                console.WriteLine($"| Max Parameters | {metrics.Max(m => m.ParameterCount)} |");
+                console.WriteLine($"| Average Complexity | {metrics.Average(m => m.CyclomaticComplexity):F1} |");
+                console.WriteLine($"| Max Complexity | {metrics.Max(m => m.CyclomaticComplexity)} |");
+                console.WriteLine($"| Average Doc Lines | {metrics.Average(m => m.DocumentationLineCount):F1} |");
             }
         }
     }
 
-    private static void OutputTable(List<MemberInfo> results, string criteria, bool showStats)
+    private void OutputTable(List<MemberInfo> results, string criteria, bool showStats)
     {
-        AnsiConsole.MarkupLine($"[green]Methods with {criteria}:[/]");
-        AnsiConsole.WriteLine();
+        console.MarkupLine($"[green]Methods with {criteria}:[/]");
+        console.WriteLine();
 
         Table table = new();
         table.AddColumn("Method");
@@ -272,13 +277,13 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
             );
         }
 
-        AnsiConsole.Write(table);
+        console.Write(table);
 
         // Show statistics
         if (showStats && results.Any(r => r.Complexity != null))
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.Write(new Rule("[bold]Statistics[/]").RuleStyle("dim"));
+            console.WriteLine();
+            console.Write(new Rule("[bold]Statistics[/]").RuleStyle("dim"));
 
             List<ComplexityMetrics> metrics = [.. results
                 .Where(r => r.Complexity != null)
@@ -297,7 +302,7 @@ public class ComplexityCommand : Command<ComplexityCommand.Settings>
                 grid.AddRow("Max Complexity", metrics.Max(m => m.CyclomaticComplexity).ToString());
                 grid.AddRow("Average Doc Lines", metrics.Average(m => m.DocumentationLineCount).ToString("F1"));
 
-                AnsiConsole.Write(grid);
+                console.Write(grid);
             }
         }
     }
