@@ -63,3 +63,76 @@ task . FullBuild
 # task PrePublish {}
 # task PostPublish {}
 # task RunLast {}
+
+#
+# Task Overrides for .NET 10 Compatibility
+#
+
+# Override RunTestsWithDotNetCoverage to support .NET 10 Microsoft.Testing.Platform
+# .NET 10 requires '--solution' flag instead of positional solution argument
+task RunTestsWithDotNetCoverage {
+    if ($SkipTest) {
+        Write-Build Yellow "Skipping tests (SkipTest = true)"
+        return
+    }
+
+    # Ensure dotnet-coverage tool is available
+    $dotnetCoverageExe = Get-Command dotnet-coverage -ErrorAction SilentlyContinue
+    if (-not $dotnetCoverageExe) {
+        Write-Build Yellow "dotnet-coverage tool not found. Installing..."
+        exec { dotnet tool install --global dotnet-coverage }
+        $dotnetCoverageExe = Get-Command dotnet-coverage
+    }
+
+    # Setup coverage output file
+    $coverageFile = Join-Path $BuildOutput "coverage.cobertura.xml"
+
+    # Build dotnet test arguments with .NET 10 compatible syntax
+    # .NET 10 with Microsoft.Testing.Platform requires --solution flag
+    $dotnetTestArgs = @(
+        "test"
+        "--solution"
+        $SolutionToBuild
+        "--configuration"
+        $Configuration
+        "--no-build"
+        "--no-restore"
+        "--verbosity"
+        "normal"
+    )
+
+    Write-Build Green "Running tests with code coverage..."
+    Write-Build Gray "  Solution: $SolutionToBuild"
+    Write-Build Gray "  Coverage output: $coverageFile"
+
+    # Run tests with code coverage using dotnet-coverage
+    $dotnetCoverageArgs = @(
+        "collect"
+        "--output-format"
+        "cobertura"
+        "--output"
+        $coverageFile
+    )
+
+    # Add include filter for assemblies if specified
+    if ($IncludeAssembliesInCodeCoverage) {
+        $dotnetCoverageArgs += "--include-assemblies"
+        $dotnetCoverageArgs += $IncludeAssembliesInCodeCoverage
+    }
+
+    $dotnetCoverageArgs += "--"
+    $dotnetCoverageArgs += "dotnet"
+    $dotnetCoverageArgs += $dotnetTestArgs
+
+    exec {
+        & dotnet-coverage $dotnetCoverageArgs
+    }
+
+    # Verify coverage file was created
+    if (Test-Path $coverageFile) {
+        $fileSize = (Get-Item $coverageFile).Length
+        Write-Build Green "Code coverage report generated: $coverageFile ($fileSize bytes)"
+    } else {
+        Write-Build Yellow "Warning: Code coverage file not found at $coverageFile"
+    }
+}
