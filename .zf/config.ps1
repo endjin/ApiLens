@@ -104,6 +104,8 @@ task RunTestsWithDotNetCoverage {
         "--no-build"
         "--no-restore"
         "--verbosity", "normal"
+        "--results-directory", $CoverageDir
+        "--report-trx"
     )
 
     Write-Build Green "Running tests with code coverage..."
