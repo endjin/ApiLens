@@ -125,7 +125,7 @@ task RunTestsWithDotNetCoverage {
     $dotnetCoverageArgs += $dotnetTestArgs
 
     exec {
-        & dotnet-coverage $dotnetCoverageArgs
+        & dotnet-coverage @dotnetCoverageArgs
     }
 
     # Verify coverage file was created
