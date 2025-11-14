@@ -5,6 +5,7 @@ using ApiLens.Core.Formatting;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 
 namespace ApiLens.Cli.Commands;
 
@@ -21,19 +22,23 @@ public class MembersCommand : Command<MembersCommand.Settings>
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
+    private readonly IAnsiConsole console;
 
     public MembersCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
         IIndexPathResolver indexPathResolver,
-        IQueryEngineFactory queryEngineFactory)
+        IQueryEngineFactory queryEngineFactory,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
+        ArgumentNullException.ThrowIfNull(console);
 
         this.indexManagerFactory = indexManagerFactory;
         this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
+        this.console = console;
     }
 
     public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
@@ -71,9 +76,9 @@ public class MembersCommand : Command<MembersCommand.Settings>
                     }
                     else
                     {
-                        AnsiConsole.MarkupLine($"[red]Type '{settings.TypeName}' not found.[/]");
-                        AnsiConsole.WriteLine();
-                        AnsiConsole.MarkupLine("[dim]Try using the full type name (e.g., 'System.String' instead of 'String')[/]");
+                        console.MarkupLine($"[red]Type '{settings.TypeName}' not found.[/]");
+                        console.WriteLine();
+                        console.MarkupLine("[dim]Try using the full type name (e.g., 'System.String' instead of 'String')[/]");
                     }
                     return 1;
                 }
@@ -124,12 +129,12 @@ public class MembersCommand : Command<MembersCommand.Settings>
         }
         catch (InvalidOperationException ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+            console.MarkupLine($"[red]Error:[/] {ex.Message}");
             return 1;
         }
     }
 
-    private static int GetMemberTypeOrder(MemberType memberType)
+    private int GetMemberTypeOrder(MemberType memberType)
     {
         return memberType switch
         {
@@ -142,7 +147,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
         };
     }
 
-    private static void OutputJson(List<MemberInfo> members, MemberInfo? targetType,
+    private void OutputJson(List<MemberInfo> members, MemberInfo? targetType,
         ILuceneIndexManager indexManager, MetadataService metadataService, Settings settings)
     {
         var response = new
@@ -169,27 +174,27 @@ public class MembersCommand : Command<MembersCommand.Settings>
 
         string json = JsonSerializer.Serialize(response, JsonOptions);
 
-        var originalWidth = AnsiConsole.Profile.Width;
-        AnsiConsole.Profile.Width = int.MaxValue;
-        AnsiConsole.WriteLine(json);
-        AnsiConsole.Profile.Width = originalWidth;
+        var originalWidth = console.Profile.Width;
+        console.Profile.Width = int.MaxValue;
+        console.WriteLine(json);
+        console.Profile.Width = originalWidth;
     }
 
-    private static void OutputTable(MemberInfo targetType,
+    private void OutputTable(MemberInfo targetType,
         IEnumerable<IGrouping<MemberType, MemberInfo>> groupedMembers, Settings settings)
     {
-        AnsiConsole.Write(new Rule($"[bold yellow]{Markup.Escape(targetType.FullName)}[/]")
+        console.Write(new Rule($"[bold yellow]{Markup.Escape(targetType.FullName)}[/]")
         {
             Justification = Justify.Left
         });
 
         if (!string.IsNullOrWhiteSpace(targetType.Summary))
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[dim]{Markup.Escape(targetType.Summary)}[/]");
+            console.WriteLine();
+            console.MarkupLine($"[dim]{Markup.Escape(targetType.Summary)}[/]");
         }
 
-        AnsiConsole.WriteLine();
+        console.WriteLine();
 
         foreach (var group in groupedMembers)
         {
@@ -202,7 +207,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
                 _ => $"{group.Key}s"
             };
 
-            AnsiConsole.MarkupLine($"[bold cyan]{memberTypePlural}[/] ({group.Count()})");
+            console.MarkupLine($"[bold cyan]{memberTypePlural}[/] ({group.Count()})");
 
             var table = new Table();
             table.AddColumn("Name");
@@ -249,30 +254,30 @@ public class MembersCommand : Command<MembersCommand.Settings>
                 table.AddRow(row.ToArray());
             }
 
-            AnsiConsole.Write(table);
+            console.Write(table);
 
             if (group.Count() > settings.MaxPerType)
             {
-                AnsiConsole.MarkupLine($"[dim]  ... and {group.Count() - settings.MaxPerType} more[/]");
+                console.MarkupLine($"[dim]  ... and {group.Count() - settings.MaxPerType} more[/]");
             }
 
-            AnsiConsole.WriteLine();
+            console.WriteLine();
         }
 
         var totalMembers = groupedMembers.Sum(g => g.Count());
-        AnsiConsole.MarkupLine($"[green]Total: {totalMembers} member(s)[/]");
+        console.MarkupLine($"[green]Total: {totalMembers} member(s)[/]");
     }
 
-    private static void OutputMarkdown(MemberInfo targetType,
+    private void OutputMarkdown(MemberInfo targetType,
         IEnumerable<IGrouping<MemberType, MemberInfo>> groupedMembers, Settings settings)
     {
-        AnsiConsole.WriteLine($"# {targetType.FullName}");
-        AnsiConsole.WriteLine();
+        console.WriteLine($"# {targetType.FullName}");
+        console.WriteLine();
 
         if (!string.IsNullOrWhiteSpace(targetType.Summary))
         {
-            AnsiConsole.WriteLine(targetType.Summary);
-            AnsiConsole.WriteLine();
+            console.WriteLine(targetType.Summary);
+            console.WriteLine();
         }
 
         foreach (var group in groupedMembers)
@@ -286,32 +291,32 @@ public class MembersCommand : Command<MembersCommand.Settings>
                 _ => $"{group.Key}s"
             };
 
-            AnsiConsole.WriteLine($"## {memberTypePlural}");
-            AnsiConsole.WriteLine();
+            console.WriteLine($"## {memberTypePlural}");
+            console.WriteLine();
 
             foreach (var member in group.Take(settings.MaxPerType))
             {
-                AnsiConsole.WriteLine($"### {FormatMemberName(member)}");
+                console.WriteLine($"### {FormatMemberName(member)}");
 
                 if (group.Key == MemberType.Method)
                 {
-                    AnsiConsole.WriteLine($"- **Parameters**: {FormatParameters(member)}");
-                    AnsiConsole.WriteLine($"- **Returns**: {member.ReturnType ?? ExtractTypeFromMember(member)}");
+                    console.WriteLine($"- **Parameters**: {FormatParameters(member)}");
+                    console.WriteLine($"- **Returns**: {member.ReturnType ?? ExtractTypeFromMember(member)}");
                 }
 
                 if (!string.IsNullOrWhiteSpace(member.Summary))
                 {
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.WriteLine("**Summary:**");
-                    AnsiConsole.WriteLine(member.Summary);
+                    console.WriteLine();
+                    console.WriteLine("**Summary:**");
+                    console.WriteLine(member.Summary);
                 }
 
-                AnsiConsole.WriteLine();
+                console.WriteLine();
             }
         }
     }
 
-    private static string FormatMemberName(MemberInfo member)
+    private string FormatMemberName(MemberInfo member)
     {
         // Use the Name property directly as it's now properly extracted
         var name = member.Name;
@@ -331,7 +336,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
         return name;
     }
 
-    private static string FormatParameters(MemberInfo member)
+    private string FormatParameters(MemberInfo member)
     {
         if (member.Parameters.Length == 0)
             return "()";
@@ -344,7 +349,7 @@ public class MembersCommand : Command<MembersCommand.Settings>
         return $"({string.Join(", ", paramStrings)})";
     }
 
-    private static string ExtractTypeFromMember(MemberInfo member)
+    private string ExtractTypeFromMember(MemberInfo member)
     {
         // Use the ReturnType property if available
         if (!string.IsNullOrWhiteSpace(member.ReturnType))

@@ -6,6 +6,7 @@ using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
+using Spectre.Console;
 
 namespace ApiLens.Cli.Commands;
 
@@ -19,25 +20,29 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
     private readonly IPackageDeduplicationService deduplicationService;
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IIndexPathResolver indexPathResolver;
+    private readonly IAnsiConsole console;
 
     public NuGetCommand(
         IFileSystemService fileSystem,
         INuGetCacheScanner scanner,
         IPackageDeduplicationService deduplicationService,
         ILuceneIndexManagerFactory indexManagerFactory,
-        IIndexPathResolver indexPathResolver)
+        IIndexPathResolver indexPathResolver,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(scanner);
         ArgumentNullException.ThrowIfNull(deduplicationService);
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
+        ArgumentNullException.ThrowIfNull(console);
 
         this.fileSystem = fileSystem;
         this.scanner = scanner;
         this.deduplicationService = deduplicationService;
         this.indexManagerFactory = indexManagerFactory;
         this.indexPathResolver = indexPathResolver;
+        this.console = console;
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
@@ -48,11 +53,11 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
         {
             // Get NuGet cache path
             string cachePath = fileSystem.GetUserNuGetCachePath();
-            AnsiConsole.MarkupLine($"[green]NuGet cache location:[/] {cachePath}");
+            console.MarkupLine($"[green]NuGet cache location:[/] {cachePath}");
 
             if (!fileSystem.DirectoryExists(cachePath))
             {
-                AnsiConsole.MarkupLine("[red]Error:[/] NuGet cache directory does not exist.");
+                console.MarkupLine("[red]Error:[/] NuGet cache directory does not exist.");
                 return 1;
             }
 
@@ -60,7 +65,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             List<NuGetPackageInfo> packages = [];
             ImmutableArray<NuGetPackageInfo> allPackages = ImmutableArray<NuGetPackageInfo>.Empty;
 
-            await AnsiConsole.Status()
+            await console.Status()
                 .StartAsync("Scanning NuGet cache...", async ctx =>
                 {
                     ctx.Spinner(Spinner.Known.Star);
@@ -83,20 +88,20 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 
             if (packages.Count == 0)
             {
-                AnsiConsole.MarkupLine("[yellow]No packages found matching the filter.[/]");
+                console.MarkupLine("[yellow]No packages found matching the filter.[/]");
                 commandStopwatch.Stop();
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine(
+                console.WriteLine();
+                console.MarkupLine(
                     $"[dim]Total command execution time: {FormatDuration(commandStopwatch.Elapsed)}[/]");
                 return 0;
             }
 
-            AnsiConsole.MarkupLine($"[green]Found {packages.Count} NuGet package(s) with XML documentation.[/]");
+            console.MarkupLine($"[green]Found {packages.Count} NuGet package(s) with XML documentation.[/]");
 
             // Apply version filter if specified
             if (!string.IsNullOrWhiteSpace(settings.VersionFilter))
             {
-                await AnsiConsole.Status()
+                await console.Status()
                     .StartAsync("Applying version filter...", async ctx =>
                     {
                         ctx.Spinner(Spinner.Known.Star);
@@ -108,13 +113,13 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                             packages = [.. packages.Where(p => versionRegex.IsMatch(p.Version))];
                         });
                     });
-                AnsiConsole.MarkupLine($"[green]After version filter: {packages.Count} package(s).[/]");
+                console.MarkupLine($"[green]After version filter: {packages.Count} package(s).[/]");
             }
 
             // Apply latest-only filter if specified
             if (settings.LatestOnly)
             {
-                await AnsiConsole.Status()
+                await console.Status()
                     .StartAsync("Filtering to latest versions only...", ctx =>
                     {
                         ctx.Spinner(Spinner.Known.Star);
@@ -124,15 +129,15 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                         packages = [.. latestPackages];
                         return Task.CompletedTask;
                     });
-                AnsiConsole.MarkupLine($"[green]After latest-only filter: {packages.Count} package(s) to process.[/]");
+                console.MarkupLine($"[green]After latest-only filter: {packages.Count} package(s) to process.[/]");
             }
 
             if (settings.List)
             {
                 DisplayPackageList(packages);
                 commandStopwatch.Stop();
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine(
+                console.WriteLine();
+                console.MarkupLine(
                     $"[dim]Total command execution time: {FormatDuration(commandStopwatch.Elapsed)}[/]");
                 return 0;
             }
@@ -149,7 +154,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 
             if (settings.Clean)
             {
-                AnsiConsole.MarkupLine("[yellow]Cleaning index...[/]");
+                console.MarkupLine("[yellow]Cleaning index...[/]");
                 indexManager.DeleteAll();
                 await indexManager.CommitAsync();
                 packagesToIndex = packages;
@@ -161,7 +166,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 HashSet<string> indexedXmlPaths = [];
                 HashSet<string> emptyXmlPaths = [];
 
-                await AnsiConsole.Status()
+                await console.Status()
                     .StartAsync("Analyzing index for change detection...", async ctx =>
                     {
                         ctx.Spinner(Spinner.Known.Star);
@@ -190,37 +195,37 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 int uniquePackageVersions =
                     indexedPackagesWithFramework.Sum(kvp => kvp.Value.Select(v => v.Version).Distinct().Count());
 
-                AnsiConsole.MarkupLine(
+                console.MarkupLine(
                     $"[dim]Index contains {uniquePackageVersions:N0} package versions across {indexedPackagesWithFramework.Count:N0} packages.[/]");
 
                 if (stats.EmptyXmlFilesSkipped > 0)
                 {
-                    AnsiConsole.MarkupLine($"[dim]Skipping {stats.EmptyXmlFilesSkipped:N0} known empty XML files.[/]");
+                    console.MarkupLine($"[dim]Skipping {stats.EmptyXmlFilesSkipped:N0} known empty XML files.[/]");
                 }
 
                 if (stats.UniqueXmlFiles > 0 && stats.TotalScannedPackages > stats.UniqueXmlFiles)
                 {
-                    AnsiConsole.MarkupLine(
+                    console.MarkupLine(
                         $"[dim]Found {stats.TotalScannedPackages:N0} package entries sharing {stats.UniqueXmlFiles:N0} unique XML files.[/]");
                 }
 
                 if (deduplicationResult.SkippedPackages > 0)
                 {
-                    AnsiConsole.MarkupLine(
+                    console.MarkupLine(
                         $"[green]Skipping {deduplicationResult.SkippedPackages:N0} package(s) already up-to-date in index.[/]");
                 }
 
                 if (packagesToIndex.Count == 0)
                 {
-                    AnsiConsole.MarkupLine("[yellow]All packages are already up-to-date. Nothing to index.[/]");
+                    console.MarkupLine("[yellow]All packages are already up-to-date. Nothing to index.[/]");
                     commandStopwatch.Stop();
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine(
+                    console.WriteLine();
+                    console.MarkupLine(
                         $"[dim]Total command execution time: {FormatDuration(commandStopwatch.Elapsed)}[/]");
                     return 0;
                 }
 
-                AnsiConsole.MarkupLine(
+                console.MarkupLine(
                     $"[green]Found {packagesToIndex.Count:N0} XML file(s) to index ({stats.NewPackages:N0} new, {stats.UpdatedPackages:N0} updated).[/]");
 
                 // Clean up old versions if needed
@@ -228,7 +233,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 {
                     int documentsBeforeCleanup = indexManager.GetTotalDocuments();
 
-                    await AnsiConsole.Status()
+                    await console.Status()
                         .StartAsync($"Removing old versions from {packageIdsToDelete.Count:N0} package(s)...",
                             async ctx =>
                             {
@@ -247,7 +252,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 
                     if (documentsRemoved > 0)
                     {
-                        AnsiConsole.MarkupLine(
+                        console.MarkupLine(
                             $"[green]Removed {documentsRemoved:N0} API members from old versions.[/]");
                     }
                 }
@@ -255,7 +260,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 
             // Index packages
             IndexingResult result = null!;
-            await AnsiConsole.Progress()
+            await console.Progress()
                 .AutoClear(true)
                 .Columns(
                     new TaskDescriptionColumn(),
@@ -282,12 +287,12 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
                 });
 
             // Display results after progress context
-            AnsiConsole.WriteLine();
+            console.WriteLine();
             DisplayResults(result, indexManager, settings.IndexPath);
 
             commandStopwatch.Stop();
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[dim]Total command execution time: {FormatDuration(commandStopwatch.Elapsed)}[/]");
+            console.WriteLine();
+            console.MarkupLine($"[dim]Total command execution time: {FormatDuration(commandStopwatch.Elapsed)}[/]");
 
             return 0;
         }
@@ -295,17 +300,17 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
         catch (Exception ex)
 #pragma warning restore CA1031 // Do not catch general exception types
         {
-            AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+            console.MarkupLine($"[red]Error:[/] {ex.Message}");
             if (settings.Verbose)
             {
-                AnsiConsole.WriteException(ex);
+                console.WriteException(ex);
             }
 
             return 1;
         }
     }
 
-    private static void DisplayPackageList(List<NuGetPackageInfo> packages)
+    private void DisplayPackageList(List<NuGetPackageInfo> packages)
     {
         Table table = new Table()
             .Border(TableBorder.Rounded)
@@ -343,12 +348,12 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             }
         }
 
-        AnsiConsole.Write(table);
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[green]Total packages:[/] {packages.Count}");
+        console.Write(table);
+        console.WriteLine();
+        console.MarkupLine($"[green]Total packages:[/] {packages.Count}");
     }
 
-    private static void DisplayResults(IndexingResult result, ILuceneIndexManager indexManager, string indexPath)
+    private void DisplayResults(IndexingResult result, ILuceneIndexManager indexManager, string indexPath)
     {
         Table table = new Table()
             .Border(TableBorder.Rounded)
@@ -396,21 +401,21 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
             }
         }
 
-        AnsiConsole.Write(table);
+        console.Write(table);
 
         // Display errors if any
         if (result.Errors.Length > 0)
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[red]Errors encountered ({result.Errors.Length}):[/]");
+            console.WriteLine();
+            console.MarkupLine($"[red]Errors encountered ({result.Errors.Length}):[/]");
             foreach (string error in result.Errors.Take(10))
             {
-                AnsiConsole.MarkupLine($"  [red]•[/] {error}");
+                console.MarkupLine($"  [red]•[/] {error}");
             }
 
             if (result.Errors.Length > 10)
             {
-                AnsiConsole.MarkupLine($"  [dim]... and {result.Errors.Length - 10} more[/]");
+                console.MarkupLine($"  [dim]... and {result.Errors.Length - 10} more[/]");
             }
         }
     }

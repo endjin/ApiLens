@@ -4,6 +4,7 @@ using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 
 namespace ApiLens.Cli.Commands;
 
@@ -12,18 +13,22 @@ public class StatsCommand : Command<StatsCommand.Settings>
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IIndexPathResolver indexPathResolver;
     private readonly IQueryEngineFactory queryEngineFactory;
+    private readonly IAnsiConsole console;
 
     public StatsCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
         IIndexPathResolver indexPathResolver,
-        IQueryEngineFactory queryEngineFactory)
+        IQueryEngineFactory queryEngineFactory,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
+        ArgumentNullException.ThrowIfNull(console);
         this.indexManagerFactory = indexManagerFactory;
         this.indexPathResolver = indexPathResolver;
         this.queryEngineFactory = queryEngineFactory;
+        this.console = console;
     }
 
     public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
@@ -63,14 +68,14 @@ public class StatsCommand : Command<StatsCommand.Settings>
                     string errorJson = JsonSerializer.Serialize(errorResponse, GetJsonOptions());
 
                     // Temporarily set unlimited width to prevent JSON wrapping
-                    var originalWidth = AnsiConsole.Profile.Width;
-                    AnsiConsole.Profile.Width = int.MaxValue;
-                    AnsiConsole.WriteLine(errorJson);
-                    AnsiConsole.Profile.Width = originalWidth;
+                    var originalWidth = console.Profile.Width;
+                    console.Profile.Width = int.MaxValue;
+                    console.WriteLine(errorJson);
+                    console.Profile.Width = originalWidth;
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine("[yellow]No index found at the specified location.[/]");
+                    console.MarkupLine("[yellow]No index found at the specified location.[/]");
                 }
                 return 0;
             }
@@ -93,14 +98,14 @@ public class StatsCommand : Command<StatsCommand.Settings>
         }
         catch (InvalidOperationException ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error getting index statistics:[/] {ex.Message}");
+            console.MarkupLine($"[red]Error getting index statistics:[/] {ex.Message}");
             return 1;
         }
     }
 
-    private static void OutputTable(IndexStatistics stats, DocumentationMetrics? docMetrics)
+    private void OutputTable(IndexStatistics stats, DocumentationMetrics? docMetrics)
     {
-        AnsiConsole.WriteLine();
+        console.WriteLine();
         Table table = new();
         table.AddColumn("Property");
         table.AddColumn("Value");
@@ -116,13 +121,13 @@ public class StatsCommand : Command<StatsCommand.Settings>
             table.AddRow("File Count", stats.FileCount.ToString("N0"));
         }
 
-        AnsiConsole.Write(table);
+        console.Write(table);
 
         // Show documentation metrics if available
         if (docMetrics != null)
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.Write(new Rule("[bold yellow]Documentation Quality Metrics[/]"));
+            console.WriteLine();
+            console.Write(new Rule("[bold yellow]Documentation Quality Metrics[/]"));
 
             Table docTable = new();
             docTable.AddColumn("Metric");
@@ -139,11 +144,11 @@ public class StatsCommand : Command<StatsCommand.Settings>
                 docTable.AddRow("[dim]Needs Attention[/]", string.Join(", ", docMetrics.PoorlyDocumentedTypes.Take(3)));
             }
 
-            AnsiConsole.Write(docTable);
+            console.Write(docTable);
         }
     }
 
-    private static void OutputJson(IndexStatistics stats, DocumentationMetrics? docMetrics, ILuceneIndexManager indexManager,
+    private void OutputJson(IndexStatistics stats, DocumentationMetrics? docMetrics, ILuceneIndexManager indexManager,
         MetadataService metadataService)
     {
         object statsData = docMetrics != null ?
@@ -192,10 +197,10 @@ public class StatsCommand : Command<StatsCommand.Settings>
         string json = JsonSerializer.Serialize(response, GetJsonOptions());
 
         // Temporarily set unlimited width to prevent JSON wrapping
-        var originalWidth = AnsiConsole.Profile.Width;
-        AnsiConsole.Profile.Width = int.MaxValue;
-        AnsiConsole.WriteLine(json);
-        AnsiConsole.Profile.Width = originalWidth;
+        var originalWidth = console.Profile.Width;
+        console.Profile.Width = int.MaxValue;
+        console.WriteLine(json);
+        console.Profile.Width = originalWidth;
     }
 
     private static JsonSerializerOptions GetJsonOptions()
@@ -209,19 +214,19 @@ public class StatsCommand : Command<StatsCommand.Settings>
         };
     }
 
-    private static void OutputMarkdown(IndexStatistics stats, DocumentationMetrics? docMetrics)
+    private void OutputMarkdown(IndexStatistics stats, DocumentationMetrics? docMetrics)
     {
-        AnsiConsole.WriteLine("# Index Statistics");
-        AnsiConsole.WriteLine();
-        AnsiConsole.WriteLine($"**Index Path**: `{stats.IndexPath}`");
-        AnsiConsole.WriteLine();
-        AnsiConsole.WriteLine("| Metric | Value |");
-        AnsiConsole.WriteLine("|--------|-------|");
-        AnsiConsole.WriteLine($"| Total Size | {FormatSize(stats.TotalSizeInBytes)} |");
-        AnsiConsole.WriteLine($"| Documents | {stats.DocumentCount:N0} |");
-        AnsiConsole.WriteLine($"| Fields | {stats.FieldCount:N0} |");
-        AnsiConsole.WriteLine($"| Files | {stats.FileCount:N0} |");
-        AnsiConsole.WriteLine(
+        console.WriteLine("# Index Statistics");
+        console.WriteLine();
+        console.WriteLine($"**Index Path**: `{stats.IndexPath}`");
+        console.WriteLine();
+        console.WriteLine("| Metric | Value |");
+        console.WriteLine("|--------|-------|");
+        console.WriteLine($"| Total Size | {FormatSize(stats.TotalSizeInBytes)} |");
+        console.WriteLine($"| Documents | {stats.DocumentCount:N0} |");
+        console.WriteLine($"| Fields | {stats.FieldCount:N0} |");
+        console.WriteLine($"| Files | {stats.FileCount:N0} |");
+        console.WriteLine(
             $"| Last Modified | {stats.LastModified?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Unknown"} |");
     }
 

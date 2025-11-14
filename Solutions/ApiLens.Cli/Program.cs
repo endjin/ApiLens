@@ -6,6 +6,7 @@ using ApiLens.Core.Parsing;
 using ApiLens.Core.Querying;
 using ApiLens.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Spectre.Console;
 
 namespace ApiLens.Cli;
 
@@ -33,6 +34,7 @@ internal class Program
         services.AddSingleton<IAssetFileParserService, AssetFileParserService>();
         services.AddSingleton<IProjectAnalysisService, ProjectAnalysisService>();
         services.AddSingleton<MetadataService>();
+        services.AddSingleton<IAnsiConsole>(AnsiConsole.Console);
 
         TypeRegistrar registrar = new(services);
         CommandApp app = new(registrar);

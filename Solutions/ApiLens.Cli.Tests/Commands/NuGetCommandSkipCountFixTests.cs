@@ -31,10 +31,11 @@ public sealed class NuGetCommandSkipCountFixTests : IDisposable
         indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
 
-        command = new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, mockIndexManagerFactory, indexPathResolver);
-
         console = new TestConsole();
-        AnsiConsole.Console = console;
+        console.Profile.Width = 120;
+        console.Profile.Height = 40;
+
+        command = new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, mockIndexManagerFactory, indexPathResolver, console);
     }
 
     [TestMethod]

@@ -26,15 +26,17 @@ public class MembersCommandTests : IDisposable
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
         indexPathResolver = Substitute.For<IIndexPathResolver>();
         indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
-        command = new MembersCommand(indexManagerFactory, indexPathResolver, queryEngineFactory);
         console = new TestConsole();
-        AnsiConsole.Console = console;
+        console.Profile.Width = 120;
+        console.Profile.Height = 40;
 
         mockIndexManager = Substitute.For<ILuceneIndexManager>();
         mockQueryEngine = Substitute.For<IQueryEngine>();
 
         indexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
         queryEngineFactory.Create(mockIndexManager).Returns(mockQueryEngine);
+
+        command = new MembersCommand(indexManagerFactory, indexPathResolver, queryEngineFactory, console);
     }
 
     [TestCleanup]

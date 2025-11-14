@@ -5,6 +5,7 @@ using ApiLens.Core.Formatting;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Querying;
+using Spectre.Console;
 
 namespace ApiLens.Cli.Commands;
 
@@ -21,19 +22,23 @@ public class QueryCommand : Command<QueryCommand.Settings>
     private readonly ILuceneIndexManagerFactory indexManagerFactory;
     private readonly IQueryEngineFactory queryEngineFactory;
     private readonly IIndexPathResolver indexPathResolver;
+    private readonly IAnsiConsole console;
 
     public QueryCommand(
         ILuceneIndexManagerFactory indexManagerFactory,
         IQueryEngineFactory queryEngineFactory,
-        IIndexPathResolver indexPathResolver)
+        IIndexPathResolver indexPathResolver,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(indexManagerFactory);
         ArgumentNullException.ThrowIfNull(queryEngineFactory);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
+        ArgumentNullException.ThrowIfNull(console);
 
         this.indexManagerFactory = indexManagerFactory;
         this.queryEngineFactory = queryEngineFactory;
         this.indexPathResolver = indexPathResolver;
+        this.console = console;
     }
 
     public override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
@@ -154,15 +159,15 @@ public class QueryCommand : Command<QueryCommand.Settings>
                 else
                 {
                     // Provide helpful suggestions
-                    AnsiConsole.MarkupLine("[yellow]No results found.[/]");
+                    console.MarkupLine("[yellow]No results found.[/]");
 
                     var suggestionService = new SuggestionService(queryEngine);
                     var queryType = ConvertToSuggestionQueryType(settings.QueryType);
                     var similarNames = suggestionService.GetSimilarNames(settings.Query, queryType);
                     var suggestionMessage = suggestionService.FormatSuggestionMessage(settings.Query, queryType, similarNames);
 
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine("[dim]" + Markup.Escape(suggestionMessage) + "[/]");
+                    console.WriteLine();
+                    console.MarkupLine("[dim]" + Markup.Escape(suggestionMessage) + "[/]");
                 }
                 return 0;
             }
@@ -187,7 +192,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
         }
         catch (InvalidOperationException ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error during query:[/] {ex.Message}");
+            console.MarkupLine($"[red]Error during query:[/] {ex.Message}");
             return 1;
         }
     }
@@ -286,7 +291,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
         };
     }
 
-    private static void OutputJson(List<MemberInfo> results, ILuceneIndexManager indexManager,
+    private void OutputJson(List<MemberInfo> results, ILuceneIndexManager indexManager,
         MetadataService metadataService, Settings settings)
     {
         ResponseMetadata metadata = metadataService.BuildMetadata(results, indexManager,
@@ -301,13 +306,13 @@ public class QueryCommand : Command<QueryCommand.Settings>
         string json = JsonSerializer.Serialize(response, JsonOptions);
 
         // Temporarily set unlimited width to prevent JSON wrapping
-        var originalWidth = AnsiConsole.Profile.Width;
-        AnsiConsole.Profile.Width = int.MaxValue;
-        AnsiConsole.WriteLine(json);
-        AnsiConsole.Profile.Width = originalWidth;
+        var originalWidth = console.Profile.Width;
+        console.Profile.Width = int.MaxValue;
+        console.WriteLine(json);
+        console.Profile.Width = originalWidth;
     }
 
-    private static void OutputGroupedTable(List<MemberInfo> results, GroupBy groupBy)
+    private void OutputGroupedTable(List<MemberInfo> results, GroupBy groupBy)
     {
         var groups = groupBy switch
         {
@@ -320,7 +325,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
 
         foreach (var group in groups.OrderBy(g => g.Key))
         {
-            AnsiConsole.Write(new Rule($"[bold yellow]{Markup.Escape(group.Key ?? "Unknown")}[/] ({group.Count()} items)")
+            console.Write(new Rule($"[bold yellow]{Markup.Escape(group.Key ?? "Unknown")}[/] ({group.Count()} items)")
             {
                 Justification = Justify.Left
             });
@@ -349,8 +354,8 @@ public class QueryCommand : Command<QueryCommand.Settings>
                 table.AddRow(row.ToArray());
             }
 
-            AnsiConsole.Write(table);
-            AnsiConsole.WriteLine();
+            console.Write(table);
+            console.WriteLine();
         }
     }
 
@@ -380,7 +385,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
         return "Other";
     }
 
-    private static void OutputTable(List<MemberInfo> results)
+    private void OutputTable(List<MemberInfo> results)
     {
         Table table = new();
         table.AddColumn("Type");
@@ -402,7 +407,7 @@ public class QueryCommand : Command<QueryCommand.Settings>
             );
         }
 
-        AnsiConsole.Write(table);
+        console.Write(table);
     }
 
     private static string FormatVersionInfo(MemberInfo member)
@@ -427,26 +432,26 @@ public class QueryCommand : Command<QueryCommand.Settings>
         return string.Join(" ", parts);
     }
 
-    private static void OutputMarkdown(List<MemberInfo> results)
+    private void OutputMarkdown(List<MemberInfo> results)
     {
-        AnsiConsole.WriteLine("# Query Results");
-        AnsiConsole.WriteLine();
-        AnsiConsole.WriteLine($"Found {results.Count} result(s)");
-        AnsiConsole.WriteLine();
+        console.WriteLine("# Query Results");
+        console.WriteLine();
+        console.WriteLine($"Found {results.Count} result(s)");
+        console.WriteLine();
 
         foreach (MemberInfo result in results)
         {
-            AnsiConsole.WriteLine($"## {GenericTypeFormatter.FormatFullName(result.FullName)}");
-            AnsiConsole.WriteLine();
-            AnsiConsole.WriteLine($"- **Type**: {result.MemberType}");
-            AnsiConsole.WriteLine($"- **Namespace**: {GenericTypeFormatter.FormatTypeName(result.Namespace)}");
-            AnsiConsole.WriteLine($"- **Assembly**: {result.Assembly}");
+            console.WriteLine($"## {GenericTypeFormatter.FormatFullName(result.FullName)}");
+            console.WriteLine();
+            console.WriteLine($"- **Type**: {result.MemberType}");
+            console.WriteLine($"- **Namespace**: {GenericTypeFormatter.FormatTypeName(result.Namespace)}");
+            console.WriteLine($"- **Assembly**: {result.Assembly}");
 
             // Add version information if available
             if (!string.IsNullOrWhiteSpace(result.PackageId) || result.IsFromNuGetCache)
             {
-                AnsiConsole.WriteLine();
-                AnsiConsole.WriteLine("### Version Information");
+                console.WriteLine();
+                console.WriteLine("### Version Information");
 
                 if (!string.IsNullOrWhiteSpace(result.PackageId))
                 {
@@ -456,28 +461,28 @@ public class QueryCommand : Command<QueryCommand.Settings>
                         packageDisplay += $" v{result.PackageVersion}";
                     }
 
-                    AnsiConsole.WriteLine($"- **Package**: {packageDisplay}");
+                    console.WriteLine($"- **Package**: {packageDisplay}");
                 }
 
                 if (!string.IsNullOrWhiteSpace(result.TargetFramework))
                 {
-                    AnsiConsole.WriteLine($"- **Framework**: {result.TargetFramework}");
+                    console.WriteLine($"- **Framework**: {result.TargetFramework}");
                 }
 
                 if (result.IsFromNuGetCache)
                 {
-                    AnsiConsole.WriteLine($"- **Source**: NuGet Cache");
+                    console.WriteLine($"- **Source**: NuGet Cache");
                 }
             }
 
             if (!string.IsNullOrWhiteSpace(result.Summary))
             {
-                AnsiConsole.WriteLine();
-                AnsiConsole.WriteLine("### Summary");
-                AnsiConsole.WriteLine(result.Summary);
+                console.WriteLine();
+                console.WriteLine("### Summary");
+                console.WriteLine(result.Summary);
             }
 
-            AnsiConsole.WriteLine();
+            console.WriteLine();
         }
     }
 

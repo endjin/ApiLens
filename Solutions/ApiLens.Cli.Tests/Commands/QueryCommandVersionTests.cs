@@ -43,7 +43,8 @@ public class QueryCommandVersionTests
         });
         queryEngineFactory.Create(Arg.Any<ILuceneIndexManager>()).Returns(callInfo => new QueryEngine(callInfo.Arg<ILuceneIndexManager>()));
 
-        command = new QueryCommand(indexManagerFactory, queryEngineFactory, indexPathResolver);
+        TestConsole testConsole = new();
+        command = new QueryCommand(indexManagerFactory, queryEngineFactory, indexPathResolver, testConsole);
     }
 
     [TestCleanup]
@@ -70,10 +71,14 @@ public class QueryCommandVersionTests
         };
 
         TestConsole console = new();
-        AnsiConsole.Console = console;
+        console.Profile.Width = 120;
+        console.Profile.Height = 40;
+
+        // Create command with this test's console
+        QueryCommand testCommand = new(indexManagerFactory, queryEngineFactory, indexPathResolver, console);
 
         // Act
-        int result = command.Execute(null!, settings, CancellationToken.None);
+        int result = testCommand.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -99,10 +104,14 @@ public class QueryCommandVersionTests
         };
 
         TestConsole console = new();
-        AnsiConsole.Console = console;
+        console.Profile.Width = 120;
+        console.Profile.Height = 40;
+
+        // Create command with this test's console
+        QueryCommand testCommand = new(indexManagerFactory, queryEngineFactory, indexPathResolver, console);
 
         // Act
-        int result = command.Execute(null!, settings, CancellationToken.None);
+        int result = testCommand.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -129,10 +138,14 @@ public class QueryCommandVersionTests
         };
 
         TestConsole console = new();
-        AnsiConsole.Console = console;
+        console.Profile.Width = 120;
+        console.Profile.Height = 40;
+
+        // Create command with this test's console
+        QueryCommand testCommand = new(indexManagerFactory, queryEngineFactory, indexPathResolver, console);
 
         // Act
-        int result = command.Execute(null!, settings, CancellationToken.None);
+        int result = testCommand.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);
@@ -156,10 +169,14 @@ public class QueryCommandVersionTests
         };
 
         TestConsole console = new();
-        AnsiConsole.Console = console;
+        console.Profile.Width = 120;
+        console.Profile.Height = 40;
+
+        // Create command with this test's console
+        QueryCommand testCommand = new(indexManagerFactory, queryEngineFactory, indexPathResolver, console);
 
         // Act
-        int result = command.Execute(null!, settings, CancellationToken.None);
+        int result = testCommand.Execute(null!, settings, CancellationToken.None);
 
         // Assert
         result.ShouldBe(0);

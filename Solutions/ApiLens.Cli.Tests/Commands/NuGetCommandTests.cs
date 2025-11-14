@@ -40,12 +40,14 @@ public sealed class NuGetCommandTests : IDisposable
         mockIndexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
         mockIndexManagerFactory.Create(Arg.Any<string>()).Returns(mockIndexManager);
 
-        command = new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, mockIndexManagerFactory, mockIndexPathResolver);
         // CommandContext is sealed, so we'll pass null in tests since it's not used
         context = null!;
 
         console = new TestConsole();
-        AnsiConsole.Console = console;
+        console.Profile.Width = 120;
+        console.Profile.Height = 40;
+
+        command = new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, mockIndexManagerFactory, mockIndexPathResolver, console);
     }
 
     private void SetupFakeFileSystem(string? customCachePath = null)
@@ -57,7 +59,7 @@ public sealed class NuGetCommandTests : IDisposable
         }
         fakeFileSystem = new FakeFileSystem(fakeEnvironment);
         fakeFileSystemService = new FileSystemService(fakeFileSystem, fakeEnvironment);
-        command = new NuGetCommand(fakeFileSystemService, mockScanner, mockDeduplicationService, mockIndexManagerFactory, mockIndexPathResolver);
+        command = new NuGetCommand(fakeFileSystemService, mockScanner, mockDeduplicationService, mockIndexManagerFactory, mockIndexPathResolver, console);
     }
 
     [TestMethod]
@@ -137,7 +139,7 @@ public sealed class NuGetCommandTests : IDisposable
     public void Constructor_WithNullFileSystem_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new NuGetCommand(null!, mockScanner, mockDeduplicationService, mockIndexManagerFactory, mockIndexPathResolver))
+        Should.Throw<ArgumentNullException>(() => new NuGetCommand(null!, mockScanner, mockDeduplicationService, mockIndexManagerFactory, mockIndexPathResolver, console))
             .ParamName.ShouldBe("fileSystem");
     }
 
@@ -145,7 +147,7 @@ public sealed class NuGetCommandTests : IDisposable
     public void Constructor_WithNullScanner_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, null!, mockDeduplicationService, mockIndexManagerFactory, mockIndexPathResolver))
+        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, null!, mockDeduplicationService, mockIndexManagerFactory, mockIndexPathResolver, console))
             .ParamName.ShouldBe("scanner");
     }
 
@@ -153,7 +155,7 @@ public sealed class NuGetCommandTests : IDisposable
     public void Constructor_WithNullDeduplicationService_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, mockScanner, null!, mockIndexManagerFactory, mockIndexPathResolver))
+        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, mockScanner, null!, mockIndexManagerFactory, mockIndexPathResolver, console))
             .ParamName.ShouldBe("deduplicationService");
     }
 
@@ -161,7 +163,7 @@ public sealed class NuGetCommandTests : IDisposable
     public void Constructor_WithNullIndexManagerFactory_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, null!, mockIndexPathResolver))
+        Should.Throw<ArgumentNullException>(() => new NuGetCommand(mockFileSystem, mockScanner, mockDeduplicationService, null!, mockIndexPathResolver, console))
             .ParamName.ShouldBe("indexManagerFactory");
     }
 

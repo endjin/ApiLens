@@ -22,9 +22,11 @@ public sealed class QueryCommandTests : IDisposable
         queryEngineFactory = Substitute.For<IQueryEngineFactory>();
         indexPathResolver = Substitute.For<IIndexPathResolver>();
         indexPathResolver.ResolveIndexPath(Arg.Any<string>()).Returns(info => info.Arg<string>() ?? "./index");
-        command = new QueryCommand(indexManagerFactory, queryEngineFactory, indexPathResolver);
         console = new TestConsole();
-        AnsiConsole.Console = console;
+        console.Profile.Width = 120;
+        console.Profile.Height = 40;
+
+        command = new QueryCommand(indexManagerFactory, queryEngineFactory, indexPathResolver, console);
     }
 
     [TestCleanup]

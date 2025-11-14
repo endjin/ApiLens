@@ -4,6 +4,7 @@ using ApiLens.Cli.Services;
 using ApiLens.Core.Lucene;
 using ApiLens.Core.Models;
 using ApiLens.Core.Services;
+using Spectre.Console;
 using IOPath = System.IO.Path;
 
 namespace ApiLens.Cli.Commands;
@@ -18,25 +19,29 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
     private readonly ILuceneIndexManagerFactory indexFactory;
     private readonly IFileSystemService fileSystem;
     private readonly IIndexPathResolver indexPathResolver;
+    private readonly IAnsiConsole console;
 
     public AnalyzeCommand(
         IProjectAnalysisService projectAnalysis,
         INuGetCacheScanner nugetScanner,
         ILuceneIndexManagerFactory indexFactory,
         IFileSystemService fileSystem,
-        IIndexPathResolver indexPathResolver)
+        IIndexPathResolver indexPathResolver,
+        IAnsiConsole console)
     {
         ArgumentNullException.ThrowIfNull(projectAnalysis);
         ArgumentNullException.ThrowIfNull(nugetScanner);
         ArgumentNullException.ThrowIfNull(indexFactory);
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(indexPathResolver);
+        ArgumentNullException.ThrowIfNull(console);
 
         this.projectAnalysis = projectAnalysis;
         this.nugetScanner = nugetScanner;
         this.indexFactory = indexFactory;
         this.fileSystem = fileSystem;
         this.indexPathResolver = indexPathResolver;
+        this.console = console;
     }
 
     public class Settings : CommandSettings
@@ -75,20 +80,20 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
             // Validate input
             if (!projectAnalysis.IsProjectOrSolution(settings.Path))
             {
-                AnsiConsole.MarkupLine("[red]Error:[/] File must be a .sln, .csproj, .fsproj, or .vbproj file");
+                console.MarkupLine("[red]Error:[/] File must be a .sln, .csproj, .fsproj, or .vbproj file");
                 return 1;
             }
 
             if (!fileSystem.FileExists(settings.Path))
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] File not found: {settings.Path}");
+                console.MarkupLine($"[red]Error:[/] File not found: {settings.Path}");
                 return 1;
             }
 
             // Analyze the project/solution
-            AnsiConsole.MarkupLine($"[green]Analyzing:[/] {settings.Path}");
+            console.MarkupLine($"[green]Analyzing:[/] {settings.Path}");
 
-            ProjectAnalysisResult analysisResult = await AnsiConsole.Status()
+            ProjectAnalysisResult analysisResult = await console.Status()
                 .StartAsync("Analyzing project structure...", async ctx =>
                 {
                     ctx.Spinner(Spinner.Known.Star);
@@ -104,19 +109,19 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
 
             if (analysisResult.Packages.Count == 0)
             {
-                AnsiConsole.MarkupLine("[yellow]No packages found to analyze.[/]");
+                console.MarkupLine("[yellow]No packages found to analyze.[/]");
                 return 0;
             }
 
             // Find packages in NuGet cache
             string cachePath = fileSystem.GetUserNuGetCachePath();
-            AnsiConsole.MarkupLine($"[green]NuGet cache:[/] {cachePath}");
+            console.MarkupLine($"[green]NuGet cache:[/] {cachePath}");
 
             List<NuGetPackageInfo> packagesToIndex = await FindPackagesInCache(analysisResult.Packages, cachePath);
 
             if (packagesToIndex.Count == 0)
             {
-                AnsiConsole.MarkupLine("[yellow]No packages with XML documentation found in NuGet cache.[/]");
+                console.MarkupLine("[yellow]No packages with XML documentation found in NuGet cache.[/]");
                 return 0;
             }
 
@@ -131,10 +136,10 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-            if (AnsiConsole.Profile.Capabilities.Unicode)
+            console.MarkupLine($"[red]Error:[/] {ex.Message}");
+            if (console.Profile.Capabilities.Unicode)
             {
-                AnsiConsole.WriteException(ex);
+                console.WriteException(ex);
             }
             return 1;
         }
@@ -162,12 +167,12 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         {
             foreach (string warning in result.Warnings)
             {
-                AnsiConsole.MarkupLine($"[yellow]Warning:[/] {warning}");
+                console.MarkupLine($"[yellow]Warning:[/] {warning}");
             }
         }
 
-        AnsiConsole.Write(table);
-        AnsiConsole.WriteLine();
+        console.Write(table);
+        console.WriteLine();
     }
 
     private async Task<List<NuGetPackageInfo>> FindPackagesInCache(
@@ -176,7 +181,7 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
     {
         List<NuGetPackageInfo> packagesToIndex = [];
 
-        await AnsiConsole.Status()
+        await console.Status()
             .StartAsync("Locating packages in NuGet cache...", async ctx =>
             {
                 ctx.Spinner(Spinner.Known.Star);
@@ -221,7 +226,7 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
                 });
             });
 
-        AnsiConsole.MarkupLine($"[green]Found {packagesToIndex.Count} XML documentation files[/]");
+        console.MarkupLine($"[green]Found {packagesToIndex.Count} XML documentation files[/]");
         return packagesToIndex;
     }
 
@@ -235,7 +240,7 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
 
         if (cleanIndex)
         {
-            AnsiConsole.MarkupLine("[yellow]Cleaning existing index...[/]");
+            console.MarkupLine("[yellow]Cleaning existing index...[/]");
             indexManager.DeleteAll();
             await indexManager.CommitAsync();
         }
@@ -245,12 +250,12 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
 
         if (xmlFiles.Count == 0)
         {
-            AnsiConsole.MarkupLine("[yellow]No XML documentation files to index.[/]");
+            console.MarkupLine("[yellow]No XML documentation files to index.[/]");
             return;
         }
 
         // Use the high-performance batch indexing
-        await AnsiConsole.Progress()
+        await console.Progress()
             .StartAsync(async ctx =>
             {
                 ProgressTask task = ctx.AddTask("[green]Indexing documentation...[/]", maxValue: xmlFiles.Count);
@@ -269,17 +274,17 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
 
                 task.StopTask();
 
-                AnsiConsole.MarkupLine($"[green]Successfully indexed {result.SuccessfulDocuments:N0} API members[/]");
+                console.MarkupLine($"[green]Successfully indexed {result.SuccessfulDocuments:N0} API members[/]");
 
                 if (result.Errors.Length > 0)
                 {
                     foreach (string? error in result.Errors.Take(5))
                     {
-                        AnsiConsole.MarkupLine($"[yellow]Warning:[/] {error}");
+                        console.MarkupLine($"[yellow]Warning:[/] {error}");
                     }
                     if (result.Errors.Length > 5)
                     {
-                        AnsiConsole.MarkupLine($"[yellow]... and {result.Errors.Length - 5} more warnings[/]");
+                        console.MarkupLine($"[yellow]... and {result.Errors.Length - 5} more warnings[/]");
                     }
                 }
             });
@@ -309,25 +314,25 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
                 }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
 
                 // Temporarily set unlimited width to prevent JSON wrapping
-                var originalWidth = AnsiConsole.Profile.Width;
-                AnsiConsole.Profile.Width = int.MaxValue;
-                AnsiConsole.WriteLine(json);
-                AnsiConsole.Profile.Width = originalWidth;
+                var originalWidth = console.Profile.Width;
+                console.Profile.Width = int.MaxValue;
+                console.WriteLine(json);
+                console.Profile.Width = originalWidth;
                 break;
 
             case OutputFormat.Markdown:
-                AnsiConsole.WriteLine($"# Analysis Results");
-                AnsiConsole.WriteLine();
-                AnsiConsole.WriteLine($"**File:** {analysisResult.Path}");
-                AnsiConsole.WriteLine($"**Type:** {analysisResult.Type}");
-                AnsiConsole.WriteLine($"**Total Packages:** {analysisResult.Packages.Count}");
-                AnsiConsole.WriteLine($"**Indexed Files:** {indexedPackages.Count}");
-                AnsiConsole.WriteLine();
-                AnsiConsole.WriteLine("## Indexed Packages");
+                console.WriteLine($"# Analysis Results");
+                console.WriteLine();
+                console.WriteLine($"**File:** {analysisResult.Path}");
+                console.WriteLine($"**Type:** {analysisResult.Type}");
+                console.WriteLine($"**Total Packages:** {analysisResult.Packages.Count}");
+                console.WriteLine($"**Indexed Files:** {indexedPackages.Count}");
+                console.WriteLine();
+                console.WriteLine("## Indexed Packages");
                 IEnumerable<IGrouping<string, NuGetPackageInfo>> mdGrouped = indexedPackages.GroupBy(p => $"{p.PackageId} {p.Version}");
                 foreach (IGrouping<string, NuGetPackageInfo>? group in mdGrouped.OrderBy(g => g.Key))
                 {
-                    AnsiConsole.WriteLine($"- {group.Key} ({group.Count()} files)");
+                    console.WriteLine($"- {group.Key} ({group.Count()} files)");
                 }
                 break;
 
@@ -350,12 +355,12 @@ public class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
                     );
                 }
 
-                AnsiConsole.Write(table);
+                console.Write(table);
                 break;
         }
 
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[dim]Analysis completed in {elapsed.TotalSeconds:F2} seconds[/]");
+        console.WriteLine();
+        console.MarkupLine($"[dim]Analysis completed in {elapsed.TotalSeconds:F2} seconds[/]");
     }
 
     // GetDefaultIndexPath method removed - now using IIndexPathResolver
