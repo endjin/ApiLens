@@ -85,7 +85,7 @@ task RunTestsWithDotNetCoverage {
     }
 
     # Setup coverage output file
-    $coverageFile = Join-Path $BuildOutput "coverage.cobertura.xml"
+    $coverageFile = Join-Path $CoverageDir "coverage.cobertura.xml"
 
     # Build dotnet test arguments with .NET 10 compatible syntax
     # .NET 10 with Microsoft.Testing.Platform requires --solution flag
