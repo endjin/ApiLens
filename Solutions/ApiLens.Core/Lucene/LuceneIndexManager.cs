@@ -14,6 +14,7 @@ using Lucene.Net.QueryParsers.Classic;
 using Lucene.Net.Search;
 using Lucene.Net.Store;
 using Lucene.Net.Util;
+using Fields = ApiLens.Core.Lucene.LuceneFields;
 
 namespace ApiLens.Core.Lucene;
 
@@ -74,20 +75,20 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         // Configure per-field analyzer
         Dictionary<string, Analyzer> fieldAnalyzers = new()
         {
-            { "id", keywordAnalyzer },
-            { "memberType", keywordAnalyzer },
-            { "name", keywordAnalyzer },
-            { "fullName", keywordAnalyzer },
-            { "assembly", keywordAnalyzer },
-            { "namespace", keywordAnalyzer },
-            { "memberTypeFacet", keywordAnalyzer },
-            { "crossref", keywordAnalyzer },
-            { "exceptionType", keywordAnalyzer },
-            { "attribute", keywordAnalyzer },
-            { "packageId", keywordAnalyzer },
-            { "packageVersion", keywordAnalyzer },
-            { "targetFramework", keywordAnalyzer },
-            { "contentHash", keywordAnalyzer }
+            { Fields.Id, keywordAnalyzer },
+            { Fields.MemberType, keywordAnalyzer },
+            { Fields.Name, keywordAnalyzer },
+            { Fields.FullName, keywordAnalyzer },
+            { Fields.Assembly, keywordAnalyzer },
+            { Fields.Namespace, keywordAnalyzer },
+            { Fields.MemberTypeFacet, keywordAnalyzer },
+            { Fields.CrossRef, keywordAnalyzer },
+            { Fields.ExceptionType, keywordAnalyzer },
+            { Fields.Attribute, keywordAnalyzer },
+            { Fields.PackageId, keywordAnalyzer },
+            { Fields.PackageVersion, keywordAnalyzer },
+            { Fields.TargetFramework, keywordAnalyzer },
+            { Fields.ContentHash, keywordAnalyzer }
         };
 
         analyzer = new PerFieldAnalyzerWrapper(whitespaceAnalyzer, fieldAnalyzers);
@@ -162,7 +163,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                     {
                         foreach (Document batchDoc in batch)
                         {
-                            Term idTerm = new("id", batchDoc.Get("id"));
+                            Term idTerm = new(Fields.Id, batchDoc.Get(Fields.Id));
                             writer.UpdateDocument(idTerm, batchDoc);
                         }
 
@@ -185,7 +186,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             {
                 foreach (Document batchDoc in batch)
                 {
-                    Term idTerm = new("id", batchDoc.Get("id"));
+                    Term idTerm = new(Fields.Id, batchDoc.Get(Fields.Id));
                     writer.UpdateDocument(idTerm, batchDoc);
                 }
 
@@ -307,9 +308,9 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                     // Add a special document to track empty XML files
                     Document emptyFileDoc =
                     [
-                        new StringField("id", $"EMPTY_FILE|{NormalizePath(filePath)}", Field.Store.YES),
-                        new StringField("documentType", "EmptyXmlFile", Field.Store.YES),
-                        new StringField("sourceFilePath", NormalizePath(filePath), Field.Store.YES)
+                        new StringField(Fields.Id, $"EMPTY_FILE|{NormalizePath(filePath)}", Field.Store.YES),
+                        new StringField(Fields.DocumentType, "EmptyXmlFile", Field.Store.YES),
+                        new StringField(Fields.SourceFilePath, NormalizePath(filePath), Field.Store.YES)
                     ];
                     await documentChannel.Writer.WriteAsync(emptyFileDoc, ct);
                     Interlocked.Increment(ref totalDocuments);
@@ -332,7 +333,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         // Signal completion by sending a sentinel document
         Document sentinelDoc =
         [
-            new StringField("id", "SENTINEL_END_OF_STREAM", Field.Store.NO)
+            new StringField(Fields.Id, "SENTINEL_END_OF_STREAM", Field.Store.NO)
         ];
         await documentChannel.Writer.WriteAsync(sentinelDoc, cancellationToken);
 
@@ -359,7 +360,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         await foreach (Document doc in documentChannel.Reader.ReadAllAsync(cancellationToken))
         {
             // Check for sentinel document
-            string? id = doc.Get("id");
+            string? id = doc.Get(Fields.Id);
             if (id == "SENTINEL_END_OF_STREAM")
             {
                 // Process any remaining documents in the batch before exiting
@@ -368,10 +369,10 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                     Stopwatch batchStopwatch = Stopwatch.StartNew();
                     foreach (Document batchDoc in batch)
                     {
-                        string? docId = batchDoc.Get("id");
+                        string? docId = batchDoc.Get(Fields.Id);
                         if (!string.IsNullOrEmpty(docId))
                         {
-                            Term idTerm = new("id", docId);
+                            Term idTerm = new(Fields.Id, docId);
                             writer.UpdateDocument(idTerm, batchDoc);
                         }
                     }
@@ -390,10 +391,10 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
                 Stopwatch batchStopwatch = Stopwatch.StartNew();
                 foreach (Document batchDoc in batch)
                 {
-                    string? docId = batchDoc.Get("id");
+                    string? docId = batchDoc.Get(Fields.Id);
                     if (!string.IsNullOrEmpty(docId))
                     {
-                        Term idTerm = new("id", docId);
+                        Term idTerm = new(Fields.Id, docId);
                         writer.UpdateDocument(idTerm, batchDoc);
                     }
                 }
@@ -411,10 +412,10 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             Stopwatch batchStopwatch = Stopwatch.StartNew();
             foreach (Document batchDoc in batch)
             {
-                string? docId = batchDoc.Get("id");
+                string? docId = batchDoc.Get(Fields.Id);
                 if (!string.IsNullOrEmpty(docId))
                 {
-                    Term idTerm = new("id", docId);
+                    Term idTerm = new(Fields.Id, docId);
                     writer.UpdateDocument(idTerm, batchDoc);
                 }
             }
@@ -433,7 +434,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
     public void DeleteDocumentsByPackageId(string packageId)
     {
         ArgumentNullException.ThrowIfNull(packageId);
-        Term packageTerm = new("packageId", packageId);
+        Term packageTerm = new(Fields.PackageId, packageId);
         writer.DeleteDocuments(packageTerm);
     }
 
@@ -442,7 +443,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         ArgumentNullException.ThrowIfNull(packageIds);
         foreach (string packageId in packageIds)
         {
-            Term packageTerm = new("packageId", packageId);
+            Term packageTerm = new(Fields.PackageId, packageId);
             writer.DeleteDocuments(packageTerm);
         }
     }
@@ -474,7 +475,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             Query query;
             bool hasWildcards = searchTerm.Contains('*') || searchTerm.Contains('?');
 
-            if (!hasWildcards && fieldName is "id" or "memberType" or "name" or "fullName" or "assembly" or "namespace" or "exceptionType")
+            if (!hasWildcards && fieldName is Fields.Id or Fields.MemberType or Fields.Name or Fields.FullName or Fields.Assembly or Fields.Namespace or Fields.ExceptionType)
             {
                 query = new TermQuery(new Term(fieldName, searchTerm));
             }
@@ -664,6 +665,32 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         return performanceTracker.GetMetrics();
     }
 
+    /// <inheritdoc/>
+    public bool HasDocuments()
+    {
+        return GetTotalDocuments() > 0;
+    }
+
+    /// <summary>
+    /// Checks if the specified path contains a valid Lucene index.
+    /// A valid index has at least one segment file.
+    /// </summary>
+    /// <param name="indexPath">The path to check.</param>
+    /// <returns>True if the path contains a valid Lucene index, false otherwise.</returns>
+    public static bool IsValidIndexPath(string indexPath)
+    {
+        if (string.IsNullOrWhiteSpace(indexPath) || !System.IO.Directory.Exists(indexPath))
+        {
+            return false;
+        }
+
+        // Check for presence of Lucene segment files
+        var files = System.IO.Directory.GetFiles(indexPath);
+        return files.Any(f =>
+            System.IO.Path.GetFileName(f).StartsWith("segments", StringComparison.OrdinalIgnoreCase) ||
+            System.IO.Path.GetFileName(f) == "write.lock");
+    }
+
     public Dictionary<string, HashSet<string>> GetIndexedPackageVersions()
     {
         Dictionary<string, HashSet<string>> packageVersions = new(StringComparer.OrdinalIgnoreCase);
@@ -672,7 +699,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         try
         {
             // Only load the fields we need for efficiency
-            HashSet<string> fieldsToLoad = ["packageId", "packageVersion"];
+            HashSet<string> fieldsToLoad = [Fields.PackageId, Fields.PackageVersion];
 
             // Iterate through all documents efficiently
             for (int i = 0; i < reader.MaxDoc; i++)
@@ -686,8 +713,8 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
 
                 Document? doc = reader.Document(i, fieldsToLoad);
 
-                string? packageId = doc?.Get("packageId");
-                string? version = doc?.Get("packageVersion");
+                string? packageId = doc?.Get(Fields.PackageId);
+                string? version = doc?.Get(Fields.PackageVersion);
 
                 if (!string.IsNullOrWhiteSpace(packageId) && !string.IsNullOrWhiteSpace(version))
                 {
@@ -717,7 +744,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         try
         {
             // Only load the fields we need for efficiency
-            HashSet<string> fieldsToLoad = ["packageId", "packageVersion", "targetFramework"];
+            HashSet<string> fieldsToLoad = [Fields.PackageId, Fields.PackageVersion, Fields.TargetFramework];
 
             // Iterate through all documents efficiently
             for (int i = 0; i < reader.MaxDoc; i++)
@@ -731,9 +758,9 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
 
                 Document? doc = reader.Document(i, fieldsToLoad);
 
-                string? packageId = doc?.Get("packageId");
-                string? version = doc?.Get("packageVersion");
-                string? framework = doc?.Get("targetFramework") ?? "unknown";
+                string? packageId = doc?.Get(Fields.PackageId);
+                string? version = doc?.Get(Fields.PackageVersion);
+                string? framework = doc?.Get(Fields.TargetFramework) ?? "unknown";
 
                 if (!string.IsNullOrWhiteSpace(packageId) && !string.IsNullOrWhiteSpace(version))
                 {
@@ -763,7 +790,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         try
         {
             // Only load the sourceFilePath field for efficiency
-            HashSet<string> fieldsToLoad = ["sourceFilePath"];
+            HashSet<string> fieldsToLoad = [Fields.SourceFilePath];
 
             // Iterate through all documents efficiently
             HashSet<string> seenPaths = new(StringComparer.OrdinalIgnoreCase);
@@ -771,7 +798,7 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
             for (int i = 0; i < reader.MaxDoc; i++)
             {
                 Document? doc = reader.Document(i, fieldsToLoad);
-                string? sourcePath = doc?.Get("sourceFilePath");
+                string? sourcePath = doc?.Get(Fields.SourceFilePath);
 
                 if (!string.IsNullOrWhiteSpace(sourcePath) && seenPaths.Add(sourcePath))
                 {
@@ -795,16 +822,16 @@ public sealed class LuceneIndexManager : ILuceneIndexManager
         try
         {
             // Search for empty file documents
-            TermQuery query = new(new Term("documentType", "EmptyXmlFile"));
+            TermQuery query = new(new Term(Fields.DocumentType, "EmptyXmlFile"));
             IndexSearcher searcher = new(reader);
             TopDocs topDocs = searcher.Search(query, int.MaxValue);
 
-            HashSet<string> fieldsToLoad = ["sourceFilePath"];
+            HashSet<string> fieldsToLoad = [Fields.SourceFilePath];
 
             foreach (ScoreDoc scoreDoc in topDocs.ScoreDocs)
             {
                 Document? doc = searcher.Doc(scoreDoc.Doc, fieldsToLoad);
-                string? sourcePath = doc?.Get("sourceFilePath");
+                string? sourcePath = doc?.Get(Fields.SourceFilePath);
 
                 if (!string.IsNullOrWhiteSpace(sourcePath))
                 {

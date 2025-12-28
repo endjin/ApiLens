@@ -3,6 +3,7 @@ using ApiLens.Core.Models;
 using Lucene.Net.Documents;
 using Lucene.Net.Index;
 using Lucene.Net.Search;
+using Fields = ApiLens.Core.Lucene.LuceneFields;
 
 namespace ApiLens.Core.Querying;
 
@@ -36,7 +37,7 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        string fieldName = ignoreCase ? "nameNormalized" : "nameText";
+        string fieldName = ignoreCase ? Fields.NameNormalized : Fields.NameText;
         string searchValue = ignoreCase ? name.ToLowerInvariant() : name;
 
         TopDocs topDocs = indexManager.SearchByField(fieldName, searchValue, maxResults);
@@ -48,7 +49,7 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(searchText);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("content", searchText, maxResults);
+        TopDocs topDocs = indexManager.SearchByField(Fields.Content, searchText, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -58,7 +59,7 @@ public class QueryEngine : IQueryEngine
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
         // Use exact match on StringField for consistency with other commands
-        var query = new TermQuery(new Term("namespace", namespaceName));
+        var query = new TermQuery(new Term(Fields.Namespace, namespaceName));
         TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
@@ -67,7 +68,7 @@ public class QueryEngine : IQueryEngine
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
 
-        TopDocs topDocs = indexManager.SearchByField("id", id, 1);
+        TopDocs topDocs = indexManager.SearchByField(Fields.Id, id, 1);
         List<MemberInfo> members = ConvertTopDocsToMembers(topDocs);
         return members.Count > 0 ? members[0] : null;
     }
@@ -77,7 +78,7 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(assemblyName);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("assembly", assemblyName, maxResults);
+        TopDocs topDocs = indexManager.SearchByField(Fields.Assembly, assemblyName, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -85,7 +86,7 @@ public class QueryEngine : IQueryEngine
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("memberType", memberType.ToString(), maxResults);
+        TopDocs topDocs = indexManager.SearchByField(Fields.MemberType, memberType.ToString(), maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -120,7 +121,7 @@ public class QueryEngine : IQueryEngine
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
         // Search for members that belong to the specified declaring type
-        TopDocs topDocs = indexManager.SearchByField("declaringType", declaringType, maxResults);
+        TopDocs topDocs = indexManager.SearchByField(Fields.DeclaringType, declaringType, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -129,7 +130,7 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(codePattern);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("codeExample", codePattern, maxResults);
+        TopDocs topDocs = indexManager.SearchByField(Fields.CodeExample, codePattern, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -171,7 +172,7 @@ public class QueryEngine : IQueryEngine
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
         // Search for documents that have the codeExample field
-        List<Document> documents = indexManager.SearchByFieldExists("codeExample", maxResults);
+        List<Document> documents = indexManager.SearchByFieldExists(Fields.CodeExample, maxResults);
         return ConvertDocumentsToMembers(documents);
     }
 
@@ -217,7 +218,7 @@ public class QueryEngine : IQueryEngine
         }
 
         // Always add text field search as fallback
-        queryBuilder.Add(new TermQuery(new Term("exceptionTypeText", searchTerm.ToLowerInvariant())), Occur.SHOULD);
+        queryBuilder.Add(new TermQuery(new Term(Fields.ExceptionTypeText, searchTerm.ToLowerInvariant())), Occur.SHOULD);
 
         return queryBuilder;
     }
@@ -225,7 +226,7 @@ public class QueryEngine : IQueryEngine
     private void AddWildcardQueries(BooleanQuery queryBuilder, string pattern, bool hasNamespace)
     {
         // Try wildcard on full exception type
-        Query? fullWildcard = CreateWildcardQuery("exceptionType", pattern);
+        Query? fullWildcard = CreateWildcardQuery(Fields.ExceptionType, pattern);
         if (fullWildcard != null)
         {
             queryBuilder.Add(fullWildcard, Occur.SHOULD);
@@ -234,7 +235,7 @@ public class QueryEngine : IQueryEngine
         // If no namespace, also try on simple name and with common namespaces
         if (!hasNamespace)
         {
-            Query? simpleWildcard = CreateWildcardQuery("exceptionSimpleName", pattern);
+            Query? simpleWildcard = CreateWildcardQuery(Fields.ExceptionSimpleName, pattern);
             if (simpleWildcard != null)
             {
                 queryBuilder.Add(simpleWildcard, Occur.SHOULD);
@@ -243,7 +244,7 @@ public class QueryEngine : IQueryEngine
             // Try with common namespaces
             foreach (string ns in CommonExceptionNamespaces.Take(5)) // Limit to most common
             {
-                Query? nsWildcard = CreateWildcardQuery("exceptionType", $"{ns}.{pattern}");
+                Query? nsWildcard = CreateWildcardQuery(Fields.ExceptionType, $"{ns}.{pattern}");
                 if (nsWildcard != null)
                 {
                     queryBuilder.Add(nsWildcard, Occur.SHOULD);
@@ -255,10 +256,10 @@ public class QueryEngine : IQueryEngine
     private void AddNamespacedQueries(BooleanQuery queryBuilder, string searchTerm)
     {
         // Exact match
-        queryBuilder.Add(new TermQuery(new Term("exceptionType", searchTerm)), Occur.SHOULD);
+        queryBuilder.Add(new TermQuery(new Term(Fields.ExceptionType, searchTerm)), Occur.SHOULD);
 
         // Prefix match (e.g., "System.IOException" matches "System.IO.IOException")
-        Query? prefixQuery = CreateWildcardQuery("exceptionType", $"{searchTerm}*");
+        Query? prefixQuery = CreateWildcardQuery(Fields.ExceptionType, $"{searchTerm}*");
         if (prefixQuery != null)
         {
             queryBuilder.Add(prefixQuery, Occur.SHOULD);
@@ -271,32 +272,32 @@ public class QueryEngine : IQueryEngine
             string namespacePart = searchTerm.Substring(0, lastDot);
             string typeName = searchTerm.Substring(lastDot + 1);
 
-            Query? middleWildcard = CreateWildcardQuery("exceptionType", $"{namespacePart}.*.{typeName}");
+            Query? middleWildcard = CreateWildcardQuery(Fields.ExceptionType, $"{namespacePart}.*.{typeName}");
             if (middleWildcard != null)
             {
                 queryBuilder.Add(middleWildcard, Occur.SHOULD);
             }
 
             // Also search just the type name
-            queryBuilder.Add(new TermQuery(new Term("exceptionSimpleName", typeName.ToLowerInvariant())), Occur.SHOULD);
+            queryBuilder.Add(new TermQuery(new Term(Fields.ExceptionSimpleName, typeName.ToLowerInvariant())), Occur.SHOULD);
         }
     }
 
     private void AddSimpleNameQueries(BooleanQuery queryBuilder, string searchTerm)
     {
         // Search simple name field
-        queryBuilder.Add(new TermQuery(new Term("exceptionSimpleName", searchTerm.ToLowerInvariant())), Occur.SHOULD);
+        queryBuilder.Add(new TermQuery(new Term(Fields.ExceptionSimpleName, searchTerm.ToLowerInvariant())), Occur.SHOULD);
 
         // Try exact match with common namespaces
         List<string> namespacedTypes = [.. CommonExceptionNamespaces.Select(ns => $"{ns}.{searchTerm}")];
 
         foreach (string nsType in namespacedTypes)
         {
-            queryBuilder.Add(new TermQuery(new Term("exceptionType", nsType)), Occur.SHOULD);
+            queryBuilder.Add(new TermQuery(new Term(Fields.ExceptionType, nsType)), Occur.SHOULD);
         }
 
         // Suffix wildcard for partial matches (e.g., "Exception" matches "ArgumentException")
-        Query? suffixQuery = CreateWildcardQuery("exceptionType", $"*{searchTerm}");
+        Query? suffixQuery = CreateWildcardQuery(Fields.ExceptionType, $"*{searchTerm}");
         if (suffixQuery != null)
         {
             queryBuilder.Add(suffixQuery, Occur.SHOULD);
@@ -323,7 +324,7 @@ public class QueryEngine : IQueryEngine
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
         // Search for methods with parameter count in range
-        List<Document> documents = indexManager.SearchByIntRange("parameterCount", minParams, maxParams, maxResults);
+        List<Document> documents = indexManager.SearchByIntRange(Fields.ParameterCount, minParams, maxParams, maxResults);
         return ConvertDocumentsToMembers(documents);
     }
 
@@ -335,7 +336,7 @@ public class QueryEngine : IQueryEngine
 
         // Search for methods with cyclomatic complexity in range
         List<Document> documents =
-            indexManager.SearchByIntRange("cyclomaticComplexity", minComplexity, maxComplexity, maxResults);
+            indexManager.SearchByIntRange(Fields.CyclomaticComplexity, minComplexity, maxComplexity, maxResults);
         return ConvertDocumentsToMembers(documents);
     }
 
@@ -347,12 +348,12 @@ public class QueryEngine : IQueryEngine
 
         // Use normalized package ID for case-insensitive search
         string normalizedPackageId = packageId.ToLowerInvariant();
-        TopDocs topDocs = indexManager.SearchByField("packageIdNormalized", normalizedPackageId, maxResults);
+        TopDocs topDocs = indexManager.SearchByField(Fields.PackageIdNormalized, normalizedPackageId, maxResults);
 
         // Fallback to original field for backward compatibility with old indexes
         if (topDocs.TotalHits == 0)
         {
-            topDocs = indexManager.SearchByField("packageId", packageId, maxResults);
+            topDocs = indexManager.SearchByField(Fields.PackageId, packageId, maxResults);
         }
 
         return ConvertTopDocsToMembers(topDocs);
@@ -363,7 +364,7 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("packageVersion", version, maxResults);
+        TopDocs topDocs = indexManager.SearchByField(Fields.PackageVersion, version, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -372,7 +373,7 @@ public class QueryEngine : IQueryEngine
         ArgumentException.ThrowIfNullOrWhiteSpace(framework);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
-        TopDocs topDocs = indexManager.SearchByField("targetFramework", framework, maxResults);
+        TopDocs topDocs = indexManager.SearchByField(Fields.TargetFramework, framework, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -382,7 +383,7 @@ public class QueryEngine : IQueryEngine
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
         // First search for assembly matches (supports wildcards)
-        TopDocs assemblyDocs = indexManager.SearchByField("assembly", assemblyPattern, maxResults * 10);
+        TopDocs assemblyDocs = indexManager.SearchByField(Fields.Assembly, assemblyPattern, maxResults * 10);
         List<MemberInfo> allMembers = ConvertTopDocsToMembers(assemblyDocs);
 
         // Filter to only Type members
@@ -402,18 +403,18 @@ public class QueryEngine : IQueryEngine
         {
             // Exact match - use normalized field
             string normalizedPattern = packagePattern.ToLowerInvariant();
-            packageDocs = indexManager.SearchByField("packageIdNormalized", normalizedPattern, maxResults * 10);
+            packageDocs = indexManager.SearchByField(Fields.PackageIdNormalized, normalizedPattern, maxResults * 10);
 
             // Fallback for old indexes
             if (packageDocs.TotalHits == 0)
             {
-                packageDocs = indexManager.SearchByField("packageId", packagePattern, maxResults * 10);
+                packageDocs = indexManager.SearchByField(Fields.PackageId, packagePattern, maxResults * 10);
             }
         }
         else
         {
             // Wildcard search on original field
-            packageDocs = indexManager.SearchByField("packageId", packagePattern, maxResults * 10);
+            packageDocs = indexManager.SearchByField(Fields.PackageId, packagePattern, maxResults * 10);
         }
 
         List<MemberInfo> allMembers = ConvertTopDocsToMembers(packageDocs);
@@ -430,7 +431,7 @@ public class QueryEngine : IQueryEngine
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
         // Search namespace field with pattern (supports wildcards)
-        TopDocs topDocs = indexManager.SearchByField("namespace", namespacePattern, maxResults);
+        TopDocs topDocs = indexManager.SearchByField(Fields.Namespace, namespacePattern, maxResults);
         return ConvertTopDocsToMembers(topDocs);
     }
 
@@ -446,7 +447,7 @@ public class QueryEngine : IQueryEngine
         bool hasWildcards = assemblyPattern.Contains('*') || assemblyPattern.Contains('?');
         if (hasWildcards)
         {
-            Query? wildcardQuery = CreateWildcardQuery("assembly", assemblyPattern);
+            Query? wildcardQuery = CreateWildcardQuery(Fields.Assembly, assemblyPattern);
             if (wildcardQuery != null)
             {
                 query.Add(wildcardQuery, Occur.MUST);
@@ -454,13 +455,13 @@ public class QueryEngine : IQueryEngine
         }
         else
         {
-            query.Add(new TermQuery(new Term("assembly", assemblyPattern)), Occur.MUST);
+            query.Add(new TermQuery(new Term(Fields.Assembly, assemblyPattern)), Occur.MUST);
         }
 
         // Add member type filter if specified
         if (memberType.HasValue)
         {
-            query.Add(new TermQuery(new Term("memberType", memberType.Value.ToString())), Occur.MUST);
+            query.Add(new TermQuery(new Term(Fields.MemberType, memberType.Value.ToString())), Occur.MUST);
         }
 
         TopDocs topDocs = indexManager.SearchWithQuery(query, maxResults);
@@ -491,7 +492,7 @@ public class QueryEngine : IQueryEngine
         }
 
         // Use "name" field for wildcard searches (StringField, not analyzed)
-        Query? nameQuery = CreateWildcardQuery("name", processedNamePattern);
+        Query? nameQuery = CreateWildcardQuery(Fields.Name, processedNamePattern);
         if (nameQuery != null)
         {
             query.Add(nameQuery, Occur.MUST);
@@ -500,7 +501,7 @@ public class QueryEngine : IQueryEngine
         // Member type filter
         if (memberType.HasValue)
         {
-            query.Add(new TermQuery(new Term("memberType", memberType.Value.ToString())), Occur.MUST);
+            query.Add(new TermQuery(new Term(Fields.MemberType, memberType.Value.ToString())), Occur.MUST);
         }
 
         // Namespace pattern filter
@@ -509,7 +510,7 @@ public class QueryEngine : IQueryEngine
             bool nsHasWildcards = namespacePattern.Contains('*') || namespacePattern.Contains('?');
             if (nsHasWildcards)
             {
-                Query? nsQuery = CreateWildcardQuery("namespace", namespacePattern);
+                Query? nsQuery = CreateWildcardQuery(Fields.Namespace, namespacePattern);
                 if (nsQuery != null)
                 {
                     query.Add(nsQuery, Occur.MUST);
@@ -517,7 +518,7 @@ public class QueryEngine : IQueryEngine
             }
             else
             {
-                query.Add(new TermQuery(new Term("namespace", namespacePattern)), Occur.MUST);
+                query.Add(new TermQuery(new Term(Fields.Namespace, namespacePattern)), Occur.MUST);
             }
         }
 
@@ -527,7 +528,7 @@ public class QueryEngine : IQueryEngine
             bool asmHasWildcards = assemblyPattern.Contains('*') || assemblyPattern.Contains('?');
             if (asmHasWildcards)
             {
-                Query? asmQuery = CreateWildcardQuery("assembly", assemblyPattern);
+                Query? asmQuery = CreateWildcardQuery(Fields.Assembly, assemblyPattern);
                 if (asmQuery != null)
                 {
                     query.Add(asmQuery, Occur.MUST);
@@ -535,7 +536,7 @@ public class QueryEngine : IQueryEngine
             }
             else
             {
-                query.Add(new TermQuery(new Term("assembly", assemblyPattern)), Occur.MUST);
+                query.Add(new TermQuery(new Term(Fields.Assembly, assemblyPattern)), Occur.MUST);
             }
         }
 
@@ -555,7 +556,7 @@ public class QueryEngine : IQueryEngine
         // Apply member type filter if specified
         if (memberType.HasValue)
         {
-            query.Add(new TermQuery(new Term("memberType", memberType.Value.ToString())), Occur.MUST);
+            query.Add(new TermQuery(new Term(Fields.MemberType, memberType.Value.ToString())), Occur.MUST);
         }
 
         // Apply namespace pattern filter if specified
@@ -564,7 +565,7 @@ public class QueryEngine : IQueryEngine
             bool nsHasWildcards = namespacePattern.Contains('*') || namespacePattern.Contains('?');
             if (nsHasWildcards)
             {
-                Query? nsQuery = CreateWildcardQuery("namespace", namespacePattern);
+                Query? nsQuery = CreateWildcardQuery(Fields.Namespace, namespacePattern);
                 if (nsQuery != null)
                 {
                     query.Add(nsQuery, Occur.MUST);
@@ -572,7 +573,7 @@ public class QueryEngine : IQueryEngine
             }
             else
             {
-                query.Add(new TermQuery(new Term("namespace", namespacePattern)), Occur.MUST);
+                query.Add(new TermQuery(new Term(Fields.Namespace, namespacePattern)), Occur.MUST);
             }
         }
 
@@ -582,7 +583,7 @@ public class QueryEngine : IQueryEngine
             bool asmHasWildcards = assemblyPattern.Contains('*') || assemblyPattern.Contains('?');
             if (asmHasWildcards)
             {
-                Query? asmQuery = CreateWildcardQuery("assembly", assemblyPattern);
+                Query? asmQuery = CreateWildcardQuery(Fields.Assembly, assemblyPattern);
                 if (asmQuery != null)
                 {
                     query.Add(asmQuery, Occur.MUST);
@@ -590,7 +591,7 @@ public class QueryEngine : IQueryEngine
             }
             else
             {
-                query.Add(new TermQuery(new Term("assembly", assemblyPattern)), Occur.MUST);
+                query.Add(new TermQuery(new Term(Fields.Assembly, assemblyPattern)), Occur.MUST);
             }
         }
 
@@ -654,12 +655,12 @@ public class QueryEngine : IQueryEngine
 
     private static MemberInfo? ConvertDocumentToMember(Document document)
     {
-        string? id = SanitizeString(document.Get("id"));
-        string? memberTypeStr = document.Get("memberType");
-        string? name = SanitizeString(document.Get("name"));
-        string? fullName = SanitizeString(document.Get("fullName"));
-        string? assembly = SanitizeString(document.Get("assembly"));
-        string? namespaceName = SanitizeString(document.Get("namespace"));
+        string? id = SanitizeString(document.Get(Fields.Id));
+        string? memberTypeStr = document.Get(Fields.MemberType);
+        string? name = SanitizeString(document.Get(Fields.Name));
+        string? fullName = SanitizeString(document.Get(Fields.FullName));
+        string? assembly = SanitizeString(document.Get(Fields.Assembly));
+        string? namespaceName = SanitizeString(document.Get(Fields.Namespace));
 
         if (string.IsNullOrEmpty(id) ||
             string.IsNullOrEmpty(memberTypeStr) ||
@@ -677,13 +678,13 @@ public class QueryEngine : IQueryEngine
         }
 
         // Extract related types
-        string[]? relatedTypeFields = document.GetValues("relatedType");
+        string[]? relatedTypeFields = document.GetValues(Fields.RelatedType);
         ImmutableArray<string> relatedTypes = relatedTypeFields != null
             ? [.. relatedTypeFields]
             : [];
 
         // Extract cross-references
-        string[]? crossRefFields = document.GetValues("crossref");
+        string[]? crossRefFields = document.GetValues(Fields.CrossRef);
         List<CrossReference> crossRefs = [];
 
         if (crossRefFields != null)
@@ -693,19 +694,19 @@ public class QueryEngine : IQueryEngine
                 // Try to determine cross-reference type from specific fields
                 ReferenceType refType = ReferenceType.SeeAlso;
 
-                if (document.Get($"crossref_Inherits") == crossRefId)
+                if (document.Get(Fields.CrossRefType("Inherits")) == crossRefId)
                 {
                     refType = ReferenceType.Inheritance;
                 }
-                else if (document.Get($"crossref_Implements") == crossRefId)
+                else if (document.Get(Fields.CrossRefType("Implements")) == crossRefId)
                 {
                     refType = ReferenceType.Inheritance;
                 }
-                else if (document.Get($"crossref_Return") == crossRefId)
+                else if (document.Get(Fields.CrossRefType("Return")) == crossRefId)
                 {
                     refType = ReferenceType.ReturnType;
                 }
-                else if (document.Get($"crossref_Param") == crossRefId)
+                else if (document.Get(Fields.CrossRefType("Param")) == crossRefId)
                 {
                     refType = ReferenceType.Parameter;
                 }
@@ -721,8 +722,8 @@ public class QueryEngine : IQueryEngine
         }
 
         // Extract code examples
-        string[]? exampleFields = document.GetValues("codeExample");
-        string[]? exampleDescFields = document.GetValues("codeExampleDescription");
+        string[]? exampleFields = document.GetValues(Fields.CodeExample);
+        string[]? exampleDescFields = document.GetValues(Fields.CodeExampleDescription);
         List<CodeExample> examples = [];
 
         if (exampleFields != null)
@@ -740,8 +741,8 @@ public class QueryEngine : IQueryEngine
         }
 
         // Extract exceptions
-        string[]? exceptionTypes = document.GetValues("exceptionType");
-        string[]? exceptionConditions = document.GetValues("exceptionCondition");
+        string[]? exceptionTypes = document.GetValues(Fields.ExceptionType);
+        string[]? exceptionConditions = document.GetValues(Fields.ExceptionCondition);
         List<ExceptionInfo> exceptions = [];
 
         if (exceptionTypes != null)
@@ -759,7 +760,7 @@ public class QueryEngine : IQueryEngine
         }
 
         // Extract attributes
-        string[]? attributeTypes = document.GetValues("attribute");
+        string[]? attributeTypes = document.GetValues(Fields.Attribute);
         List<AttributeInfo> attributes = [];
 
         if (attributeTypes != null)
@@ -775,8 +776,8 @@ public class QueryEngine : IQueryEngine
         }
 
         // Extract parameters
-        string[]? parameterFields = document.GetValues("parameter");
-        string[]? parameterDescFields = document.GetValues("parameterDescription");
+        string[]? parameterFields = document.GetValues(Fields.Parameter);
+        string[]? parameterDescFields = document.GetValues(Fields.ParameterDescription);
         List<ParameterInfo> parameters = [];
 
         if (parameterFields != null)
@@ -807,9 +808,9 @@ public class QueryEngine : IQueryEngine
 
         // Extract complexity metrics
         ComplexityMetrics? complexity = null;
-        string? paramCountStr = document.Get("parameterCount");
-        string? complexityStr = document.Get("cyclomaticComplexity");
-        string? docLinesStr = document.Get("documentationLineCount");
+        string? paramCountStr = document.Get(Fields.ParameterCount);
+        string? complexityStr = document.Get(Fields.CyclomaticComplexity);
+        string? docLinesStr = document.Get(Fields.DocumentationLineCount);
 
         if (!string.IsNullOrEmpty(paramCountStr) &&
             !string.IsNullOrEmpty(complexityStr) &&
@@ -827,16 +828,16 @@ public class QueryEngine : IQueryEngine
         }
 
         // Version tracking fields
-        string? packageId = document.Get("packageId");
-        string? packageVersion = document.Get("packageVersion");
-        string? targetFramework = document.Get("targetFramework");
-        string? isFromNuGetCacheStr = document.Get("isFromNuGetCache");
-        string? sourceFilePath = document.Get("sourceFilePath");
+        string? packageId = document.Get(Fields.PackageId);
+        string? packageVersion = document.Get(Fields.PackageVersion);
+        string? targetFramework = document.Get(Fields.TargetFramework);
+        string? isFromNuGetCacheStr = document.Get(Fields.IsFromNuGetCache);
+        string? sourceFilePath = document.Get(Fields.SourceFilePath);
 
         // Extract method modifiers
-        bool isStatic = bool.TryParse(document.Get("isStatic"), out bool isStaticValue) && isStaticValue;
-        bool isAsync = bool.TryParse(document.Get("isAsync"), out bool isAsyncValue) && isAsyncValue;
-        bool isExtension = bool.TryParse(document.Get("isExtension"), out bool isExtensionValue) && isExtensionValue;
+        bool isStatic = bool.TryParse(document.Get(Fields.IsStatic), out bool isStaticValue) && isStaticValue;
+        bool isAsync = bool.TryParse(document.Get(Fields.IsAsync), out bool isAsyncValue) && isAsyncValue;
+        bool isExtension = bool.TryParse(document.Get(Fields.IsExtension), out bool isExtensionValue) && isExtensionValue;
 
         return new MemberInfo
         {
@@ -846,11 +847,11 @@ public class QueryEngine : IQueryEngine
             FullName = fullName,
             Assembly = assembly,
             Namespace = namespaceName,
-            Summary = SanitizeString(document.Get("summary")),
-            Remarks = SanitizeString(document.Get("remarks")),
-            Returns = SanitizeString(document.Get("returns")),
-            ReturnType = document.Get("returnType"),
-            SeeAlso = SanitizeString(document.Get("seeAlso")),
+            Summary = SanitizeString(document.Get(Fields.Summary)),
+            Remarks = SanitizeString(document.Get(Fields.Remarks)),
+            Returns = SanitizeString(document.Get(Fields.Returns)),
+            ReturnType = document.Get(Fields.ReturnType),
+            SeeAlso = SanitizeString(document.Get(Fields.SeeAlso)),
             CrossReferences = [.. crossRefs],
             RelatedTypes = relatedTypes,
             CodeExamples = [.. examples],

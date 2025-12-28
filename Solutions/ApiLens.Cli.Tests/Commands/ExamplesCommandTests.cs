@@ -73,7 +73,7 @@ public class ExamplesCommandTests : IDisposable
 
         // Assert
         settings.Pattern.ShouldBeNull();
-        settings.IndexPath.ShouldBe("./index");
+        settings.IndexPath.ShouldBeNull(); // Default is null; resolved by IndexPathResolver to ~/.apilens/index
         settings.MaxResults.ShouldBe(10);
         settings.Format.ShouldBe(OutputFormat.Table);
     }

@@ -57,6 +57,14 @@ public class ResponseMetadata
     public DateTime? IndexLastModified { get; set; }
 
     /// <summary>
+    /// The resolved path to the index directory.
+    /// This helps Claude Code and other tools understand which index was used for the query.
+    /// </summary>
+    [JsonPropertyName("indexPath")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? IndexPath { get; set; }
+
+    /// <summary>
     /// The original query string (if applicable)
     /// </summary>
     [JsonPropertyName("query")]

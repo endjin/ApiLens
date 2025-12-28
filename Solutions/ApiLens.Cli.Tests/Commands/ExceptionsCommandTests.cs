@@ -76,7 +76,7 @@ public class ExceptionsCommandTests : IDisposable
 
         // Assert
         settings.ExceptionType.ShouldBe("ArgumentNullException");
-        settings.IndexPath.ShouldBe("./index");
+        settings.IndexPath.ShouldBeNull(); // Default is null; resolved by IndexPathResolver to ~/.apilens/index
         settings.MaxResults.ShouldBe(10);
         settings.ShowDetails.ShouldBe(false);
         settings.Format.ShouldBe(OutputFormat.Table);

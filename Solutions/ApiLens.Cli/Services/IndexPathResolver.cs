@@ -26,28 +26,23 @@ public class IndexPathResolver : IIndexPathResolver
 
     /// <summary>
     /// Resolves the index path using the following priority:
-    /// 1. Explicitly provided path (if not null or default)
+    /// 1. Explicitly provided path (if not null/empty)
     /// 2. APILENS_INDEX environment variable
-    /// 3. ~/.apilens/index (user home directory)
+    /// 3. ~/.apilens/index (user home directory) - the unconditional default
     /// </summary>
+    /// <remarks>
+    /// This method always returns a consistent path regardless of the current working directory.
+    /// The default location (~/.apilens/index) ensures Claude Code and other tools always use
+    /// the same index regardless of which directory they invoke commands from.
+    /// </remarks>
     public string ResolveIndexPath(string? providedPath)
     {
-        // 1. If an explicit path is provided and it's not the default, use it
-        // Note: We check if it's exactly the default value from Settings
+        // 1. If an explicit path is provided (not null/empty), use it
         if (!string.IsNullOrWhiteSpace(providedPath))
         {
-            // Check if this is the default value from Settings (not user-provided)
-            // The default value in Settings is "./index" - if user explicitly provides
-            // a path (even if it's "./index"), we should honor it
-            // We can detect this by checking if the path exists or was explicitly set
             DirectoryPath dirPath = new(providedPath);
             DirectoryPath absolutePath = dirPath.MakeAbsolute(environment);
-
-            // If the path exists or is not the exact default, use it
-            if (fileSystem.Exist(absolutePath) || providedPath != "./index")
-            {
-                return absolutePath.FullPath;
-            }
+            return absolutePath.FullPath;
         }
 
         // 2. Check for environment variable
@@ -58,7 +53,7 @@ public class IndexPathResolver : IIndexPathResolver
             return dirPath.MakeAbsolute(environment).FullPath;
         }
 
-        // 3. Use default location in user's home directory
+        // 3. Use default location in user's home directory (unconditional default)
         DirectoryPath homeDir = environment.HomeDirectory;
         DirectoryPath defaultPath = homeDir.Combine(DefaultIndexDirectoryName).Combine(DefaultIndexSubdirectory);
 

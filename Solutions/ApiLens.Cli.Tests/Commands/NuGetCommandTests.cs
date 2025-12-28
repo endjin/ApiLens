@@ -69,7 +69,7 @@ public sealed class NuGetCommandTests : IDisposable
         NuGetCommand.Settings settings = new();
 
         // Assert
-        settings.IndexPath.ShouldBe("./index");
+        settings.IndexPath.ShouldBeNull(); // Default is null; resolved by IndexPathResolver to ~/.apilens/index
         settings.Clean.ShouldBe(false);
         settings.LatestOnly.ShouldBe(false);
         settings.PackageFilter.ShouldBeNull();

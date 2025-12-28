@@ -493,9 +493,9 @@ public class QueryCommand : Command<QueryCommand.Settings>
         [CommandArgument(0, "<query>")]
         public string Query { get; init; } = string.Empty;
 
-        [Description("Path to the Lucene index directory (default: ./index). Create with 'analyze' or 'index' command first")]
+        [Description("Path to the Lucene index directory (default: ~/.apilens/index or APILENS_INDEX env var). Create with 'analyze' or 'index' command first")]
         [CommandOption("-i|--index")]
-        public string IndexPath { get; init; } = "./index";
+        public string? IndexPath { get; init; }
 
         [Description("Maximum results to return (default: 10, max: 1000). Use larger values for comprehensive searches")]
         [CommandOption("-m|--max")]

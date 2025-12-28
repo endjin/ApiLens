@@ -288,7 +288,7 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 
             // Display results after progress context
             console.WriteLine();
-            DisplayResults(result, indexManager, settings.IndexPath);
+            DisplayResults(result, indexManager, resolvedIndexPath);
 
             commandStopwatch.Stop();
             console.WriteLine();
@@ -454,9 +454,9 @@ public class NuGetCommand : AsyncCommand<NuGetCommand.Settings>
 
     public sealed class Settings : CommandSettings
     {
-        [Description("Path to the Lucene index directory")]
+        [Description("Path to the Lucene index directory (default: ~/.apilens/index or APILENS_INDEX env var)")]
         [CommandOption("-i|--index")]
-        public string IndexPath { get; init; } = "./index";
+        public string? IndexPath { get; init; }
 
         [Description("Clean the index before adding new documents")]
         [CommandOption("-c|--clean")]

@@ -25,25 +25,25 @@ public class DocumentBuilder : IDocumentBuilder
 
         Document doc =
         [
-            new StringField("id", SanitizeForStorage(memberInfo.Id), Field.Store.YES),
-            new StringField("memberType", memberInfo.MemberType.ToString(), Field.Store.YES),
-            new StringField("name", memberInfo.Name, Field.Store.YES),
-            new StringField("fullName", memberInfo.FullName, Field.Store.YES),
-            new StringField("assembly", memberInfo.Assembly, Field.Store.YES),
-            new StringField("namespace", memberInfo.Namespace, Field.Store.YES),
+            new StringField(LuceneFields.Id, SanitizeForStorage(memberInfo.Id), Field.Store.YES),
+            new StringField(LuceneFields.MemberType, memberInfo.MemberType.ToString(), Field.Store.YES),
+            new StringField(LuceneFields.Name, memberInfo.Name, Field.Store.YES),
+            new StringField(LuceneFields.FullName, memberInfo.FullName, Field.Store.YES),
+            new StringField(LuceneFields.Assembly, memberInfo.Assembly, Field.Store.YES),
+            new StringField(LuceneFields.Namespace, memberInfo.Namespace, Field.Store.YES),
 
             // Indexed fields for searching
-            new TextField("nameText", memberInfo.Name, Field.Store.NO),
-            new TextField("fullNameText", memberInfo.FullName, Field.Store.NO),
-            new TextField("namespaceText", memberInfo.Namespace, Field.Store.NO),
-            
+            new TextField(LuceneFields.NameText, memberInfo.Name, Field.Store.NO),
+            new TextField(LuceneFields.FullNameText, memberInfo.FullName, Field.Store.NO),
+            new TextField(LuceneFields.NamespaceText, memberInfo.Namespace, Field.Store.NO),
+
             // Normalized fields for case-insensitive search
-            new StringField("nameNormalized", memberInfo.Name.ToLowerInvariant(), Field.Store.NO),
-            new StringField("fullNameNormalized", memberInfo.FullName.ToLowerInvariant(), Field.Store.NO),
-            new StringField("namespaceNormalized", memberInfo.Namespace.ToLowerInvariant(), Field.Store.NO),
+            new StringField(LuceneFields.NameNormalized, memberInfo.Name.ToLowerInvariant(), Field.Store.NO),
+            new StringField(LuceneFields.FullNameNormalized, memberInfo.FullName.ToLowerInvariant(), Field.Store.NO),
+            new StringField(LuceneFields.NamespaceNormalized, memberInfo.Namespace.ToLowerInvariant(), Field.Store.NO),
 
             // Facet field for filtering by member type
-            new StringField("memberTypeFacet", memberInfo.MemberType.ToString(), Field.Store.YES)
+            new StringField(LuceneFields.MemberTypeFacet, memberInfo.MemberType.ToString(), Field.Store.YES)
         ];
 
         // Add declaring type for non-type members
@@ -52,7 +52,7 @@ public class DocumentBuilder : IDocumentBuilder
             string declaringType = ExtractDeclaringType(memberInfo.FullName);
             if (!string.IsNullOrEmpty(declaringType))
             {
-                doc.Add(new StringField("declaringType", declaringType, Field.Store.YES));
+                doc.Add(new StringField(LuceneFields.DeclaringType, declaringType, Field.Store.YES));
             }
         }
 
@@ -60,53 +60,53 @@ public class DocumentBuilder : IDocumentBuilder
         switch (memberInfo.MemberType)
         {
             case MemberType.Type:
-                doc.Add(new TextField("typeSearch", memberInfo.Name, Field.Store.YES));
+                doc.Add(new TextField(LuceneFields.TypeSearch, memberInfo.Name, Field.Store.YES));
                 break;
             case MemberType.Method:
-                doc.Add(new TextField("methodSearch", memberInfo.Name, Field.Store.YES));
+                doc.Add(new TextField(LuceneFields.MethodSearch, memberInfo.Name, Field.Store.YES));
                 break;
             case MemberType.Property:
-                doc.Add(new TextField("propertySearch", memberInfo.Name, Field.Store.YES));
+                doc.Add(new TextField(LuceneFields.PropertySearch, memberInfo.Name, Field.Store.YES));
                 break;
             case MemberType.Field:
-                doc.Add(new TextField("fieldSearch", memberInfo.Name, Field.Store.YES));
+                doc.Add(new TextField(LuceneFields.FieldSearch, memberInfo.Name, Field.Store.YES));
                 break;
             case MemberType.Event:
-                doc.Add(new TextField("eventSearch", memberInfo.Name, Field.Store.YES));
+                doc.Add(new TextField(LuceneFields.EventSearch, memberInfo.Name, Field.Store.YES));
                 break;
         }
 
         // Add optional fields
         if (!string.IsNullOrWhiteSpace(memberInfo.Summary))
         {
-            doc.Add(new TextField("summary", SanitizeForStorage(memberInfo.Summary), Field.Store.YES));
+            doc.Add(new TextField(LuceneFields.Summary, SanitizeForStorage(memberInfo.Summary), Field.Store.YES));
         }
 
         if (!string.IsNullOrWhiteSpace(memberInfo.Remarks))
         {
-            doc.Add(new TextField("remarks", SanitizeForStorage(memberInfo.Remarks), Field.Store.YES));
+            doc.Add(new TextField(LuceneFields.Remarks, SanitizeForStorage(memberInfo.Remarks), Field.Store.YES));
         }
 
         // Add cross-references
         foreach (CrossReference crossRef in memberInfo.CrossReferences)
         {
-            doc.Add(new StringField("crossref", crossRef.TargetId, Field.Store.YES));
-            doc.Add(new StringField($"crossref_{crossRef.Type}", crossRef.TargetId, Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.CrossRef, crossRef.TargetId, Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.CrossRefType(crossRef.Type.ToString()), crossRef.TargetId, Field.Store.YES));
         }
 
         // Add related types
         foreach (string relatedType in memberInfo.RelatedTypes)
         {
-            doc.Add(new TextField("relatedType", relatedType, Field.Store.YES));
+            doc.Add(new TextField(LuceneFields.RelatedType, relatedType, Field.Store.YES));
         }
 
         // Add code examples
         foreach (CodeExample example in memberInfo.CodeExamples)
         {
-            doc.Add(new TextField("codeExample", example.Code, Field.Store.YES));
+            doc.Add(new TextField(LuceneFields.CodeExample, example.Code, Field.Store.YES));
             if (!string.IsNullOrWhiteSpace(example.Description))
             {
-                doc.Add(new TextField("codeExampleDescription", example.Description, Field.Store.YES));
+                doc.Add(new TextField(LuceneFields.CodeExampleDescription, example.Description, Field.Store.YES));
             }
         }
 
@@ -114,36 +114,36 @@ public class DocumentBuilder : IDocumentBuilder
         foreach (ExceptionInfo exception in memberInfo.Exceptions)
         {
             // Store the full exception type as keyword field for exact matching
-            doc.Add(new StringField("exceptionType", exception.Type, Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.ExceptionType, exception.Type, Field.Store.YES));
 
             // Also add as text field for partial matching
-            doc.Add(new TextField("exceptionTypeText", exception.Type, Field.Store.NO));
+            doc.Add(new TextField(LuceneFields.ExceptionTypeText, exception.Type, Field.Store.NO));
 
             // Extract just the class name without namespace for easier searching
             string simpleName = exception.Type.Contains('.')
                 ? exception.Type.Substring(exception.Type.LastIndexOf('.') + 1)
                 : exception.Type;
-            doc.Add(new TextField("exceptionSimpleName", simpleName, Field.Store.NO));
+            doc.Add(new TextField(LuceneFields.ExceptionSimpleName, simpleName, Field.Store.NO));
 
             if (!string.IsNullOrWhiteSpace(exception.Condition))
             {
-                doc.Add(new TextField("exceptionCondition", exception.Condition, Field.Store.YES));
+                doc.Add(new TextField(LuceneFields.ExceptionCondition, exception.Condition, Field.Store.YES));
             }
         }
 
         // Add attributes
         foreach (AttributeInfo attribute in memberInfo.Attributes)
         {
-            doc.Add(new StringField("attribute", attribute.Type, Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.Attribute, attribute.Type, Field.Store.YES));
         }
 
         // Add parameters
         foreach (ParameterInfo parameter in memberInfo.Parameters)
         {
-            doc.Add(new TextField("parameter", $"{parameter.Type} {parameter.Name}", Field.Store.YES));
+            doc.Add(new TextField(LuceneFields.Parameter, $"{parameter.Type} {parameter.Name}", Field.Store.YES));
             if (!string.IsNullOrWhiteSpace(parameter.Description))
             {
-                doc.Add(new TextField("parameterDescription", parameter.Description, Field.Store.YES));
+                doc.Add(new TextField(LuceneFields.ParameterDescription, parameter.Description, Field.Store.YES));
             }
         }
 
@@ -193,85 +193,86 @@ public class DocumentBuilder : IDocumentBuilder
             }
         }
 
-        doc.Add(new TextField("content", contentBuilder.ToString(), Field.Store.NO));
+        // Note: Content field is built later via BuildSearchableContent() for consistency
+        // The contentBuilder here was used for inline building but caused duplicate field issues
 
         // Add returns documentation
         if (!string.IsNullOrWhiteSpace(memberInfo.Returns))
         {
-            doc.Add(new TextField("returns", SanitizeForStorage(memberInfo.Returns), Field.Store.YES));
+            doc.Add(new TextField(LuceneFields.Returns, SanitizeForStorage(memberInfo.Returns), Field.Store.YES));
         }
 
         // Add return type for methods
         if (!string.IsNullOrWhiteSpace(memberInfo.ReturnType))
         {
-            doc.Add(new StringField("returnType", memberInfo.ReturnType, Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.ReturnType, memberInfo.ReturnType, Field.Store.YES));
         }
 
         // Add see also references
         if (!string.IsNullOrWhiteSpace(memberInfo.SeeAlso))
         {
-            doc.Add(new TextField("seeAlso", SanitizeForStorage(memberInfo.SeeAlso), Field.Store.YES));
+            doc.Add(new TextField(LuceneFields.SeeAlso, SanitizeForStorage(memberInfo.SeeAlso), Field.Store.YES));
         }
 
         // Add method modifiers
         if (memberInfo.MemberType == MemberType.Method)
         {
-            doc.Add(new StringField("isStatic", memberInfo.IsStatic.ToString().ToLowerInvariant(), Field.Store.YES));
-            doc.Add(new StringField("isAsync", memberInfo.IsAsync.ToString().ToLowerInvariant(), Field.Store.YES));
-            doc.Add(new StringField("isExtension", memberInfo.IsExtension.ToString().ToLowerInvariant(), Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.IsStatic, memberInfo.IsStatic.ToString().ToLowerInvariant(), Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.IsAsync, memberInfo.IsAsync.ToString().ToLowerInvariant(), Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.IsExtension, memberInfo.IsExtension.ToString().ToLowerInvariant(), Field.Store.YES));
         }
 
         // Add complexity metrics
         if (memberInfo.Complexity != null)
         {
-            doc.Add(new Int32Field("parameterCount", memberInfo.Complexity.ParameterCount, Field.Store.YES));
-            doc.Add(new Int32Field("cyclomaticComplexity", memberInfo.Complexity.CyclomaticComplexity,
+            doc.Add(new Int32Field(LuceneFields.ParameterCount, memberInfo.Complexity.ParameterCount, Field.Store.YES));
+            doc.Add(new Int32Field(LuceneFields.CyclomaticComplexity, memberInfo.Complexity.CyclomaticComplexity,
                 Field.Store.YES));
-            doc.Add(new Int32Field("documentationLineCount", memberInfo.Complexity.DocumentationLineCount,
+            doc.Add(new Int32Field(LuceneFields.DocumentationLineCount, memberInfo.Complexity.DocumentationLineCount,
                 Field.Store.YES));
         }
 
         // Add version tracking fields
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageId))
         {
-            doc.Add(new StringField("packageId", memberInfo.PackageId, Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.PackageId, memberInfo.PackageId, Field.Store.YES));
             // Add normalized package ID for case-insensitive search
-            doc.Add(new StringField("packageIdNormalized", memberInfo.PackageId.ToLowerInvariant(), Field.Store.NO));
+            doc.Add(new StringField(LuceneFields.PackageIdNormalized, memberInfo.PackageId.ToLowerInvariant(), Field.Store.NO));
         }
 
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageVersion))
         {
-            doc.Add(new StringField("packageVersion", memberInfo.PackageVersion, Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.PackageVersion, memberInfo.PackageVersion, Field.Store.YES));
         }
 
         if (!string.IsNullOrWhiteSpace(memberInfo.TargetFramework))
         {
-            doc.Add(new StringField("targetFramework", memberInfo.TargetFramework, Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.TargetFramework, memberInfo.TargetFramework, Field.Store.YES));
         }
 
-        doc.Add(new StringField("isFromNuGetCache", memberInfo.IsFromNuGetCache.ToString().ToLowerInvariant(),
+        doc.Add(new StringField(LuceneFields.IsFromNuGetCache, memberInfo.IsFromNuGetCache.ToString().ToLowerInvariant(),
             Field.Store.YES));
 
         // Always add sourceFilePath for proper change detection tracking
-        doc.Add(new StringField("sourceFilePath", SanitizeForStorage(memberInfo.SourceFilePath ?? string.Empty), Field.Store.YES));
+        doc.Add(new StringField(LuceneFields.SourceFilePath, SanitizeForStorage(memberInfo.SourceFilePath ?? string.Empty), Field.Store.YES));
 
         // Add searchable version field
         if (!string.IsNullOrWhiteSpace(memberInfo.PackageVersion))
         {
-            doc.Add(new TextField("versionSearch", memberInfo.PackageVersion, Field.Store.YES));
+            doc.Add(new TextField(LuceneFields.VersionSearch, memberInfo.PackageVersion, Field.Store.YES));
         }
 
         // Add content hash for deduplication (not stored)
         if (!string.IsNullOrWhiteSpace(memberInfo.ContentHash))
         {
-            doc.Add(new StringField("contentHash", memberInfo.ContentHash, Field.Store.NO));
+            doc.Add(new StringField(LuceneFields.ContentHash, memberInfo.ContentHash, Field.Store.NO));
         }
 
         // Method-specific fields would be handled by overloaded methods
 
         // Create a combined searchable content field
         string content = BuildSearchableContent(memberInfo);
-        doc.Add(new TextField("content", content, Field.Store.YES));
+        doc.Add(new TextField(LuceneFields.Content, content, Field.Store.YES));
 
         return doc;
     }
@@ -366,21 +367,21 @@ public class DocumentBuilder : IDocumentBuilder
         // Add type-specific fields
         if (!string.IsNullOrWhiteSpace(typeInfo.BaseType))
         {
-            doc.Add(new StringField("baseType", typeInfo.BaseType, Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.BaseType, typeInfo.BaseType, Field.Store.YES));
         }
 
         foreach (string interfaceName in typeInfo.Interfaces)
         {
-            doc.Add(new StringField("interface", interfaceName, Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.Interface, interfaceName, Field.Store.YES));
         }
 
         if (typeInfo.IsGeneric)
         {
-            doc.Add(new StringField("isGeneric", "true", Field.Store.YES));
-            doc.Add(new Int32Field("genericArity", typeInfo.GenericArity, Field.Store.YES));
+            doc.Add(new StringField(LuceneFields.IsGeneric, "true", Field.Store.YES));
+            doc.Add(new Int32Field(LuceneFields.GenericArity, typeInfo.GenericArity, Field.Store.YES));
         }
 
-        doc.Add(new StringField("typeKind", typeInfo.Kind.ToString(), Field.Store.YES));
+        doc.Add(new StringField(LuceneFields.TypeKind, typeInfo.Kind.ToString(), Field.Store.YES));
 
         return doc;
     }
@@ -411,7 +412,7 @@ public class DocumentBuilder : IDocumentBuilder
         // Add method-specific fields (parameters only, since other fields are already added)
         foreach (ParameterInfo parameter in methodInfo.Parameters)
         {
-            doc.Add(new TextField("parameter", $"{parameter.Type} {parameter.Name}", Field.Store.YES));
+            doc.Add(new TextField(LuceneFields.Parameter, $"{parameter.Type} {parameter.Name}", Field.Store.YES));
         }
 
         return doc;

@@ -288,9 +288,9 @@ public class StatsCommand : Command<StatsCommand.Settings>
 
     public sealed class Settings : CommandSettings
     {
-        [Description("Path to the Lucene index directory")]
+        [Description("Path to the Lucene index directory (default: ~/.apilens/index or APILENS_INDEX env var)")]
         [CommandOption("-i|--index")]
-        public string IndexPath { get; init; } = "./index";
+        public string? IndexPath { get; init; }
 
         [Description("Output format")]
         [CommandOption("-f|--format")]

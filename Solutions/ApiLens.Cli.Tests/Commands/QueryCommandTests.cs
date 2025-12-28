@@ -46,7 +46,7 @@ public sealed class QueryCommandTests : IDisposable
 
         // Assert
         settings.Query.ShouldBe("String");
-        settings.IndexPath.ShouldBe("./index");
+        settings.IndexPath.ShouldBeNull(); // Default is null; resolved by IndexPathResolver to ~/.apilens/index
         settings.MaxResults.ShouldBe(10);
         settings.QueryType.ShouldBe(QueryCommand.QueryType.Name);
         settings.Format.ShouldBe(OutputFormat.Table);

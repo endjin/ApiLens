@@ -76,6 +76,7 @@ public class MetadataService
             metadata.IndexSize = indexStats.TotalSizeInBytes;
             metadata.IndexDocumentCount = indexStats.DocumentCount;
             metadata.IndexLastModified = indexStats.LastModified;
+            metadata.IndexPath = indexStats.IndexPath;
         }
         else
         {
@@ -115,6 +116,7 @@ public class MetadataService
             metadata.IndexSize = indexStats.TotalSizeInBytes;
             metadata.IndexDocumentCount = indexStats.DocumentCount;
             metadata.IndexLastModified = indexStats.LastModified;
+            metadata.IndexPath = indexStats.IndexPath;
         }
         else
         {
@@ -152,6 +154,7 @@ public class MetadataService
             metadata.IndexSize = indexStats.TotalSizeInBytes;
             metadata.IndexDocumentCount = indexStats.DocumentCount;
             metadata.IndexLastModified = indexStats.LastModified;
+            metadata.IndexPath = indexStats.IndexPath;
         }
         else
         {
