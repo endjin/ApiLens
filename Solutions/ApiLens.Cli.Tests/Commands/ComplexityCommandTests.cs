@@ -75,7 +75,7 @@ public class ComplexityCommandTests : IDisposable
         settings.MinComplexity.ShouldBeNull();
         settings.MinParams.ShouldBeNull();
         settings.MaxParams.ShouldBeNull();
-        settings.IndexPath.ShouldBe("./index");
+        settings.IndexPath.ShouldBeNull(); // Default is null; resolved by IndexPathResolver to ~/.apilens/index
         settings.MaxResults.ShouldBe(20);
         settings.SortBy.ShouldBe("complexity");
         settings.ShowStats.ShouldBe(false);

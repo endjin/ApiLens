@@ -58,7 +58,7 @@ if (-not $SkipBuild) {
 }
 
 # Set up paths
-$apilens = Join-Path $PSScriptRoot "../../Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+$apilens = Join-Path $PSScriptRoot "../../Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens"
 if ($IsWindows -or $env:OS -eq "Windows_NT") {
     $apilens = "$apilens.exe"
 }

@@ -45,4 +45,11 @@ public interface ILuceneIndexManager : IDisposable
 
     // Performance metrics
     PerformanceMetrics GetPerformanceMetrics();
+
+    // Index validation
+    /// <summary>
+    /// Checks if the index contains any documents.
+    /// </summary>
+    /// <returns>True if the index has at least one document, false otherwise.</returns>
+    bool HasDocuments();
 }

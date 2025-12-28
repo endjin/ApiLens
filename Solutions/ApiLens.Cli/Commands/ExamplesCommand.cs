@@ -248,9 +248,9 @@ public class ExamplesCommand : Command<ExamplesCommand.Settings>
         [CommandArgument(0, "[pattern]")]
         public string? Pattern { get; init; }
 
-        [Description("Path to the Lucene index directory")]
+        [Description("Path to the Lucene index directory (default: ~/.apilens/index or APILENS_INDEX env var)")]
         [CommandOption("-i|--index")]
-        public string IndexPath { get; init; } = "./index";
+        public string? IndexPath { get; init; }
 
         [Description("Maximum number of results to return")]
         [CommandOption("-m|--max")]

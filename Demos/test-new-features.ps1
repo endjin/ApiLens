@@ -74,7 +74,7 @@ Write-Host "Testing all new features and improvements`n" -ForegroundColor Gray
 
 # Build ApiLens if needed
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens"
 if ($IsWindows) { $apilens += ".exe" }
 
 if (-not $SkipBuild) {

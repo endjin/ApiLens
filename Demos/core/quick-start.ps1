@@ -23,7 +23,7 @@ function Write-Command {
 }
 
 # Build if needed
-if (-not (Test-Path "./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens*")) {
+if (-not (Test-Path "./Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens*")) {
     Write-Host "`n📦 Building ApiLens..." -ForegroundColor Yellow
     dotnet build ./Solutions/ApiLens.Cli/ApiLens.Cli.csproj --verbosity quiet
 }
@@ -84,7 +84,7 @@ New-Item -ItemType Directory -Path $demoDir -Force | Out-Null
 
 # Get the repository root (two levels up from Demos/core/)
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens"
 if ($IsWindows) { $apilens += ".exe" }
 
 # Index the files

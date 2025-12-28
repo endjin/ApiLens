@@ -386,9 +386,9 @@ public class HierarchyCommand : Command<HierarchyCommand.Settings>
         [CommandOption("--max-members")]
         public int MaxMembers { get; init; } = 50;
 
-        [Description("Path to the Lucene index directory")]
+        [Description("Path to the Lucene index directory (default: ~/.apilens/index or APILENS_INDEX env var)")]
         [CommandOption("-i|--index")]
-        public string IndexPath { get; init; } = "./index";
+        public string? IndexPath { get; init; }
 
         [Description("Output format")]
         [CommandOption("-f|--format")]

@@ -23,7 +23,7 @@ Write-Host "================================" -ForegroundColor Cyan
 # Build if needed
 # Get the repository root (two levels up from Demos/core/)
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens"
 if ($IsWindows) { $apilens += ".exe" }
 if ($IsWindows -or $env:OS -eq "Windows_NT") { 
     $apilens += ".exe" 

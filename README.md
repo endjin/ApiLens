@@ -1,6 +1,6 @@
 # ApiLens
 
-ApiLens is a .NET 9 CLI application that indexes and queries .NET XML API documentation using Lucene.NET. It's designed to make .NET API documentation searchable and accessible, particularly for LLMs through the Model Context Protocol (MCP).
+ApiLens is a .NET 10 CLI application that indexes and queries .NET XML API documentation using Lucene.NET. It's designed to make .NET API documentation searchable and accessible, particularly for LLMs through the Model Context Protocol (MCP).
 
 ## Features
 
@@ -21,7 +21,7 @@ ApiLens is a .NET 9 CLI application that indexes and queries .NET XML API docume
 
 ## Prerequisites
 
-- **.NET 9 SDK** or later - [Download from Microsoft](https://dotnet.microsoft.com/download/dotnet/9.0)
+- **.NET 10 SDK** or later - [Download from Microsoft](https://dotnet.microsoft.com/download/dotnet/10.0)
 - **PowerShell Core** (optional, for running demo scripts) - [Install PowerShell](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell)
 
 ## Installation
@@ -69,7 +69,7 @@ dotnet build ./Solutions/ApiLens.Cli/ApiLens.Cli.csproj --configuration Release
 dotnet run --project ./Solutions/ApiLens.Cli -- --help
 
 # Or build and use the executable directly
-./Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens --help
+./Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens --help
 ```
 
 ## Quick Start
@@ -116,22 +116,25 @@ cd Demos && pwsh ./test-all.ps1
 
 ## Index Management
 
-ApiLens uses a smart index location strategy:
+ApiLens uses a consistent index location strategy designed for reliability with Claude Code and other AI tools:
 
-1. **Explicit path**: Use `--index /path/to/index` to specify a custom location
-2. **Environment variable**: Set `APILENS_INDEX=/path/to/index` for a persistent location
-3. **Default**: Uses `~/.apilens/index` in your home directory
+1. **Default**: Uses `~/.apilens/index` in your home directory (always consistent regardless of working directory)
+2. **Environment variable**: Set `APILENS_INDEX=/path/to/index` to override the default
+3. **Explicit path**: Use `--index /path/to/index` to specify a custom location
+
+**Why this matters for Claude Code**: The default `~/.apilens/index` ensures that API documentation is always accessible regardless of which directory Claude Code invokes commands from. JSON output includes the `indexPath` in metadata so tools always know which index was used.
 
 ```bash
-# Use custom index location
-apilens index ./docs --index /my/custom/index
+# Default location (recommended for Claude Code integration)
+apilens index ./docs  # Uses ~/.apilens/index
+apilens query String  # Uses same index from any directory
 
-# Set environment variable for consistent location
+# Set environment variable for team/shared location
 export APILENS_INDEX=/shared/apilens-index
 apilens index ./docs  # Uses /shared/apilens-index
 
-# Default location (no configuration needed)
-apilens index ./docs  # Uses ~/.apilens/index
+# Use explicit custom index location
+apilens index ./docs --index /my/custom/index
 ```
 
 ## Core Commands
@@ -477,7 +480,7 @@ The solution is organized under the `Solutions/` directory:
 
 ### Prerequisites
 
-- .NET 9 SDK
+- .NET 10 SDK
 - Visual Studio 2022 or VS Code with C# extensions
 - PowerShell Core (for running demo scripts)
 

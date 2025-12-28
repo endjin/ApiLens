@@ -19,7 +19,7 @@ Write-Host "New features: Leading wildcard support and type exploration" -Foregr
 
 # Build if needed
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens"
 if ($IsWindows -or $env:OS -eq "Windows_NT") { 
     $apilens += ".exe" 
 }

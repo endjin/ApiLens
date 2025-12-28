@@ -137,7 +137,7 @@ public class IndexCommandTests : IDisposable
 
         // Assert
         settings.Path.ShouldBe("/docs/MyLib.xml");
-        settings.IndexPath.ShouldBe("./index");
+        settings.IndexPath.ShouldBeNull(); // Default is null; resolved by IndexPathResolver to ~/.apilens/index
         settings.Clean.ShouldBe(false);
         settings.Pattern.ShouldBeNull();
     }
@@ -336,7 +336,7 @@ public class IndexCommandTests : IDisposable
         IndexCommand.Settings settings = new() { Path = "/test" };
 
         // Assert
-        settings.IndexPath.ShouldBe("./index");
+        settings.IndexPath.ShouldBeNull(); // Default is null; resolved by IndexPathResolver to ~/.apilens/index
         settings.Clean.ShouldBeFalse();
         settings.Pattern.ShouldBeNull();
     }

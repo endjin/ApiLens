@@ -60,7 +60,7 @@ public sealed class StatsCommandTests : IDisposable
         StatsCommand.Settings defaultSettings = new();
 
         // Assert
-        defaultSettings.IndexPath.ShouldBe("./index");
+        defaultSettings.IndexPath.ShouldBeNull(); // Default is null; resolved by IndexPathResolver to ~/.apilens/index
         defaultSettings.Format.ShouldBe(OutputFormat.Table);
     }
 

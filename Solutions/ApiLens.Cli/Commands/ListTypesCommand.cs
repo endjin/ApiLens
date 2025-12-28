@@ -382,9 +382,9 @@ public class ListTypesCommand : Command<ListTypesCommand.Settings>
         [CommandOption("-g|--group-by")]
         public GroupByOption GroupBy { get; init; } = GroupByOption.Assembly;
 
-        [Description("Path to the Lucene index directory")]
+        [Description("Path to the Lucene index directory (default: ~/.apilens/index or APILENS_INDEX env var)")]
         [CommandOption("-i|--index")]
-        public string IndexPath { get; init; } = "./index";
+        public string? IndexPath { get; init; }
 
         [Description("Maximum number of results to return")]
         [CommandOption("-m|--max")]

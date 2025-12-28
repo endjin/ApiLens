@@ -374,9 +374,9 @@ public class MembersCommand : Command<MembersCommand.Settings>
         [CommandArgument(0, "<type-name>")]
         public string TypeName { get; init; } = string.Empty;
 
-        [Description("Path to the Lucene index directory")]
+        [Description("Path to the Lucene index directory (default: ~/.apilens/index or APILENS_INDEX env var)")]
         [CommandOption("-i|--index")]
-        public string IndexPath { get; init; } = "./index";
+        public string? IndexPath { get; init; }
 
         [Description("Maximum total results to return")]
         [CommandOption("-m|--max")]
