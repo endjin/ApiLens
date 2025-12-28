@@ -18,7 +18,7 @@ Write-Host "================================" -ForegroundColor Cyan
 
 # Build if needed
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens"
 if ($IsWindows -or $env:OS -eq "Windows_NT") { 
     $apilens += ".exe" 
 }

@@ -20,7 +20,7 @@ Write-Host "New features: Proper deduplication and property type linking" -Foreg
 
 # Build if needed
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens"
 if ($IsWindows -or $env:OS -eq "Windows_NT") { 
     $apilens += ".exe" 
 }
@@ -87,7 +87,7 @@ Write-Host "`n🎯 The deduplication service uses intelligent framework prioriti
 Write-Host @"
 
 Priority Order (highest to lowest):
-1. net9.0, net8.0, net7.0, net6.0 (latest .NET versions first)
+1. net10.0, net8.0, net7.0, net6.0 (latest .NET versions first)
 2. net5.0, netcoreapp3.1, netcoreapp3.0 (older .NET Core)
 3. netstandard2.1, netstandard2.0 (cross-platform)
 4. net48, net472, etc. (legacy .NET Framework)
@@ -205,7 +205,7 @@ Write-Host @"
 🎯 Key Improvements:
    ✅ Fixed --distinct flag - it now works properly!
    ✅ --distinct defaults to 'true' for better user experience
-   ✅ Intelligent framework version prioritization (net9.0 > net8.0 > netstandard2.0)
+   ✅ Intelligent framework version prioritization (net10.0 > net8.0 > netstandard2.0)
    ✅ Property type linking for richer metadata
    ✅ Consistent deduplication across all commands (list-types, members, query)
 

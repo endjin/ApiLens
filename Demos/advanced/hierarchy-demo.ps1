@@ -27,7 +27,7 @@ Write-Host "Exploring type relationships and inheritance hierarchies`n" -Foregro
 
 # Ensure ApiLens is built
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens"
 if ($IsWindows) { $apilens += ".exe" }
 
 if (-not (Test-Path $apilens)) {

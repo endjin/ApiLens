@@ -7,7 +7,7 @@ Write-Host "Demonstrating the new package exploration and smart querying feature
 
 # Get the repository root (two levels up from Demos/advanced/)
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+$apilens = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens"
 if ($IsWindows) { $apilens += ".exe" }
 
 # Step 1: Analyze a solution

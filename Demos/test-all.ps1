@@ -176,7 +176,7 @@ if ($Category -eq "all" -or $Category -eq "nuget") {
     
     # Test specific features
     Write-Host "`nTesting NuGet command..." -ForegroundColor Yellow
-    $apilensPath = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+    $apilensPath = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens"
     if ($IsWindows -or $env:OS -eq "Windows_NT") { 
         $apilensPath += ".exe" 
     }

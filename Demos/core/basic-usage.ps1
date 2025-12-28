@@ -64,7 +64,7 @@ function Invoke-ApiLens {
     
     # Get the repo root (two levels up from script location)
     $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    $apiLensPath = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net9.0/apilens"
+    $apiLensPath = Join-Path $repoRoot "Solutions/ApiLens.Cli/bin/Debug/net10.0/apilens"
     if ($IsWindows) {
         $apiLensPath += ".exe"
     }
